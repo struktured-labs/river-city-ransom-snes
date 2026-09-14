@@ -24,13 +24,13 @@
       },
       "candidate_manifest_sha256": "12e692293c5a8e58f6f0780e5ba68ad21dbef30e20e8741c586669ac43f9da9e",
       "capture_manifest_sha256": "eaa37947acc434f0a44062f490a128b327642fcff86491810b1a93ef7f97979d",
-      "receipt_sha256": "930c2dac9c267e96d2ef506fca57619d4b48b7ee3317236800c7eaa9fbd32457",
-      "audit_tool_sha256": "439d2c50e5ca835620b25a5870b155dc91df9dd4c4e61ea3e0076c535e7d4689",
+      "receipt_sha256": "09787c7481437eaeddeeb4f6be93c96b03470bbddc0742dd1f2b936c589cb18e",
+      "audit_tool_sha256": "8df43cd874727f016d4a57cf56915a372681e8c903a77bb866ca3154c41a5560",
       "reference_frame": 600,
       "native_frames": 1800,
       "input_profile": "title",
       "synchronized": false,
-      "evidence_sha256": "7565146397bf118c8c0dff694d2cc69a9321d68f47dedf05e31c7ef013bfad7b"
+      "evidence_sha256": "e19ea47135c5990968615b8d17c13d6bcf7f779746fbb8034e42007672128ac6"
     },
     {
       "id": "street",
@@ -53,13 +53,13 @@
       },
       "candidate_manifest_sha256": "12e692293c5a8e58f6f0780e5ba68ad21dbef30e20e8741c586669ac43f9da9e",
       "capture_manifest_sha256": "76590fabb16fcdb25e58facb82fe391d4baf1b7f9cd54e01f406978799fcc22f",
-      "receipt_sha256": "558ac0babe23ae107719f17639f18d9c0c2b22cfd062c066469e3d9c711df336",
-      "audit_tool_sha256": "439d2c50e5ca835620b25a5870b155dc91df9dd4c4e61ea3e0076c535e7d4689",
+      "receipt_sha256": "a8ef9326fed86ee770a8ee732e8b315d287972f1cb50cf8474640f1757216239",
+      "audit_tool_sha256": "8df43cd874727f016d4a57cf56915a372681e8c903a77bb866ca3154c41a5560",
       "reference_frame": 1800,
       "native_frames": 3600,
       "input_profile": "walk",
       "synchronized": false,
-      "evidence_sha256": "8738869b8d5b8af74aa285c1ade11d9c21fa216569a814a7a22cecb984ae98fd"
+      "evidence_sha256": "eca9eb5a667728372331f33cd24c94ca8538346882faa00bdf49769ba04e13d2"
     }
   ],
   "passed": false,
@@ -72,5 +72,6 @@
     "MMC3 PRG pairs assumed",
     "Native renderer supports 8x8 sprites only",
     "No full-game or physical hardware validation"
-  ]
+  ],
+  "collage_sha256": "97fa3865d0b5ff5c0a792950a626db0ffac2033edb3199254460b348c14965c0"
 }

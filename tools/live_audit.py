@@ -75,6 +75,8 @@ def build(candidate, title, walk, core, out):
         for col, key in enumerate(("reference", "actual", "difference")):
             collage.paste(Image.open(site / case[key]), (col * 256, y + 28))
     collage.save(site / "collage.png")
+    document["collage_sha256"] = sha(site / "collage.png")
+    (site / "audit.json").write_text(json.dumps(document, indent=2) + "\n")
     print(site)
 
 

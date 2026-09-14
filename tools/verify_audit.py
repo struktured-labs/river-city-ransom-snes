@@ -5,9 +5,9 @@ import json
 from pathlib import Path
 
 try:
-    from .audit import compare, sha
+    from .audit import compare, sha, page
 except ImportError:
-    from audit import compare, sha
+    from audit import compare, sha, page
 
 
 def verify(site):
@@ -18,6 +18,10 @@ def verify(site):
     document = json.loads((site / "audit.json").read_text())
     if document["schema"] != "rcr-visual-audit-v1" or not document["cases"]:
         raise ValueError("Missing or unsupported audit cases")
+    if sha(site / "collage.png") != document["collage_sha256"]:
+        raise ValueError("Collage changed")
+    if (site / "index.html").read_text() != page(document):
+        raise ValueError("Gallery HTML differs from authenticated case rendering")
     for case in document["cases"]:
         paths = {}
         for key in ("reference", "actual", "difference"):

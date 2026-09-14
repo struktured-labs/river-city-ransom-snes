@@ -9,6 +9,9 @@ This is development evidence, not a finished-port certification.
   coroutine tail hooks and the self-modifying audio operand.
   Gallery tests reject image tampering, forbidden ROM payloads and a false live pass.
   Native assembly tests catch the accumulator-width and unmapped-WRAM regressions.
+- Generated review JavaScript passes save/reload/export contract checks and
+  starts new evidence unreviewed. Gallery integrity also covers the collage and
+  HTML, not only individual screenshots. This is not a browser-layout test.
 - Asset-free native adapter cartridge: executes the production PPU write/read,
   CHR-bank read and register/direct-page preservation code in Snes9x. The positive
   case passes with advancing counters; a deliberately corrupted CHR byte fails

@@ -26,6 +26,12 @@ class VisualControls(unittest.TestCase):
             with self.assertRaises(ValueError):
                 verify(site)
             forbidden.unlink()
+            for name in ("index.html", "collage.png"):
+                original = (site / name).read_bytes()
+                (site / name).write_bytes(original + b"tampered")
+                with self.assertRaises(ValueError):
+                    verify(site)
+                (site / name).write_bytes(original)
             document = json.loads((site / "audit.json").read_text())
             path = site / document["cases"][0]["actual"]
             image = Image.open(path).convert("RGB")

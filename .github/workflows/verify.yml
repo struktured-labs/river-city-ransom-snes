@@ -17,6 +17,7 @@ jobs:
         run: |
           python3 tools/verify_audit.py docs/audit/renderer
           python3 tools/verify_audit.py docs/audit/live
+          node tools/check_review_ui.mjs
       - name: Build pinned instrumented emulator
         run: python3 tools/bootstrap_core.py
       - name: Verify real SNES execution and SPC sound without commercial assets

@@ -1,7 +1,7 @@
 ; Bank-replicated E=1 runtime. DB always mirrors the active HiROM bank ($81-$88).
 ; Hook ABI: $1B20/21 = effective address, $1B22 = write data, $1B24 = read result.
-; CPU proof supports reset/menu PPU writes and MMC3 paired PRG switching.
-; Raster IRQ, game sound and actual SNES PPU publication are subsequent gates.
+; Trace-covered game PPU/APU writes and MMC3 paired PRG switching.
+; Bootstrap publishes graphics/audio; raster IRQ and full mapper fidelity remain open.
 .setcpu "65816"
 .a8
 .i8
