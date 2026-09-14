@@ -6,6 +6,18 @@ collages, exact evidence hashes and human verdicts attached to those hashes.
 
 ## Live game execution — incomplete
 
+Latest: bounded NMI and incremental dirty-row updates. Visible picture changes
+rose from 1.77 to 11.45/second in the scripted walk; game/audio timing is still
+incorrect. See the [timing analysis](../INTERRUPT-VALIDATION.md).
+
+![Incremental NES / SNES / difference collage](incremental/collage.png)
+
+[Latest evidence](incremental/audit.json) ·
+[Baseline pacing](pacing-before.json) · [Incremental pacing](pacing-after.json) ·
+[Latest 12,000-frame soak](incremental-soak.json)
+
+### Previous full-rebuild checkpoint
+
 Original game code runs on the SNES CPU, advances through menus into the street,
 and supplies the SPC700 NES sound engine. These are **not screenshot fixtures**.
 NES and SNES input/frame schedules are not synchronized, and scrolling, raster
@@ -30,12 +42,13 @@ over the top 239 NES rows. This does **not** prove gameplay or timing compatibil
 ## Review and reproduce
 
 GitHub renders these collages privately. Download/open the corresponding
-`live/index.html` or `renderer/index.html`, or use the loopback server in the
+`incremental/index.html`, `live/index.html` or `renderer/index.html`, or use the loopback server in the
 [runbook](../DEVELOPMENT.md), for zoomable images and per-evidence review notes.
 Export review JSON before sharing feedback. GitHub itself does not execute the HTML.
 
 ```sh
 python3 tools/verify_audit.py docs/audit/live
+python3 tools/verify_audit.py docs/audit/incremental
 python3 tools/verify_audit.py docs/audit/renderer
 ```
 

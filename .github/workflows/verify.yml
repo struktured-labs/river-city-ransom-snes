@@ -17,6 +17,7 @@ jobs:
         run: |
           python3 tools/verify_audit.py docs/audit/renderer
           python3 tools/verify_audit.py docs/audit/live
+          python3 tools/verify_audit.py docs/audit/incremental
           node tools/check_review_ui.mjs
       - name: Build pinned instrumented emulator
         run: python3 tools/bootstrap_core.py
@@ -24,3 +25,5 @@ jobs:
         run: python3 tools/smoke_libretro.py --core .deps/snes9x/libretro/snes9x_libretro.so
       - name: Exercise native PPU and CPU register ABI without commercial assets
         run: python3 tools/check_adapter.py --core .deps/snes9x/libretro/snes9x_libretro.so
+      - name: Verify incremental producer, bounded NMI and exact synthetic pixels
+        run: python3 tools/check_video.py --core .deps/snes9x/libretro/snes9x_libretro.so

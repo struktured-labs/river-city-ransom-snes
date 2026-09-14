@@ -54,8 +54,11 @@ def stub(opcode, operand, entry, resume=None, dynamic_apu=False):
         # Captured RCR PPUCTRL values use no SNES IRQ-enable bits ($10/$20).
         # The game also continues its menu/main tasks inside NMI handlers.
         # Always allow the NEXT NMI; only suppress an immediate same-VBlank one.
-        return data + b"\x08\x48\x29\x80\xf0\x05\xad\x12\x42\x30\xfb\x68\x28\x8d\x00\x42\x4c" + word(resume)
-    return (data + b"\x08\x48\xad\x20\x1c\x29\x80\xf0\x0d"
+        # Inside an active game NMI, leave hardware NMI masked except for the
+        # explicit FC60 coroutine wait (task $0100 == 0). No extra return frame.
+        guard = b"\x08\x48\xad\x0a\x1c\xf0\x0a\xad\x00\x01\xf0\x05\x68\x28\x4c" + word(resume)
+        return data + guard + b"\x68\x48\x29\x80\xf0\x05\xad\x12\x42\x30\xfb\x68\x28\x8d\x00\x42\x4c" + word(resume)
+    return (data + b"\x08\x48\xad\x0a\x1c\xd0\x14\xad\x20\x1c\x29\x80\xf0\x0d"
             + b"\xad\x12\x42\x30\xfb\xad\x20\x1c\x29\x80\x8d\x00\x42\x68\x28\x60")
 
 
@@ -73,7 +76,12 @@ def build(rom_path, traces, out):
     colors = [(rgb[i] >> 3) | ((rgb[i + 1] >> 3) << 5) | ((rgb[i + 2] >> 3) << 10) for i in range(0, 192, 3)]
     (out / "native_palette.inc").write_text(".word " + ",".join(f"${n:04X}" for n in colors) + "\n")
     for name in ("native_boot", "native_runtime"):
-        subprocess.run([str(ROOT / ".deps/cc65/bin/ca65"), "-g", "--bin-include-dir", str(ROOT / ".deps/upernes/source/asm"), "-I", str(out), "-o", str(out / (name + ".o")),
+        defines = []
+        if name == "native_runtime":
+            boot_symbols = {line.split()[2].lstrip("."): int(line.split()[1], 16)
+                            for line in (out / "native_boot.lbl").read_text().splitlines()}
+            defines = ["-D", f'video_prepare_bridge={boot_symbols["video_prepare_bridge"]}']
+        subprocess.run([str(ROOT / ".deps/cc65/bin/ca65"), *defines, "-g", "--bin-include-dir", str(ROOT / ".deps/upernes/source/asm"), "-I", str(out), "-o", str(out / (name + ".o")),
                         str(ROOT / "snes" / (name + ".asm"))], check=True)
         subprocess.run([str(ROOT / ".deps/cc65/bin/ld65"), "-C", str(ROOT / "snes" / (name + ".cfg")),
                         "-Ln", str(out / (name + ".lbl")), "-o", str(out / (name + ".bin")),
@@ -162,7 +170,11 @@ def build(rom_path, traces, out):
               "spc_sha256": deps["upernes"]["audio_sha256"],
               "palette_sha256": hashlib.sha256(rgb).hexdigest(),
               "covered_instructions": len(seen), "patches": patched, "stub_bytes": len(stubs),
-              "limitations": ["Single nametable, no scrolling/raster IRQ translation", "Graphics published every 16 NMIs; timing is not NES-equivalent",
+              "graphics_pipeline": "prepared dirty rows, whole CHR banks and bounded per-NMI DMA",
+              "limits": {"vram_bytes_per_nmi": 2048, "chr_jobs_per_nmi": 1, "row_scan_per_nmi": 32,
+                         "oam_bytes_per_nmi": 544, "cgram_bytes_per_nmi": 64,
+                         "prepared_rows_per_call": 2, "producer_row_scan_per_call": 128},
+              "limitations": ["One selected nametable viewport; no scrolling/raster IRQ translation", "Game and audio pacing still not NES-equivalent; scene-load stalls remain",
                               "SPC game audio present but length/envelope/sweep/DMC fidelity unverified",
                               "Trace-covered hardware accesses only", "MMC3 PRG pairs assumed", "Native renderer supports 8x8 sprites only",
                               "No full-game or physical hardware validation"]}

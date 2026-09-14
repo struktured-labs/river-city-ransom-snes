@@ -1,0 +1,68 @@
+{
+  "schema": "rcr-frame-pacing-v1",
+  "receipt": {
+    "schema": "rcr-emulator-receipt-v1",
+    "emulated_frames": 3600,
+    "video_frames": 3600,
+    "input_profile": "walk",
+    "rom_sha256": "c03c27a625d91c268f6bbbb958db256bf2f8dcf8a06804ee37809dbd340129b1",
+    "core_sha256": "2e05b2f9a24293fbcdd030d8c117d067dda9533025896365685078d07a1a22e5",
+    "harness_sha256": "10113d1571238693170dd0945cf78d095d6c4884a0528a1c97d93e898783bf94",
+    "audio_pcm_sha256": "06cef1bca8a76fdc1d36af6b54e761a100070d211a1756bd1b932d7a57384896",
+    "screenshot_sha256": null,
+    "game_frame_counters": [
+      71,
+      296,
+      490,
+      676,
+      871,
+      1104,
+      1248,
+      1403,
+      1556,
+      1726,
+      1888,
+      2042
+    ],
+    "audio_peak": 924,
+    "sample_rate": 32040.0,
+    "status": "passed",
+    "scope": "NMI progress and adapter fault checks; NOT gameplay/audio/visual fidelity",
+    "cpu": {
+      "pc": "00808e",
+      "a": "001b01",
+      "x": "000000",
+      "y": "000003",
+      "s": "0001fc",
+      "p": "0001b4",
+      "db": "000087",
+      "d": "000000"
+    }
+  },
+  "profile_tool_sha256": "7723538c05f5748e86edeac5c0113820eedc33cd13c92de4eb288be8ad177dee",
+  "measurement_frames": [
+    1801,
+    3600
+  ],
+  "input_profile": "walk",
+  "nmi_per_second": 31.31877777777778,
+  "nmi_gap_display_frames": {
+    "1": 552,
+    "2": 185,
+    "3": 112,
+    "4": 28,
+    "5": 38,
+    "6": 14,
+    "7": 4,
+    "8": 1,
+    "9": 1,
+    "46": 1,
+    "60": 1
+  },
+  "max_nmi_gap_display_frames": 60,
+  "picture_changes_per_second": 1.7696111111111112,
+  "game_tick_changes_per_second": 13.222000000000001,
+  "black_display_frames": 71,
+  "vblank_overrun_seen": null,
+  "host_emulation_seconds": 1.0016584209661232
+}

@@ -1,0 +1,77 @@
+{
+  "schema": "rcr-visual-audit-v1",
+  "kind": "live native execution; NOT synchronized gameplay validation",
+  "notice": "These screenshots come from original game code executing on the SNES CPU. They are NOT static renderer fixtures. CPU progress and adapter faults are checked, but reference and candidate timing/input schedules are not synchronized. Pixel scores expose differences; they do not establish gameplay fidelity. Scrolling, raster IRQs, speed, and audio accuracy remain incomplete.",
+  "cases": [
+    {
+      "id": "menu",
+      "frame": 600,
+      "title": "Live menu: NES frame 600 / SNES frame 1800 (not synchronized)",
+      "reference": "media/menu-nes.png",
+      "actual": "media/menu-snes.png",
+      "difference": "media/menu-difference.png",
+      "rom_sha256": "2098a778f32cadfa886a6dafc59e6f9303342ba9d55d70ed6135bb12402ab4ca",
+      "reference_sha256": "5dd75eee3924da95d19f9fe91662d7467695ba03d2aa218dad96be8c9e4a467b",
+      "actual_sha256": "1a4e22515f4e51790f7a988fdffcc338f7fc9503841a54378019a585d1b4bc94",
+      "difference_sha256": "63224a95a750671a4af98903c11e7a9dc8d512a850eb424fe30f8ea2bd660dfd",
+      "core_sha256": "2e05b2f9a24293fbcdd030d8c117d067dda9533025896365685078d07a1a22e5",
+      "metrics": {
+        "pixels_compared": 61184,
+        "mismatch_pixels": 0,
+        "rgb_max_error": 5,
+        "passed": true,
+        "comparison": "top 239 rows, RGB reduced to 5 bits/channel"
+      },
+      "candidate_manifest_sha256": "7c008c4ff35967e12a9adcae50693b0fa4f24442dbc836d38a314e7138c1c625",
+      "capture_manifest_sha256": "eaa37947acc434f0a44062f490a128b327642fcff86491810b1a93ef7f97979d",
+      "receipt_sha256": "f59da7b96581b493ba4c5ffb1d188520acc581ec2bbab72ed57b54c05c6d9f98",
+      "audit_tool_sha256": "8df43cd874727f016d4a57cf56915a372681e8c903a77bb866ca3154c41a5560",
+      "reference_frame": 600,
+      "native_frames": 1800,
+      "input_profile": "title",
+      "synchronized": false,
+      "evidence_sha256": "497063a7d8d6f1e4b0f8b9e14f5ad103c8084f35e40d4a91cd06c8b306ffed4a"
+    },
+    {
+      "id": "street",
+      "frame": 1800,
+      "title": "Live street: NES frame 1800 / SNES frame 3600 (not synchronized)",
+      "reference": "media/street-nes.png",
+      "actual": "media/street-snes.png",
+      "difference": "media/street-difference.png",
+      "rom_sha256": "2098a778f32cadfa886a6dafc59e6f9303342ba9d55d70ed6135bb12402ab4ca",
+      "reference_sha256": "ed41b117d6283bb02e062dd7fa63f3dc7bb36ded6b3bfb12110d0e8c31598259",
+      "actual_sha256": "18c716e1d09c2924f5fe3546f249d4bc725364fd5f1001f8ce5084b997133d98",
+      "difference_sha256": "089e8e724edcdbc569e33bd632e82a80c07dfb5ba27d2b9d23091c1a0f487a65",
+      "core_sha256": "2e05b2f9a24293fbcdd030d8c117d067dda9533025896365685078d07a1a22e5",
+      "metrics": {
+        "pixels_compared": 61184,
+        "mismatch_pixels": 2474,
+        "rgb_max_error": 255,
+        "passed": false,
+        "comparison": "top 239 rows, RGB reduced to 5 bits/channel"
+      },
+      "candidate_manifest_sha256": "7c008c4ff35967e12a9adcae50693b0fa4f24442dbc836d38a314e7138c1c625",
+      "capture_manifest_sha256": "76590fabb16fcdb25e58facb82fe391d4baf1b7f9cd54e01f406978799fcc22f",
+      "receipt_sha256": "a253b9005d2d47da10afe8fe6932fad96650b8364c21ab692d5c16977283dcf1",
+      "audit_tool_sha256": "8df43cd874727f016d4a57cf56915a372681e8c903a77bb866ca3154c41a5560",
+      "reference_frame": 1800,
+      "native_frames": 3600,
+      "input_profile": "walk",
+      "synchronized": false,
+      "evidence_sha256": "361a77e724da4beda08337029054f5bf4c98f48d3742f5f64fe21418b686c6f1"
+    }
+  ],
+  "passed": false,
+  "release_ready": false,
+  "limitations": [
+    "One selected nametable viewport; no scrolling/raster IRQ translation",
+    "Game and audio pacing still not NES-equivalent; scene-load stalls remain",
+    "SPC game audio present but length/envelope/sweep/DMC fidelity unverified",
+    "Trace-covered hardware accesses only",
+    "MMC3 PRG pairs assumed",
+    "Native renderer supports 8x8 sprites only",
+    "No full-game or physical hardware validation"
+  ],
+  "collage_sha256": "6e31a38a6852d390ebb4f25e296c05310600a89c3e4978601113116f02323390"
+}

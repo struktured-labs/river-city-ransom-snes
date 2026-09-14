@@ -1,6 +1,12 @@
 # Recorded validation — 2026-09-14
 
-## Current native checkpoint
+## Latest incremental interrupt validation
+
+See [the bounded NMI checkpoint](INTERRUPT-VALIDATION.md) for the current
+candidate, asset-free graphics regression and before/after pacing receipts.
+Earlier checkpoints below are historical and do not establish full-speed play.
+
+## Previous native checkpoint
 
 This is development evidence, not a finished-port certification.
 

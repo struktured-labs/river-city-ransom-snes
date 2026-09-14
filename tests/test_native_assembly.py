@@ -27,4 +27,4 @@ class NativeAssembly(unittest.TestCase):
             start = labels["native_color"] - 0x8000
             self.assertEqual(image[start:start + 4], bytes.fromhex("293fc220"))
             self.assertIn(bytes.fromhex("9f00307e"), image)
-            self.assertIn(bytes.fromhex("9f00387e"), image)
+            self.assertIn(bytes.fromhex("9f00507e"), image)

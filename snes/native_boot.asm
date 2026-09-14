@@ -35,6 +35,31 @@ reset:
     sta f:$7F0000,x
     inx
     bne @clear
+    ldx #0
+    lda #$FF
+@cache:
+    sta $1DA0,x
+    inx
+    cpx #24
+    bne @cache
+    stz $2105
+    stz $2106
+    stz $210B
+    stz $210C
+    stz $2123
+    stz $2124
+    stz $2125
+    stz $212E
+    stz $212F
+    lda #$20
+    sta $2107
+    lda #2
+    sta $2101
+    stz $210D
+    stz $210D
+    lda #$FF
+    sta $210E
+    sta $210E
     jsr spc_upload
     bcc :+
     lda #$EE
@@ -81,8 +106,7 @@ nmi:
     bne :+
     inc $1C05
 :
-    ; Initial visual integration samples every 16 NMIs. It is explicitly a
-    ; slow publication path until incremental VRAM updates replace this gate.
+    ; Bounded prepared-data consumer runs on every game NMI, before game code.
     jsr publish_video
     pla
     jml [$1C00]
@@ -105,6 +129,7 @@ publish_video:
     lda #0
     pha
     plb
+    jsr native_video
     jsr spc_frame
     bcc :+
     lda #$EE
@@ -112,13 +137,6 @@ publish_video:
 :
     lda #$20
     sta $0A16
-    lda $1C04
-    and #$0F
-    bne @no_video
-    rep #$20
-    .a16
-    jsr native_video
-@no_video:
     sep #$30
     .a8
     .i8
@@ -131,6 +149,41 @@ publish_video:
     pla
     plp
     rts
+video_prepare_bridge:
+    ; Producer called by hardware adapter with E=1 and NMI disabled.
+    php
+    pha
+    phx
+    phy
+    phd
+    phb
+    clc
+    xce
+    rep #$30
+    .a16
+    .i16
+    lda #$1E00
+    tcd
+    sep #$20
+    .a8
+    lda #0
+    pha
+    plb
+    rep #$20
+    .a16
+    jsr native_prepare
+    sep #$30
+    .a8
+    .i8
+    sec
+    xce
+    plb
+    pld
+    ply
+    plx
+    pla
+    plp
+    rtl
 irq:
     pha
     lda $4211
@@ -141,6 +194,7 @@ native_interrupt:
     rti
 .i16
 .include "native_video.asm"
+.include "native_prepare.asm"
 .include "native_audio.asm"
 .segment "HEADER"
     .byte "RCR NATIVE CPU PROOF "

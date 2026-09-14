@@ -24,6 +24,8 @@ Implemented:
 - Authenticated FCEUX instruction/hardware/RAM-code traces and screenshot captures.
 - Trace-covered native CPU hooks, bank switching, RCR coroutine NMI adapters,
   PPU shadow/CHR reads, original-tile rendering, controller input and game APU transport.
+- Incremental dirty-row publication, bounded VBlank DMA, and an asset-free
+  two-generation graphics regression cartridge (background, sprites and bank switch).
 - Hash-bound visual comparisons, negative controls, human review notes and receipts.
 
 See [recorded validation](docs/VALIDATION.md), [research](docs/RESEARCH.md),

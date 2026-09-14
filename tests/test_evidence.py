@@ -119,6 +119,12 @@ class NativeControls(unittest.TestCase):
                 check_native(bad)
         with self.assertRaises(RuntimeError):
             check_native(b"")
+        with self.assertRaises(RuntimeError):
+            check_native(bytes(0x1C47))
+        ram[0x1C79] = 1
+        ram[0x1C7B] = 1
+        with self.assertRaisesRegex(RuntimeError, "exceeded VBlank"):
+            check_native(ram)
 
     def test_coroutine_enable_is_tail_hook_without_extra_return_frame(self):
         code = stub(0x8D, 0x2000, 0x2000, resume=0xFC70)

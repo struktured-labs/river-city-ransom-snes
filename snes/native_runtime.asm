@@ -150,6 +150,7 @@ ppu_write:
     jmp done
 @mask:
     sta a:$1C21
+    jsl $C00000+video_prepare_bridge
     jmp done
 @oamaddr:
     sta a:$1C23
@@ -182,9 +183,58 @@ ppu_write:
     jsr ppu_pointer
     lda $22
     sta [$00]
+    jsr mark_ppu_dirty
     jsr ppu_increment
     inc a:$1C09
     jmp done
+
+mark_ppu_dirty:
+    lda a:$1C27
+    cmp #$20
+    bcc @end
+    cmp #$30
+    bcs @end
+    and #3
+    cmp #3
+    bne @tile
+    lda a:$1C26
+    cmp #$C0
+    bcc @tile
+    and #$38
+    lsr
+    sta $04
+    lda a:$1C27
+    and #$0C
+    asl
+    asl
+    asl
+    ora $04
+    tax
+    lda #1
+    sta a:$1D00,x
+    sta a:$1D01,x
+    sta a:$1D02,x
+    sta a:$1D03,x
+    rts
+@tile:
+    lda a:$1C27
+    and #$0F
+    asl
+    asl
+    asl
+    sta $04
+    lda a:$1C26
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    ora $04
+    tax
+    lda #1
+    sta a:$1D00,x
+@end:
+    rts
 
 dispatch_read:
     jsr trace_caller
@@ -391,6 +441,7 @@ nmi_task_return:
     sta a:$1C20
     stz $4200
     stz a:$1C25
+    jsl $C00000+video_prepare_bridge
     dec a:$1C0A
     pla
     pla
@@ -401,6 +452,10 @@ nmi_task_return:
     rts
 
 nmi_rti_return:
+    stz $4200
+    ; Prepare the next frame after original game updates, not in the bounded
+    ; SNES VBlank consumer. The bridge preserves the saved NES interrupt frame.
+    jsl $C00000+video_prepare_bridge
     pla
     tay
     pla

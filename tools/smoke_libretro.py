@@ -33,13 +33,15 @@ class AVInfo(C.Structure):
 
 def check_native(ram, previous=None):
     """Fail on adapter faults/reset, not just missing emulator callbacks."""
-    if len(ram) < 0x1C47:
+    if len(ram) < 0x1C7C:
         raise RuntimeError("Missing native runtime WRAM")
     counter = int.from_bytes(ram[0x1C04:0x1C06], "little")
     if ram[0x1C06] or ram[0x1C0B]:
         raise RuntimeError("Native adapter reported unknown I/O or SPC timeout")
     if ram[0x1C0A] > 1:
         raise RuntimeError("Native NMI nesting/stack invariant failed")
+    if ram[0x1C79] == 1 and ram[0x1C7B]:
+        raise RuntimeError("Native PPU publisher exceeded VBlank")
     if previous is not None and counter <= previous:
         raise RuntimeError("Native NMI counter stalled or reset")
     return counter

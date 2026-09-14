@@ -1,0 +1,33 @@
+{
+  "schema": "rcr-emulator-receipt-v1",
+  "emulated_frames": 1800,
+  "video_frames": 1800,
+  "input_profile": "title",
+  "rom_sha256": "2098a778f32cadfa886a6dafc59e6f9303342ba9d55d70ed6135bb12402ab4ca",
+  "core_sha256": "2e05b2f9a24293fbcdd030d8c117d067dda9533025896365685078d07a1a22e5",
+  "harness_sha256": "10113d1571238693170dd0945cf78d095d6c4884a0528a1c97d93e898783bf94",
+  "audio_pcm_sha256": "1bd442e0a7aa49990519613e6f6c7b2a09faa9048e03a4eec371f4f688133a29",
+  "screenshot_sha256": "1a4e22515f4e51790f7a988fdffcc338f7fc9503841a54378019a585d1b4bc94",
+  "game_frame_counters": [
+    69,
+    274,
+    539,
+    807,
+    1073,
+    1341
+  ],
+  "audio_peak": 1976,
+  "sample_rate": 32040.0,
+  "status": "passed",
+  "scope": "NMI progress and adapter fault checks; NOT gameplay/audio/visual fidelity",
+  "cpu": {
+    "pc": "c7f4c0",
+    "a": "000000",
+    "x": "000000",
+    "y": "000008",
+    "s": "0001fb",
+    "p": "000136",
+    "db": "000087",
+    "d": "000000"
+  }
+}

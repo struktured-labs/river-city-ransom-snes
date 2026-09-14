@@ -35,8 +35,23 @@ uses explicit long WRAM addresses, not unmapped bank-zero $3000–3FFF.
 
 ## Current limits
 
-The native publisher updates every 16 game NMIs and can force blank for large
-CHR transfers. Its speed is not NES-equivalent. It selects one nametable, lacks
+The incremental publisher replaces the old every-16-NMI full rebuild. PPUDATA
+writes dirty individual rows (attribute writes dirty four). Preparation converts
+at most two rows per call and stages palette, OAM and CHR descriptors. It runs
+with NMI masked from the original game's NMI return adapters and PPUMASK hook;
+this is not yet an independent asynchronous main-loop renderer.
+
+The SNES NMI consumer performs no tile conversion, forced blank or VBlank spin.
+It limits VRAM DMA to 2,048 bytes and one CHR job, scans at most 32 row flags,
+then publishes 544 OAM bytes and 64 CGRAM bytes. Rotating cursors prevent late
+rows/banks from starving. Beam-position checks defer work, and a sticky overrun
+flag makes the emulator harness fail. Individual OBJ banks transfer whole.
+Register widths, DB, direct page and the original emulation-mode stack are
+restored. Hardware hooks suppress nested NMI enables except the game's explicit
+coroutine wait. SPC transport follows the bounded PPU work; its timing remains
+separate unfinished work.
+
+Its speed is not NES-equivalent. It selects one nametable, lacks
 scroll/raster IRQ translation and native 8×16 sprite support, and assumes paired
 MMC3 PRG switches. Mirroring, clipping, emphasis, sprite edge cases and mapper
 mode changes need fuller implementation. IRQ activity is counted, not serviced.

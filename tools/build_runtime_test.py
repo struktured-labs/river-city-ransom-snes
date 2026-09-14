@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def build(out):
     out.mkdir(parents=True, exist_ok=True)
     ca65, ld65 = [str(ROOT / ".deps/cc65/bin" / name) for name in ("ca65", "ld65")]
-    subprocess.run([ca65, "-g", "-o", str(out / "runtime.o"), str(ROOT / "snes/native_runtime.asm")], check=True)
+    subprocess.run([ca65, "-D", "video_prepare_bridge=32768", "-g", "-o", str(out / "runtime.o"), str(ROOT / "snes/native_runtime.asm")], check=True)
     subprocess.run([ld65, "-C", str(ROOT / "snes/native_runtime.cfg"), "-Ln", str(out / "runtime.lbl"),
                     "-o", str(out / "runtime.bin"), str(out / "runtime.o")], check=True)
     symbols = {line.split()[2].lstrip("."): int(line.split()[1], 16)

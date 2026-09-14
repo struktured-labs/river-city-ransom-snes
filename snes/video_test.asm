@@ -1,0 +1,197 @@
+; Asset-free producer/NMI consumer test: red BG tile and blue OBJ tile.
+.setcpu "65816"
+.a8
+.i16
+.segment "CODE"
+reset:
+    sei
+    clc
+    xce
+    rep #$38
+    .a16
+    lda #0
+    tcd
+    ldx #$1FFF
+    txs
+    sep #$20
+    .a8
+    pha
+    plb
+    stz $4200
+    stz $420B
+    stz $420C
+    lda #$80
+    sta $2100
+    ldx #0
+@clear:
+    lda #0
+    sta f:$7E0000,x
+    sta f:$7F0000,x
+    inx
+    bne @clear
+    stz $2105
+    stz $210B
+    stz $210C
+    stz $212C
+    stz $212D
+    stz $2130
+    stz $2131
+    lda #4
+    sta $2133
+    lda #$20
+    sta $2107
+    lda #2
+    sta $2101
+    stz $210D
+    stz $210D
+    lda #$FF
+    sta $210E
+    sta $210E
+    ldx #0
+@cache:
+    sta $1DA0,x
+    inx
+    cpx #24
+    bne @cache
+    ldx #0
+@hide:
+    sta $1000,x
+    inx
+    inx
+    inx
+    inx
+    cpx #256
+    bne @hide
+    lda #15
+    sta $1000
+    lda #1
+    sta $1001
+    lda #16
+    sta $1003
+    lda #8
+    sta $1C20
+    lda #$18
+    sta $1C21
+    lda #1
+    sta f:$7F2000
+    sta f:$7F3F01
+    sta $1D00
+    lda #2
+    sta f:$7F3F11
+    rep #$20
+    .a16
+    lda #$1E00
+    tcd
+    jsr native_prepare
+    sep #$20
+    .a8
+    lda #5
+    sta $1C61
+    lda #$80
+    sta $4200
+@wait:
+    lda $1C04
+    cmp #60
+    bcc @wait
+    lda $1C7B
+    bne failed
+    lda $1D00
+    bne failed
+    ; Second generation: nonadjacent dirty rows and moved OAM must drain too.
+    stz $4200
+    lda #1
+    sta f:$7F20E0
+    sta f:$7F2300
+    sta $1D07
+    sta $1D18
+    lda #32
+    sta $1003
+    lda #$18
+    sta $1C20
+    rep #$20
+    .a16
+    jsr native_prepare
+    sep #$20
+    .a8
+    lda #6
+    sta $1C61
+    lda #$80
+    sta $4200
+@wait_second:
+    lda $1C04
+    cmp #120
+    bcs @ready_second
+    wai
+    stz $4200
+    rep #$20
+    .a16
+    jsr native_prepare
+    sep #$20
+    .a8
+@outside_blank:
+    lda $4212
+    bmi @outside_blank
+    lda #$80
+    sta $4200
+    bra @wait_second
+@ready_second:
+    lda $1C7B
+    bne failed
+    lda $1D07
+    ora $1D18
+    bne failed
+    ldx #0
+@queue:
+    lda $1D80,x
+    bne failed
+    inx
+    cpx #24
+    bne @queue
+    lda #1
+    sta $1C60
+@idle:
+    wai
+    bra @idle
+failed:
+    lda #$EE
+    sta $1C60
+    bra failed
+nmi:
+    rep #$30
+    .a16
+    pha
+    phx
+    phy
+    phd
+    phb
+    lda #$1E00
+    tcd
+    sep #$20
+    .a8
+    lda #0
+    pha
+    plb
+    lda $4210
+    jsr native_video
+    rep #$20
+    .a16
+    inc $1C04
+    inc $1C62
+    plb
+    pld
+    ply
+    plx
+    pla
+    rti
+interrupt:
+    rti
+.include "native_video.asm"
+.include "native_prepare.asm"
+.segment "HEADER"
+    .byte "RCR NMI VIDEO TEST  "
+    .byte $20
+    .byte $21,$00,$0B,$00,$01,$00,$00
+    .word $FFFF,0
+.segment "VECTORS"
+    .word 0,0,interrupt,interrupt,interrupt,nmi,0,interrupt
+    .word 0,0,interrupt,0,nmi,nmi,reset,interrupt
