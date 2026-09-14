@@ -1,0 +1,76 @@
+{
+  "schema": "rcr-visual-audit-v1",
+  "kind": "live native execution; NOT synchronized gameplay validation",
+  "notice": "These screenshots come from original game code executing on the SNES CPU. They are NOT static renderer fixtures. CPU progress and adapter faults are checked, but reference and candidate timing/input schedules are not synchronized. Pixel scores expose differences; they do not establish gameplay fidelity. Scrolling, raster IRQs, speed, and audio accuracy remain incomplete.",
+  "cases": [
+    {
+      "id": "menu",
+      "frame": 600,
+      "title": "Live menu: NES frame 600 / SNES frame 1800 (not synchronized)",
+      "reference": "media/menu-nes.png",
+      "actual": "media/menu-snes.png",
+      "difference": "media/menu-difference.png",
+      "rom_sha256": "c03c27a625d91c268f6bbbb958db256bf2f8dcf8a06804ee37809dbd340129b1",
+      "reference_sha256": "5dd75eee3924da95d19f9fe91662d7467695ba03d2aa218dad96be8c9e4a467b",
+      "actual_sha256": "f95ebc9d88e4e3a0bcd5438d7356057e71eaac94c00ae1ad6883bb8905db2675",
+      "difference_sha256": "86728ef10ef97e1a7b8440f1e43d52420230ff8d9257cd885c767735b3107b82",
+      "core_sha256": "2e05b2f9a24293fbcdd030d8c117d067dda9533025896365685078d07a1a22e5",
+      "metrics": {
+        "pixels_compared": 61184,
+        "mismatch_pixels": 16,
+        "rgb_max_error": 231,
+        "passed": false,
+        "comparison": "top 239 rows, RGB reduced to 5 bits/channel"
+      },
+      "candidate_manifest_sha256": "12e692293c5a8e58f6f0780e5ba68ad21dbef30e20e8741c586669ac43f9da9e",
+      "capture_manifest_sha256": "eaa37947acc434f0a44062f490a128b327642fcff86491810b1a93ef7f97979d",
+      "receipt_sha256": "930c2dac9c267e96d2ef506fca57619d4b48b7ee3317236800c7eaa9fbd32457",
+      "audit_tool_sha256": "439d2c50e5ca835620b25a5870b155dc91df9dd4c4e61ea3e0076c535e7d4689",
+      "reference_frame": 600,
+      "native_frames": 1800,
+      "input_profile": "title",
+      "synchronized": false,
+      "evidence_sha256": "7565146397bf118c8c0dff694d2cc69a9321d68f47dedf05e31c7ef013bfad7b"
+    },
+    {
+      "id": "street",
+      "frame": 1800,
+      "title": "Live street: NES frame 1800 / SNES frame 3600 (not synchronized)",
+      "reference": "media/street-nes.png",
+      "actual": "media/street-snes.png",
+      "difference": "media/street-difference.png",
+      "rom_sha256": "c03c27a625d91c268f6bbbb958db256bf2f8dcf8a06804ee37809dbd340129b1",
+      "reference_sha256": "ed41b117d6283bb02e062dd7fa63f3dc7bb36ded6b3bfb12110d0e8c31598259",
+      "actual_sha256": "ad5b7c73e4e96000e21566d0b7f7943f90470c5745a661642b97571d42350cde",
+      "difference_sha256": "ced1fb89edd724537d68158cf5a647ea9f2f02b348ba3dee422678c2202de5aa",
+      "core_sha256": "2e05b2f9a24293fbcdd030d8c117d067dda9533025896365685078d07a1a22e5",
+      "metrics": {
+        "pixels_compared": 61184,
+        "mismatch_pixels": 3134,
+        "rgb_max_error": 255,
+        "passed": false,
+        "comparison": "top 239 rows, RGB reduced to 5 bits/channel"
+      },
+      "candidate_manifest_sha256": "12e692293c5a8e58f6f0780e5ba68ad21dbef30e20e8741c586669ac43f9da9e",
+      "capture_manifest_sha256": "76590fabb16fcdb25e58facb82fe391d4baf1b7f9cd54e01f406978799fcc22f",
+      "receipt_sha256": "558ac0babe23ae107719f17639f18d9c0c2b22cfd062c066469e3d9c711df336",
+      "audit_tool_sha256": "439d2c50e5ca835620b25a5870b155dc91df9dd4c4e61ea3e0076c535e7d4689",
+      "reference_frame": 1800,
+      "native_frames": 3600,
+      "input_profile": "walk",
+      "synchronized": false,
+      "evidence_sha256": "8738869b8d5b8af74aa285c1ade11d9c21fa216569a814a7a22cecb984ae98fd"
+    }
+  ],
+  "passed": false,
+  "release_ready": false,
+  "limitations": [
+    "Single nametable, no scrolling/raster IRQ translation",
+    "Graphics published every 16 NMIs; timing is not NES-equivalent",
+    "SPC game audio present but length/envelope/sweep/DMC fidelity unverified",
+    "Trace-covered hardware accesses only",
+    "MMC3 PRG pairs assumed",
+    "Native renderer supports 8x8 sprites only",
+    "No full-game or physical hardware validation"
+  ]
+}

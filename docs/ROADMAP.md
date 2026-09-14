@@ -6,16 +6,17 @@ not completion of that outcome.
 
 1. **Implemented: foundation.** Strict original-ROM profile, lossless tiles,
    reproducible assembly, SNES boot and SPC pulse diagnostic, data tests.
-2. **Needs original ROM: program map.** Record reset/NMI/IRQ, decode reachable
+2. **Partially implemented: program map.** Original US ROM located on Bluemage;
+   authenticated title/street traces drive 178 hardware/RAM-code patches. Record reset/NMI/IRQ, decode reachable
    code in all 16 PRG banks, identify banked data and indirect call tables.
    Inventory PPU/APU/controller/MMC3 reads and writes with traces. Rebuild the
    unmodified NES image byte-for-byte before changing instructions.
-3. **Native boot and title.** Choose game memory map, implement bank switching,
+3. **Implemented experimentally: native boot and title.** Choose game memory map, implement bank switching,
    interrupt adapters, hardware access hooks, tile/palette/OAM upload and input.
    Match the original title with original assets and timing.
-4. **Playable slice.** Match street scrolling, HUD split, two players, enemies,
+4. **Street reached; incomplete slice.** Match street scrolling, HUD split, two players, enemies,
    shops and transitions. Preserve original sprite data, animation and controls.
-5. **Game audio.** Route original audio-driver writes through an event-aware APU
+5. **Game audio transport implemented; fidelity open.** Route original audio-driver writes through an event-aware APU
    bridge. Verify both pulses, triangle, noise, length/envelopes/sweep, silence
    and any DMC usage. Evaluate the Myself086/newer engine with matching protocol.
 6. **Full-game validation and patch.** Play through with deterministic input,

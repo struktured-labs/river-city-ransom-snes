@@ -58,9 +58,11 @@ engine is the SNES-oriented option appropriate to the requested architecture.
 [NES-Games-Disassembly](https://github.com/cyneprepou4uk/NES-Games-Disassembly)
 lists River City Ransom in WIP with whole-file CRC C3508F7E. Inspection of its
 current main tree and branch list found no River City Ransom source directory.
-A WIP README entry is not available source. The local workspace and project
-filename search also did not locate an RCR ROM. Actual vectors and game code
-must be extracted from the user's original copy before gameplay porting.
+A WIP README entry is not available source. Following the user's direction,
+their US ROM was located on Bluemage (MiSTer) and copied to ignored local storage.
+Its SHA-256 is `b95f8def04c0012604b7cc68cf4ed8f49b2dfe4beda6182051de4b2423bea7b1`.
+Measured vectors are NMI FF4F, reset FF76 and IRQ F1D9. The trace-derived native
+integration is documented in [NATIVE.md](NATIVE.md).
 
 ## Implementation decisions
 
@@ -70,10 +72,9 @@ flipping and palette selections when the renderer is implemented. Palette RGB
 conversion needs a documented reference because NES composite colour has no
 unique lossless RGB equivalent. Do not introduce replacement art or MSU music.
 
-The final game layout remains undecided pending PRG analysis. The diagnostic's
-single-bank LoROM is only a hardware test. Determine RCR's actual MMC3 PRG mode,
-bank pairs, CHR mode, mirroring writes and IRQ schedule from code and runtime
-traces before choosing fixed-bank replication versus WRAM mapping.
+The current experiment uses fixed-bank replication in HiROM with eight selectable
+16 KiB PRG pairs. The diagnostic's single-bank LoROM remains a separate hardware
+test. Full MMC3 mode/mirroring/IRQ coverage still needs broader runtime traces.
 
 PPU scroll/address latches, buffered reads, attribute quadrants, OAM conversion,
 8x16 sprite addressing and split-screen timing need dedicated implementations.

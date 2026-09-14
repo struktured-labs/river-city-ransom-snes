@@ -1,0 +1,50 @@
+diff --git a/cpuexec.cpp b/cpuexec.cpp
+index aa43b2f..d594dd6 100644
+--- a/cpuexec.cpp
++++ b/cpuexec.cpp
+@@ -135,6 +135,22 @@ void S9xMainLoop (void)
+ 			break;
+ 		}
+ 
++		if (Registers.PCw == 0xff4f || Registers.PCw == 0xff61 || Registers.PCw == 0xf1d3 ||
++            Registers.PCw == 0xf168 || Registers.PCw == 0xf103 || Registers.PCw == 0xf12b ||
++            Registers.PCw == 0xfc60 || Registers.PCw == 0xff76 || Registers.PCw == 0xf223 ||
++            Registers.PCw == 0xfed1 || Registers.PCw == 0xfa54 || Registers.PCw == 0xfa5f ||
++            Registers.PCw == 0xfa60 || Registers.PCw == 0xfa63 ||
++            (Memory.RAM[0x1c04] == 0x6b && Memory.RAM[0x1c05] == 0))
++        {
++            static FILE *rcr_trace = getenv("RCR_NATIVE_TRACE") ? fopen(getenv("RCR_NATIVE_TRACE"), "w") : NULL;
++            if (rcr_trace) {
++                fprintf(rcr_trace, "%06x A=%04x X=%04x Y=%04x S=%04x P=%04x D=%04x DB=%02x task=%02x guard=%02x depth=%02x frame=%04x\n",
++                        Registers.PBPC, Registers.A.W, Registers.X.W, Registers.Y.W, Registers.S.W,
++                        Registers.P.W, Registers.D.W, Registers.DB, Memory.RAM[0x100], Memory.RAM[0x107],
++                        Memory.RAM[0x1c0a], Memory.RAM[0x1c04] | Memory.RAM[0x1c05] << 8);
++                fflush(rcr_trace);
++            }
++        }
+ 		uint8				Op;
+ 		struct	SOpcodes	*Opcodes;
+ 
+diff --git a/libretro/libretro.cpp b/libretro/libretro.cpp
+index 6060767..fd912ae 100644
+--- a/libretro/libretro.cpp
++++ b/libretro/libretro.cpp
+@@ -2169,3 +2169,18 @@ void S9xAutoSaveSRAM()
+ {
+     return;
+ }
++
++extern "C" unsigned retro_rcr_cpu_register(unsigned index)
++{
++    switch (index) {
++        case 0: return Registers.PBPC;
++        case 1: return Registers.A.W;
++        case 2: return Registers.X.W;
++        case 3: return Registers.Y.W;
++        case 4: return Registers.S.W;
++        case 5: return Registers.P.W;
++        case 6: return Registers.DB;
++        case 7: return Registers.D.W;
++        default: return 0;
++    }
++}

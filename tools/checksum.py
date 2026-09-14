@@ -1,12 +1,15 @@
-"""Finalize/check a 32 KiB diagnostic LoROM; does not accept arbitrary games."""
+"""Finalize/check the project's power-of-two LoROM test images."""
 import argparse
 from pathlib import Path
 import struct
 
 
 def verify(data):
-    if len(data) != 32768 or data[0x7fd5:0x7fd8] != bytes((0x20, 0, 5)):
-        raise ValueError("Expected the 32 KiB LoROM diagnostic")
+    size = len(data)
+    if size < 32768 or size > 4194304 or size & (size - 1):
+        raise ValueError("Expected a power-of-two LoROM image, 32 KiB to 4 MiB")
+    if data[0x7fd5:0x7fd8] != bytes((0x20, 0, size.bit_length() - 11)):
+        raise ValueError("LoROM header size does not match image")
     complement, checksum = struct.unpack_from("<HH", data, 0x7fdc)
     if checksum ^ complement != 0xffff or sum(data) & 0xffff != checksum:
         raise ValueError("Invalid SNES checksum")
@@ -16,8 +19,8 @@ def verify(data):
 
 
 def finalize(data):
-    if len(data) != 32768:
-        raise ValueError("Expected exactly 32 KiB")
+    if len(data) < 32768:
+        raise ValueError("Truncated LoROM")
     result = bytearray(data)
     result[0x7fdc:0x7fe0] = b"\xff\xff\0\0"
     checksum = sum(result) & 0xffff

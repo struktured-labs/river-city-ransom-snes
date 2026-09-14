@@ -1,0 +1,81 @@
+{
+  "schema": "rcr-visual-audit-v1",
+  "kind": "renderer fixtures, not gameplay validation",
+  "source_rom_sha256": "b95f8def04c0012604b7cc68cf4ed8f49b2dfe4beda6182051de4b2423bea7b1",
+  "capture_manifest_sha256": "eaa37947acc434f0a44062f490a128b327642fcff86491810b1a93ef7f97979d",
+  "cases": [
+    {
+      "id": "renderer-frame-120",
+      "frame": 120,
+      "title": "Original frame 120 \u2192 native SNES renderer fixture",
+      "reference": "media/nes-00120.png",
+      "actual": "media/snes-00120.png",
+      "difference": "media/difference-00120.png",
+      "rom_sha256": "13229817dc177470864969732f60bbcc4c4e15876d88f886376d73b96ec51242",
+      "reference_sha256": "c191c9423292e5c180c96f35a7aae1e8943f34c1934adda802407ab468b8c7b9",
+      "actual_sha256": "97571a5b801e55bfc165022746a8ba88d7e807f329a9476f2615e0a0de357028",
+      "difference_sha256": "63224a95a750671a4af98903c11e7a9dc8d512a850eb424fe30f8ea2bd660dfd",
+      "core_sha256": "2e05b2f9a24293fbcdd030d8c117d067dda9533025896365685078d07a1a22e5",
+      "metrics": {
+        "pixels_compared": 61184,
+        "mismatch_pixels": 0,
+        "rgb_max_error": 3,
+        "passed": true,
+        "comparison": "top 239 rows, RGB reduced to 5 bits/channel"
+      },
+      "receipt_sha256": "73cee82c0f96be6aa1434764a9c5153981620ea7c4a32b97e844bfb7d4bce65d",
+      "audit_tool_sha256": "dd001c42195bc4a5bb19ca16769c0fc54e8bb587b9b929e77f99b0a9bd1bdb1d",
+      "fixture_manifest_sha256": "734b65dd71e82d515945a908b76ee7b8743fcac93e3977af781d9d40d5345abe",
+      "evidence_sha256": "2b7c8fd722605c4ba1560eeaddf91b380bd23937facd85e048b673fbd8a613ed"
+    },
+    {
+      "id": "renderer-frame-300",
+      "frame": 300,
+      "title": "Original frame 300 \u2192 native SNES renderer fixture",
+      "reference": "media/nes-00300.png",
+      "actual": "media/snes-00300.png",
+      "difference": "media/difference-00300.png",
+      "rom_sha256": "5ce4228091168e69821c30af74b4a7cfdd6d3ac2f98c534b4a4742646b8cfc9d",
+      "reference_sha256": "17027f97754a158b3a6724efc5f33f112b774c7bc6ed7445ba572370b76243d6",
+      "actual_sha256": "f95ebc9d88e4e3a0bcd5438d7356057e71eaac94c00ae1ad6883bb8905db2675",
+      "difference_sha256": "63224a95a750671a4af98903c11e7a9dc8d512a850eb424fe30f8ea2bd660dfd",
+      "core_sha256": "2e05b2f9a24293fbcdd030d8c117d067dda9533025896365685078d07a1a22e5",
+      "metrics": {
+        "pixels_compared": 61184,
+        "mismatch_pixels": 0,
+        "rgb_max_error": 5,
+        "passed": true,
+        "comparison": "top 239 rows, RGB reduced to 5 bits/channel"
+      },
+      "receipt_sha256": "bbe22f919ff5fef21a5e1ddf6c047cde4d662e2e0b81323447223c454d928b0f",
+      "audit_tool_sha256": "dd001c42195bc4a5bb19ca16769c0fc54e8bb587b9b929e77f99b0a9bd1bdb1d",
+      "fixture_manifest_sha256": "083b9e916c005a0be8c3b219a41ea18cfe70adbcb504eacd914a364da6741da6",
+      "evidence_sha256": "04151ce47e88efce6cd47336dfaf3657836fe04a65e683db8de3df07fea97597"
+    },
+    {
+      "id": "renderer-frame-600",
+      "frame": 600,
+      "title": "Original frame 600 \u2192 native SNES renderer fixture",
+      "reference": "media/nes-00600.png",
+      "actual": "media/snes-00600.png",
+      "difference": "media/difference-00600.png",
+      "rom_sha256": "e578d139de8d702c6e7ccb38c55e4acfac0aa995f93ab98c33915d86ec510276",
+      "reference_sha256": "5dd75eee3924da95d19f9fe91662d7467695ba03d2aa218dad96be8c9e4a467b",
+      "actual_sha256": "1a4e22515f4e51790f7a988fdffcc338f7fc9503841a54378019a585d1b4bc94",
+      "difference_sha256": "63224a95a750671a4af98903c11e7a9dc8d512a850eb424fe30f8ea2bd660dfd",
+      "core_sha256": "2e05b2f9a24293fbcdd030d8c117d067dda9533025896365685078d07a1a22e5",
+      "metrics": {
+        "pixels_compared": 61184,
+        "mismatch_pixels": 0,
+        "rgb_max_error": 5,
+        "passed": true,
+        "comparison": "top 239 rows, RGB reduced to 5 bits/channel"
+      },
+      "receipt_sha256": "aa894b63ccade221017181d038379581a9523849fde98104465a473b972cebd5",
+      "audit_tool_sha256": "dd001c42195bc4a5bb19ca16769c0fc54e8bb587b9b929e77f99b0a9bd1bdb1d",
+      "fixture_manifest_sha256": "313b16d1840ac44029ab19b39c80aa703b2bd0ba6d344e84e88a7bb1b75241a6",
+      "evidence_sha256": "844a66b6aecaf8f4b755be95c848f04c14968a1eccc289c915c354659d6113a1"
+    }
+  ],
+  "passed": true
+}

@@ -1,0 +1,81 @@
+"""Create a source-ROM-bound NES trace and screenshots in an isolated FCEUX run."""
+import argparse
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import signal
+import subprocess
+
+from PIL import Image
+
+try:
+    from .rom import Rom
+except ImportError:
+    from rom import Rom
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--rom", type=Path, default=ROOT / "roms/river-city-ransom-us.nes")
+    parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--frames", type=int, default=1800)
+    parser.add_argument("--profile", choices=("title", "walk"), default="title")
+    parser.add_argument("--timeout", type=int, default=180)
+    args = parser.parse_args()
+    Rom.parse(args.rom.read_bytes()).require_rcr_us()
+    if not 300 <= args.frames <= 18000:
+        parser.error("frames must be 300..18000")
+    out = args.out.resolve()
+    out.mkdir(parents=True, exist_ok=False)
+    (ROOT / "build").mkdir(exist_ok=True)
+    with (ROOT / "build/emulator.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        env = dict(os.environ, RCR_CAPTURE_DIR=str(out), RCR_CAPTURE_FRAMES=str(args.frames),
+                   RCR_CAPTURE_PROFILE=args.profile, QT_QPA_PLATFORM="xcb")
+        command = ["xvfb-run", "-a", "/usr/games/fceux", "--no-config", "1", "--sound", "0",
+                   "--palette", "/usr/share/fceux/palettes/FCEUX.pal",
+                   "--loadlua", str(ROOT / "tools/trace_nes.lua"), str(args.rom.resolve())]
+        with (out / "emulator.log").open("w") as log:
+            process = subprocess.Popen(command, cwd=out, env=env, stdout=log, stderr=log,
+                                       start_new_session=True)
+            try:
+                status = process.wait(timeout=args.timeout)
+            except BaseException:
+                os.killpg(process.pid, signal.SIGTERM)
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    os.killpg(process.pid, signal.SIGKILL)
+                    process.wait()
+                raise
+        if status or not (out / "complete.json").exists():
+            raise RuntimeError(f"FCEUX capture failed ({status}); see {out / 'emulator.log'}")
+    for source in sorted(out.glob("frame-*.gd")):
+        data = source.read_bytes()
+        if len(data) != 11 + 256 * 240 * 4:
+            raise ValueError(f"Unexpected GD screenshot size: {len(data)}")
+        image = Image.frombytes("RGBA", (256, 240), data[11:], "raw", "ARGB").convert("RGB")
+        image.save(source.with_suffix(".png"))
+    manifest = {
+        "schema": "rcr-nes-capture-v1", "rom_sha256": sha(args.rom),
+        "script_sha256": sha(ROOT / "tools/trace_nes.lua"),
+        "emulator_sha256": sha(Path("/usr/games/fceux")),
+        "palette_sha256": sha(Path("/usr/share/fceux/palettes/FCEUX.pal")),
+        "frames": args.frames, "profile": args.profile,
+        "files": {p.name: sha(p) for p in sorted(out.iterdir()) if p.is_file()},
+    }
+    (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    print(json.dumps({"output": str(out), "rom_sha256": manifest["rom_sha256"],
+                      "screenshots": len(list(out.glob("*.png")))}, indent=2))
+
+
+if __name__ == "__main__":
+    main()

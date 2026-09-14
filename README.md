@@ -4,10 +4,14 @@ Work in progress toward a native SNES port of the US NES game. Preserve the
 original graphics, gameplay, music and effects. Run the game logic on the 65C816,
 translate NES hardware operations, and synthesize NES sound on the SPC700.
 
-**This repository does not yet contain a playable port.** The current executable
-is a hardware/audio diagnostic: a green screen and a sustained NES square wave.
-It boots a real SNES ROM and uploads Memblers' 2A03 sound emulator. Red means the
-SPC handshake timed out. No River City Ransom program or artwork is in this test.
+**Experimental port, not release-ready.** Original game code now boots on the
+SNES CPU, reaches the menus and street, accepts input, and sends game APU writes
+to Memblers' SPC700 NES sound emulator. Scrolling, raster interrupts, timing,
+audio fidelity and full-game compatibility remain incomplete.
+
+Start with the [visual audit and collages](docs/audit/README.md). Renderer fixtures
+and live execution have separate evidence: a static pixel match is never called
+a gameplay pass. ROMs, extracted assets and generated cartridges stay local.
 
 Implemented:
 
@@ -17,10 +21,13 @@ Implemented:
   original pixel indices are unchanged, added bitplanes are zero.
 - 32 KiB LoROM startup, vectors, checksum, bounded SPC upload and frame transfer.
 - Automated data tests and a headless libretro CPU/audio smoke test.
+- Authenticated FCEUX instruction/hardware/RAM-code traces and screenshot captures.
+- Trace-covered native CPU hooks, bank switching, RCR coroutine NMI adapters,
+  PPU shadow/CHR reads, original-tile rendering, controller input and game APU transport.
+- Hash-bound visual comparisons, negative controls, human review notes and receipts.
 
-The MMC3 mapping, game entry points, PPU translation, controller hooks, IRQ/NMI
-bridges and game audio write translation remain to be implemented against the
-original ROM. See [research](docs/RESEARCH.md) and [milestones](docs/ROADMAP.md).
+See [recorded validation](docs/VALIDATION.md), [research](docs/RESEARCH.md),
+[architecture](docs/NATIVE.md) and [milestones](docs/ROADMAP.md).
 
 ## Build the audio diagnostic
 
@@ -29,6 +36,7 @@ cc65 and upernes sources into ignored `.deps/`; it does not install system tools
 
 ```sh
 make bootstrap
+python3 -m pip install -r requirements-dev.txt
 make verify
 ```
 
@@ -52,7 +60,8 @@ Preparation accepts the US PRG CRC32 `78784CBF`, CHR CRC32 `204AA5EB`, mapper 4,
 an existing extraction. Inspection can report other clean iNES 1.0 images;
 preparation rejects unrecognized revisions. ROMs and extracted assets stay local.
 
-`make port` currently fails explicitly: it cannot yet generate the game.
+`make port` still refuses to imply a finished conversion. To reproduce the
+experimental cartridge and audits, follow [the development runbook](docs/DEVELOPMENT.md).
 
 ## References and credit
 
