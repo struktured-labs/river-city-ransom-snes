@@ -1,0 +1,17 @@
+.claude/
+.codex/
+.agents/
+build/
+.deps/
+roms/
+__pycache__/
+*.pyc
+*.nes
+*.sfc
+*.smc
+*.spc
+*.brr
+*.bin
+*.wav
+*.sav
+

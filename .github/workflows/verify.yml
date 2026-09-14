@@ -1,0 +1,13 @@
+name: Verify foundation
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pinned dependencies
+        run: make bootstrap
+      - name: Assemble diagnostic and verify data conversion
+        run: make verify
