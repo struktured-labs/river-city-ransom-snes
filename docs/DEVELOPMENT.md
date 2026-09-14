@@ -9,6 +9,7 @@ make bootstrap
 python3 -m pip install -r requirements-dev.txt
 python3 tools/bootstrap_core.py
 make verify
+python3 tools/check_adapter.py --core .deps/snes9x/libretro/snes9x_libretro.so
 ```
 
 The optional core bootstrap pins Snes9x and applies the checked-in debug patch.
@@ -38,6 +39,9 @@ timeouts terminate only that group, not other emulator instances. Libretro runs
 must use separate processes, as the core is process-global. `--kind render`
 checks video callbacks only; `--kind native` checks advancing NMI counters and
 adapter faults; neither substitutes for image/input/audio equivalence tests.
+`--kind adapter` verifies the asset-free native runtime test cartridge. Its
+negative control corrupts a separate synthetic CHR byte and requires the precise
+CPU assertion failure, not just an arbitrary emulator process error.
 
 ## Review in a browser
 

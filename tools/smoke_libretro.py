@@ -142,20 +142,22 @@ def run(core_path, rom_path, frames, wav_path=None, kind="audio", screenshot=Non
                     raise RuntimeError("Expected 128 KiB native WRAM")
                 ram = C.string_at(ptr, size)
                 frame_counts.append(check_native(ram, frame_counts[-1] if frame_counts else None))
-            if kind == "audio" and frame in (frames // 2, frames - 1):
+            if kind in ("audio", "adapter") and frame in (frames // 2, frames - 1):
                 ptr = core.retro_get_memory_data(2)  # RETRO_MEMORY_SYSTEM_RAM
                 size = core.retro_get_memory_size(2)
-                if not ptr or size < 0xA23:
+                if not ptr or size != 131072:
                     raise RuntimeError("Core did not expose SNES WRAM")
                 ram = C.string_at(ptr, size)
-                if ram[0xA22] != 1:
-                    raise RuntimeError(f"Diagnostic failed: WRAM status={ram[0xA22]:02x}")
-                frame_counts.append(int.from_bytes(ram[0xA20:0xA22], "little"))
+                status_address = 0xA22 if kind == "audio" else 0x1C60
+                counter_address = 0xA20 if kind == "audio" else 0x1C62
+                if ram[status_address] != 1:
+                    raise RuntimeError(f"Diagnostic failed: WRAM status={ram[status_address]:02x}, adapter case={ram[0x1C61]}")
+                frame_counts.append(int.from_bytes(ram[counter_address:counter_address + 2], "little"))
         # Exclude IPL/startup transients: inspect only the second half of audio.
         values = struct.unpack(f"<{len(samples) // 2}h", samples)
         steady = values[len(values) // 2:]
         peak = max(map(abs, steady), default=0)
-        if video_frames < frames // 2 or (kind == "audio" and frame_counts[1] <= frame_counts[0]):
+        if video_frames < frames // 2 or (kind in ("audio", "adapter") and frame_counts[1] <= frame_counts[0]):
             raise RuntimeError("CPU/video stopped advancing")
         if kind == "audio" and (peak < 128 or len(set(steady)) < 16):
             raise RuntimeError("No sustained audio waveform")
@@ -204,6 +206,7 @@ def run(core_path, rom_path, frames, wav_path=None, kind="audio", screenshot=Non
                 "game_frame_counters": frame_counts, "audio_peak": peak,
                 "sample_rate": av.timing.sample_rate, "status": "passed",
                 "scope": {"audio": "CPU/audio diagnostic", "render": "video callbacks only; not game correctness",
+                          "adapter": "asset-free native PPU/CHR/register-ABI adapter tests",
                           "native": "NMI progress and adapter fault checks; NOT gameplay/audio/visual fidelity"}[kind],
                 "cpu": registers}
     finally:
@@ -218,7 +221,7 @@ if __name__ == "__main__":
     parser.add_argument("--rom", type=Path, default=Path("build/audio-bringup.sfc"))
     parser.add_argument("--frames", type=int, default=300)
     parser.add_argument("--wav", type=Path)
-    parser.add_argument("--kind", choices=("audio", "render", "native"), default="audio")
+    parser.add_argument("--kind", choices=("audio", "render", "native", "adapter"), default="audio")
     parser.add_argument("--screenshot", type=Path)
     parser.add_argument("--ram", type=Path)
     parser.add_argument("--profile", choices=("title", "walk"), default="title")

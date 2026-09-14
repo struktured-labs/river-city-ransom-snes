@@ -4,10 +4,15 @@
 
 This is development evidence, not a finished-port certification.
 
-- `make verify`: 17 tests pass, including attribute quadrants, flipped tall
+- `make verify`: 18 tests pass, including attribute quadrants, flipped tall
   sprites, geometry and one-pixel negative controls, NMI reset/fault detection,
   coroutine tail hooks and the self-modifying audio operand.
   Gallery tests reject image tampering, forbidden ROM payloads and a false live pass.
+  Native assembly tests catch the accumulator-width and unmapped-WRAM regressions.
+- Asset-free native adapter cartridge: executes the production PPU write/read,
+  CHR-bank read and register/direct-page preservation code in Snes9x. The positive
+  case passes with advancing counters; a deliberately corrupted CHR byte fails
+  the expected CPU-side assertion. CI runs both controls without the RCR ROM.
 - Renderer fixtures: logo at NES frame 120 and menus at 300/600 each have zero
   mismatched pixels over 61,184 pixels at RGB555 precision; raw RGB error ≤5.
   The 240th NES row is explicitly outside the 239-row SNES comparison viewport.

@@ -21,3 +21,5 @@ jobs:
         run: python3 tools/bootstrap_core.py
       - name: Verify real SNES execution and SPC sound without commercial assets
         run: python3 tools/smoke_libretro.py --core .deps/snes9x/libretro/snes9x_libretro.so
+      - name: Exercise native PPU and CPU register ABI without commercial assets
+        run: python3 tools/check_adapter.py --core .deps/snes9x/libretro/snes9x_libretro.so
