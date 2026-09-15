@@ -503,6 +503,7 @@ bulk_writer_tests_done:
     stz $1C20
     jsr bulk_writer_tests
     jsr bulk_reader_tests
+    jsr page_fill_tests
     lda #1
     sta $1C60
     stz $2121
@@ -569,6 +570,93 @@ guarded_io_test:
     stz $4200
     lda $1C8D
     jne failed
+    rts
+page_fill_tests:
+    lda #16
+    sta $1C61
+    ldx #127
+    lda #2
+@flags:
+    sta $1D00,x
+    dex
+    bpl @flags
+    stz $1C85
+    stz $1C26
+    stz $1C20
+    lda #$23            ; only last page: attributes must dirty ALL 32 rows
+    sta $1C27
+    lda #$A9
+    sta $05
+    ldx #1
+    sec
+    jsr bulk_fill_pages
+    php
+    cmp #$A9
+    jne failed
+    pla
+    and #$83
+    cmp #3              ; original C retained, X/Y zero -> Z set
+    jne failed
+    cpx #0
+    jne failed
+    cpy #0
+    jne failed
+    lda $1C27
+    cmp #$24
+    jne failed
+    lda $1C26
+    jne failed
+    lda $1C85
+    cmp #1
+    jne failed
+    ldx #0
+@check_flags:
+    lda #3
+    cpx #32
+    bcc :+
+    lda #2
+:
+    cmp $1D00,x
+    jne failed
+    inx
+    bpl @check_flags
+    lda #$7F
+    sta $09
+    stz $07
+    lda #$23
+    sta $08
+    ldy #0
+@check_page:
+    lda [$07],y
+    cmp #$A9
+    jne failed
+    iny
+    bne @check_page
+    inc $08
+    lda $08
+    cmp #$24
+    bne @check_page
+    ; X=0 means 256 pages, including repeated 14-bit shadow wrap.
+    lda #$20
+    sta $1C27
+    lda #$5A
+    sta $05
+    ldx #0
+    jsr bulk_fill_pages
+    lda $1C27
+    cmp #$20
+    jne failed
+    stz $08
+@check_all:
+    lda [$07],y
+    cmp #$5A
+    jne failed
+    iny
+    bne @check_all
+    inc $08
+    lda $08
+    cmp #$40
+    bne @check_all
     rts
 bulk_reader_tests:
     lda #15

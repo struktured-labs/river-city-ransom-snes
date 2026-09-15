@@ -60,6 +60,24 @@ def check(core):
     banked = b'\x4c' + symbols['done_banked'].to_bytes(2, 'little')
     plain = b'\x4c' + symbols['done'].to_bytes(2, 'little')
     original = (out/'adapter-test.sfc').read_bytes()
+    fill_store = bytes.fromhex('9700c8d0fb')
+    if original.count(fill_store) != 8:
+        raise RuntimeError('Expected one page fill store loop per runtime bank')
+    bad_fill = out/'missing-page-fill-store.sfc'
+    bad_fill.write_bytes(original.replace(fill_store, bytes.fromhex('eaeac8d0fb')))
+    result = subprocess.run(command + ['--rom', str(bad_fill)], capture_output=True, text=True, timeout=30)
+    if not result.returncode or 'WRAM status=ee, adapter case=16' not in result.stderr:
+        raise RuntimeError('Missing page fill store did not fail assertion 16')
+    print('Page fill bytes/attribute dirty flags/wrap pass; missing store fails case 16.')
+    dirty_stride = bytes.fromhex('98186908a8')
+    if original.count(dirty_stride) != 8:
+        raise RuntimeError('Expected one eight-byte dirty stride per runtime bank')
+    bad_attributes = out/'page-fill-missing-attributes.sfc'
+    bad_attributes.write_bytes(original.replace(dirty_stride, bytes.fromhex('98186920a8')))
+    result = subprocess.run(command + ['--rom', str(bad_attributes)], capture_output=True, text=True, timeout=30)
+    if not result.returncode or 'WRAM status=ee, adapter case=16' not in result.stderr:
+        raise RuntimeError('Omitted attribute groups did not fail assertion 16')
+    print('Incomplete attribute dirtiness also fails page fill case 16.')
     read_call = b'\x22' + symbols['dispatch_ppudata_read'].to_bytes(2, 'little') + b'\xC1'
     if original.count(read_call * 2) != 8:
         raise RuntimeError('Expected two consecutive reads in each bulk source helper')
@@ -87,8 +105,8 @@ def check(core):
         raise RuntimeError('Incorrect direct R7 did not fail pair assertion 9')
     print('All eight direct bank pairs preserve registers/state; wrong R7 fails case 9.')
     guard = bytes.fromhex('ad0a1c0d831cd00a')
-    if original.count(guard) != 32:
-        raise RuntimeError('Expected two generated I/O guards and two bulk helper guards per runtime bank')
+    if original.count(guard) != 40:
+        raise RuntimeError('Expected two generated I/O guards and three bulk helper guards per runtime bank')
     for label, replacement in (
             ('nmi-depth', bytes.fromhex('a900ea0d831cd00a')),
             ('bank-depth', bytes.fromhex('ad0a1ceaeaead00a'))):

@@ -27,6 +27,7 @@ def build(out, controllers=False, jump=False):
                     "-D", f'bank_switch_enter={symbols["bank_switch_enter"]}',
                     '-D', f'bulk_ppu_byte={symbols["bulk_ppu_byte"]}',
                     '-D', f'bulk_source_byte={symbols["bulk_source_byte"]}',
+                    '-D', f'bulk_fill_pages={symbols["bulk_fill_pages"]}',
                     "-D", 'io_write_stub=24576', '-D', f'io_read_stub={read_address}', "-o", str(out / "test.o"),
                     str(ROOT / "snes/runtime_test.asm")], check=True)
     subprocess.run([ld65, "-C", str(ROOT / "snes/native_boot.cfg"), "-o", str(out / "test.bin"),

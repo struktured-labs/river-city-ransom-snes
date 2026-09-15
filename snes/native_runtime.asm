@@ -656,6 +656,63 @@ bulk_source_byte:
     inc $1A
     rts
 
+; FCD6: aligned page fill. Its checked caller sets PPUADDR low=0 and
+; PPUCTRL increment=1. X=0 means 256 pages, as in the original DEX loop.
+bulk_fill_loop:
+    jsr bulk_fill_pages
+    jmp $FCE3
+bulk_fill_pages:
+    php
+    phd
+    stz $4200
+    lda #$1B
+    xba
+    lda #0
+    tcd
+@page:
+    phx
+    jsr ppu_pointer
+    ldy #0
+    lda a:$0005
+@bytes:
+    sta [$00],y
+    iny
+    bne @bytes
+    ; Eight-byte sampling covers tile rows AND every attribute quadrant.
+    ; OR dirtiness through the production helper, retaining queued state 2.
+@dirty:
+    tya
+    sta a:$1C26
+    jsr mark_ppu_dirty
+    tya
+    clc
+    adc #8
+    tay
+    bne @dirty
+    stz a:$1C26
+    inc a:$1C27
+    plx
+    dex
+    bne @page
+    pld
+    plp
+    php
+    pha
+    lda a:$1C0A
+    ora a:$1C83
+    bne @done
+    lda a:$1C20
+    and #$80
+    beq @done
+    sta $4200
+@done:
+    pla
+    plp
+    lda $05
+    ldy #0
+    ldx #0
+    rts
+
 bank_switch_enter:
     ; Direct translation of FED1's paired-bank operation. The original routine
     ; uses four generic mapper writes, but their effect is fully determined by

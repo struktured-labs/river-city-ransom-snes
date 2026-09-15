@@ -162,6 +162,11 @@ def build(rom_path, traces, out, experimental_fastrom=False):
     if rom.prg[source_offset:source_offset + len(source_preimage)] != source_preimage:
         raise ValueError('Bulk source helper preimage mismatch')
     prg[source_offset:source_offset + 3] = b'\x4c' + word(symbols['bulk_source_byte'])
+    fill_offset = 0x1FCB2
+    fill_preimage = bytes.fromhex('850486058406ad0220a5f829fb8d002085f8a5048d0620a0008c0620a204c920b002a606a000a5058d072088d0facad0f7')
+    if rom.prg[fill_offset:fill_offset + len(fill_preimage)] != fill_preimage:
+        raise ValueError('Aligned page fill setup/loop preimage mismatch')
+    prg[0x1FCD6:0x1FCD9] = b'\x4c' + word(symbols['bulk_fill_loop'])
     for pc, expected, name in ((0xFF61, b"\xa5\xf8\x29", "nmi_task_return"),
                                (0xF1D3, b"\x68\xa8\x68", "nmi_rti_return"),
                                (0xFED1, b"\x48\x8a\x48", "bank_switch_enter"),
@@ -203,7 +208,11 @@ def build(rom_path, traces, out, experimental_fastrom=False):
                                      {"pc": 0xC8DB, "offset": source_offset,
                                       "entry": symbols['bulk_source_byte'],
                                       "preimage_sha256": hashlib.sha256(source_preimage).hexdigest(),
-                                      "kind": "whole decompression source byte reader"}],
+                                      "kind": "whole decompression source byte reader"},
+                                     {"pc": 0xFCD6, "offset": 0x1FCD6,
+                                      "entry": symbols['bulk_fill_loop'],
+                                      "preimage_sha256": hashlib.sha256(fill_preimage).hexdigest(),
+                                      "kind": "aligned increment-one page fill, setup preimage at FCB2"}],
               "graphics_pipeline": "prepared dirty rows, whole CHR banks and bounded per-NMI DMA",
               "limits": {"vram_bytes_per_nmi": 2048, "chr_jobs_per_nmi": 1, "row_scan_per_nmi": 32,
                          "oam_bytes_per_nmi": 544, "cgram_bytes_per_nmi": 64,

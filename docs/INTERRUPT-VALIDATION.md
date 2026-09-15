@@ -426,6 +426,46 @@ both pattern halves. Existing graphics/cache/late-entry controls and 54 unit
 tests pass. Rivalmage remains unchanged.
 # Frame-boundary attribution of remaining long NMI gaps
 
+## Aligned page fill removes the longest observed stall
+
+The remaining 41-frame NMI interval sampled the FCD6 nametable-clear loop,
+not just the decompression helpers. The builder now verifies its original
+FCB2 setup through the entire loop: the caller writes PPUADDR low zero and
+clears PPUCTRL increment-32. Only that aligned increment-one loop is replaced.
+`bulk_fill_pages` copies 256 equal bytes with indirect-long indexed stores,
+then marks dirty state through the production helper every eight bytes. The
+eight-byte spacing covers every attribute group, not merely tile-row boundaries.
+Queued rows keep their immutable-ready bit. Interrupts remain masked until
+the page pointer, flags, and original direct page are restored.
+
+Executed adapter case 16 checks a single attribute-bearing page ($2300): all
+256 shadow bytes, all 32 affected row states, unaffected nametables, final
+A/X/Y/C/Z, and pending/address state. It also checks X=0's original meaning of
+256 pages, repeated 14-bit shadow wrapping, and all 16 KiB of resulting bytes.
+Missing stores and a deliberately incorrect 32-byte dirty stride each fail
+case 16. Existing adapter controls, native video/late-entry/CHR/cache controls,
+the independent all-tile row oracle, and 56 unit tests pass. A separate hardware
+interrupt-race fixture for this new helper remains outside that coverage.
+
+Final candidate `build/page-fill-02/native-cpu.sfc`, SHA
+`fbf724d3b7ad7bdf2201daf9b477aee38b99ae79f504d5e751a27239c00b65a9`,
+completes the baseline in 2,042 frames, down from 2,176; NES takes 1,936.
+Transition frames are 210/64/71/497 versus NES 170/53/54/459, so all four
+timing gates still fail. Settings pixels and basic audio-presence gates pass.
+`build/page-fill-quality-02/site/index.html` passes bundle integrity, not
+release quality. The preliminary -01 build is superseded by -02, which restores
+the direct page before the final NMI enable check.
+
+In the 12,000-frame walk, maximum NMI interval falls from 41 to 29 display
+frames, with 59.53 NMIs/sec and no detected VBlank overrun. Later encounter
+timing differs; these aggregates are not exact original-speed certification.
+The remaining long stalled runs contain 28/3/11/11/3/28 samples. Audio waveform
+fidelity, remaining stalls, and full scrolling behavior still need validation.
+No Rival deployment was made.
+The paired right-then-left capture completes in 7,058 frames (NES 6,952), with
+the diagnostic audit at `build/page-fill-recovery-01/site/index.html`. This
+proves the scripted capture completed, not matching scene/player/camera state.
+
 ## Whole decompression source-reader translation
 
 `bulk_source_byte` translates fixed-bank C8DB, whose PPU path previously used
