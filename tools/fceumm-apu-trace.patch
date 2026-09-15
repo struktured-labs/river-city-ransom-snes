@@ -1,0 +1,75 @@
+diff --git a/src/drivers/libretro/libretro.c b/src/drivers/libretro/libretro.c
+index 5ecaa3f..c1c37c8 100644
+--- a/src/drivers/libretro/libretro.c
++++ b/src/drivers/libretro/libretro.c
+@@ -3357,8 +3357,10 @@ static void retro_run_blit(uint8_t *gfx)
+ #endif
+ }
+ 
++unsigned rcr_observer_frame = 0;
+ void retro_run(void)
+ {
++   rcr_observer_frame++;
+    uint8_t *gfx;
+    int32_t ssize = 0;
+    bool updated  = false;
+diff --git a/src/sound.c b/src/sound.c
+index 678b045..b1a6485 100644
+--- a/src/sound.c
++++ b/src/sound.c
+@@ -19,6 +19,7 @@
+  */
+ 
+ #include <stdlib.h>
++#include <stdio.h>
+ 
+ #include <string.h>
+ 
+@@ -217,7 +218,23 @@ static void SQReload(int x, uint8_t V) {
+ 	EnvUnits[x].reloaddec = 1;
+ }
+ 
++static void rcr_trace_apu(uint32_t address, uint8_t value) {
++    extern unsigned rcr_observer_frame;
++    static FILE *trace;
++    static int initialized;
++    if (!initialized) {
++        const char *path = getenv("RCR_NES_APU_TRACE");
++        initialized = 1;
++        if (path) trace = fopen(path, "w");
++    }
++    if (trace) {
++        fprintf(trace, "%u,%llu,%u,%u\n", rcr_observer_frame, (unsigned long long)(timestampbase + timestamp), address, value);
++        fflush(trace);
++    }
++}
++
+ static DECLFW(Write_PSG) {
++    rcr_trace_apu(A, V);
+ 	A &= 0x1F;
+ 	switch (A) {
+ 	case 0x0:
+@@ -301,6 +318,7 @@ static DECLFW(Write_PSG) {
+ }
+ 
+ static DECLFW(Write_DMCRegs) {
++    rcr_trace_apu(A, V);
+ 	A &= 0xF;
+ 
+ 	switch (A) {
+@@ -352,6 +370,7 @@ static DECLFW(Write_DMCRegs) {
+ }
+ 
+ static DECLFW(StatusWrite) {
++    rcr_trace_apu(A, V);
+ 	int x;
+ 
+ 	DoSQ1();
+@@ -1013,6 +1032,7 @@ static void RDoNoise(void) {
+ }
+ 
+ static DECLFW(Write_IRQFM) {
++    rcr_trace_apu(A, V);
+ 	V = (V & 0xC0) >> 6;
+ 	fcnt = 0;
+ 	if (V & 2)
