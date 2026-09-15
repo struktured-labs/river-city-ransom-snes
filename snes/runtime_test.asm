@@ -156,9 +156,15 @@ tests:
     jsl $C10000+dispatch_write
     stz $1B22
     jsl $C10000+dispatch_write
+.ifdef JUMP_TEST
+    lda #3
+    sta $1C66
+    lda #3
+.else
     lda #4
     sta $1C66
     lda #8
+.endif
     sta $1C67
     ldy #8
 @read_buttons:

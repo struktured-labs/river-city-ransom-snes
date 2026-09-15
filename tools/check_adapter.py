@@ -35,6 +35,15 @@ def check(core):
     if not missing.returncode or "WRAM status=ee, adapter case=5" not in missing.stderr:
         raise RuntimeError("Missing Select input did not fail the controller assertion")
     print("P1 Select/P2 Start serial routing passed; absent-input negative control failed correctly.")
+    jump = ROOT / 'build/jump-test'
+    build(jump, jump=True)
+    jump_cmd = command + ['--rom', str(jump/'adapter-test.sfc')]
+    for profile in ('jump-control', 'jump-swapped'):
+        subprocess.run(jump_cmd + ['--profile', profile, '--receipt', str(jump/(profile+'.json'))], check=True, timeout=30)
+    missing = subprocess.run(jump_cmd, capture_output=True, text=True, timeout=30)
+    if not missing.returncode or 'WRAM status=ee, adapter case=5' not in missing.stderr:
+        raise RuntimeError('Absent jump buttons did not fail the executed assertion')
+    print('SNES A and B+Y produce identical NES A+B on both ports; absent-input control fails.')
 
 
 if __name__ == "__main__":

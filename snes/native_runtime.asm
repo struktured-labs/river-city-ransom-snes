@@ -108,7 +108,41 @@ console_write:
     jmp done
 @joy:
     lda $22
+    and #1
     sta $4016
+    tax
+    lda a:$1C82
+    stx a:$1C82
+    cpx #0
+    bne @joy_done
+    and #1
+    beq @joy_done
+    ; Falling strobe: latch both SNES pads. First eight bits retain the
+    ; NES B/Y/Select/Start/direction mapping; ninth bit is SNES A (jump).
+    ldy #8
+@buttons:
+    lda $4016
+    lsr
+    ror a:$1C80
+    lda $4017
+    lsr
+    ror a:$1C81
+    dey
+    bne @buttons
+    lda $4016
+    and #1
+    beq :+
+    lda a:$1C80
+    ora #3
+    sta a:$1C80
+:
+    lda $4017
+    and #1
+    beq @joy_done
+    lda a:$1C81
+    ora #3
+    sta a:$1C81
+@joy_done:
     jmp done
 @dma:
     lda #0
@@ -272,12 +306,28 @@ dispatch_read:
     beq @joy2
     jmp done
 @joy1:
+    lda a:$1C82
+    bne @live1
+    lda a:$1C80
+    sec
+    ror a:$1C80
+    bra @bit1
+@live1:
     lda $4016
+@bit1:
     and #1
     sta $24
     jmp done
 @joy2:
+    lda a:$1C82
+    bne @live2
+    lda a:$1C81
+    sec
+    ror a:$1C81
+    bra @bit2
+@live2:
     lda $4017
+@bit2:
     and #1
     sta $24
     jmp done

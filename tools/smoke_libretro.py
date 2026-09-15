@@ -102,6 +102,9 @@ def run(core_path, rom_path, frames, wav_path=None, kind="audio", screenshot=Non
 
     @C.CFUNCTYPE(C.c_int16, C.c_uint, C.c_uint, C.c_uint, C.c_uint)
     def input_state(port, device, index, ident):
+        if profile in ("jump-control", "jump-swapped") and device == 1 and index == 0:
+            shortcut = 0 if profile == "jump-control" else 1
+            return int((port == shortcut and ident == 8) or (port == 1-shortcut and ident in (0, 1)))
         if profile == "select-control" and device == 1 and index == 0:
             return int((port == 0 and ident == 2) or (port == 1 and ident == 3))
         if port == 0 and device == 1 and profile == "walk":
@@ -228,7 +231,7 @@ if __name__ == "__main__":
     parser.add_argument("--kind", choices=("audio", "render", "native", "adapter"), default="audio")
     parser.add_argument("--screenshot", type=Path)
     parser.add_argument("--ram", type=Path)
-    parser.add_argument("--profile", choices=("title", "walk", "select-control"), default="title")
+    parser.add_argument("--profile", choices=("title", "walk", "select-control", "jump-control", "jump-swapped"), default="title")
     parser.add_argument("--receipt", type=Path)
     args = parser.parse_args()
     if args.frames < 120 or args.frames > 30000:

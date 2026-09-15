@@ -6,6 +6,14 @@ not to rename emulator liveness as game correctness.
 
 ## September 15 local progress (not deployed)
 
+Dedicated jump mapping: SNES **A** now supplies both NES action bits, equivalent
+to the existing **Y+B** chord, for either player. Y and B retain their individual
+actions. The production serial adapter latches the first nine SNES button bits
+on the strobe's falling edge and exposes the mapped eight-bit NES controller.
+`tools/check_adapter.py` executes A-vs-Y+B tests on both ports, plus an absent-input
+negative control and the existing Select/Start tests. This is input equivalence,
+not yet physical SNAC or animation-level jump certification. X is unchanged.
+
 Candidate `406482a448c128987266b1a37a67d10781bc7aaf64d678ee1801cf7551fdb8f3`
 is in `build/gameplay-audio-01`; its verified audio/collage dashboard is
 `build/audio-quality-01/site/index.html`. Historical evidence below is preserved.
