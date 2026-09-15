@@ -12,8 +12,10 @@ import subprocess
 
 try:
     from .rom import Rom, convert_chr
+    from .prepare_audio import prepare_engine
 except ImportError:
     from rom import Rom, convert_chr
+    from prepare_audio import prepare_engine
 
 ROOT = Path(__file__).resolve().parents[1]
 WRITES = {0x8D: "a", 0x8E: "x", 0x8C: "y", 0x9D: "a", 0x99: "a"}
@@ -79,6 +81,8 @@ def build(rom_path, traces, out, experimental_fastrom=False):
     if hashlib.sha256(engine.read_bytes()).hexdigest() != deps["upernes"]["audio_sha256"]:
         raise ValueError("Unexpected SPC engine")
     out.mkdir(parents=True, exist_ok=False)
+    patched_engine = prepare_engine(engine.read_bytes())
+    (out / 'Memblers_2a03.bin').write_bytes(patched_engine)
     rgb = Path("/usr/share/fceux/palettes/FCEUX.pal").read_bytes()
     colors = [(rgb[i] >> 3) | ((rgb[i + 1] >> 3) << 5) | ((rgb[i + 2] >> 3) << 10) for i in range(0, 192, 3)]
     (out / "native_palette.inc").write_text(".word " + ",".join(f"${n:04X}" for n in colors) + "\n")
@@ -90,7 +94,7 @@ def build(rom_path, traces, out, experimental_fastrom=False):
             boot_symbols = {line.split()[2].lstrip("."): int(line.split()[1], 16)
                             for line in (out / "native_boot.lbl").read_text().splitlines()}
             defines = ["-D", f'video_prepare_bridge={boot_symbols["video_prepare_bridge"]}']
-        subprocess.run([str(ROOT / ".deps/cc65/bin/ca65"), *defines, "-g", "--bin-include-dir", str(ROOT / ".deps/upernes/source/asm"), "-I", str(out), "-o", str(out / (name + ".o")),
+        subprocess.run([str(ROOT / ".deps/cc65/bin/ca65"), *defines, "-g", "--bin-include-dir", str(out), "-I", str(out), "-o", str(out / (name + ".o")),
                         str(ROOT / "snes" / (name + ".asm"))], check=True)
         subprocess.run([str(ROOT / ".deps/cc65/bin/ld65"), "-C", str(ROOT / "snes" / (name + ".cfg")),
                         "-Ln", str(out / (name + ".lbl")), "-o", str(out / (name + ".bin")),
@@ -200,9 +204,12 @@ def build(rom_path, traces, out, experimental_fastrom=False):
               "experimental_fastrom": experimental_fastrom,
               "source_rom_sha256": sha, "rom_sha256": hashlib.sha256(image).hexdigest(),
               "source_sha256": {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
-                                for p in [Path(__file__), *sorted((ROOT / "snes").glob("native*"))]},
+                                for p in [Path(__file__), ROOT/'tools/prepare_audio.py', *sorted((ROOT / "snes").glob("native*"))]},
               "trace_manifest_sha256": [hashlib.sha256((p / "manifest.json").read_bytes()).hexdigest() for p in traces],
-              "spc_sha256": deps["upernes"]["audio_sha256"],
+              "spc_source_sha256": deps["upernes"]["audio_sha256"],
+              "spc_sha256": hashlib.sha256(patched_engine).hexdigest(),
+              "spc_corrections": [{"offset": 0x28e, "before": 0xf3, "after": 0xf2,
+                                   "reason": "select triangle right volume through DSP address port"}],
               "palette_sha256": hashlib.sha256(rgb).hexdigest(),
               "covered_instructions": len(seen), "patches": patched, "stub_bytes": len(stubs),
               "translated_helpers": [{"pc": 0xC90C, "offset": bulk_offset,

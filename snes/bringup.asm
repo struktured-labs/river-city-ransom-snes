@@ -49,6 +49,16 @@ reset:
     bpl @clear
     jsr spc_upload
     jcs failed
+.ifdef AUDIO_TRIANGLE
+    ; Isolated triangle: control/length halt set, linear reload nonzero.
+    lda #$FF
+    sta APU_PACKET+8
+    lda #$FD
+    sta APU_PACKET+10
+    lda #4
+    sta APU_PACKET+$15
+    sta APU_PACKET+$16
+.else
     ; Constant-volume square wave, NES timer $FD (~440 Hz NTSC).
     ; Loop/length-disable keeps this diagnostic independent of the host counters.
 .ifdef AUDIO_LENGTH
@@ -65,6 +75,7 @@ reset:
     sta APU_PACKET+$15
     lda #$01                  ; square 0 retrigger; bit 5 clear for mono output
     sta APU_PACKET+$16
+.endif
     jsr spc_frame
     jcs failed
     lda #$00
@@ -113,9 +124,17 @@ reset:
 @restart:
     sep #$20
     .a8
+.ifdef AUDIO_TRIANGLE
+    lda #4
+.else
     lda #1
+.endif
     sta APU_PACKET+$15
+.ifdef AUDIO_TRIANGLE
+    lda #4
+.else
     lda #$01
+.endif
     sta APU_PACKET+$16
     lda #2
     sta PHASE
@@ -124,8 +143,13 @@ reset:
     sep #$20
     .a8
     lda #$7E
+.ifdef AUDIO_TRIANGLE
+    sta APU_PACKET+10
+    lda #4
+.else
     sta APU_PACKET+2
     lda #$01
+.endif
     sta APU_PACKET+$16
     lda #3
     sta PHASE

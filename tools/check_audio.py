@@ -11,9 +11,11 @@ import numpy as np
 try:
     from . import smoke_libretro as smoke
     from .benchmark_capture import sha
+    from .prepare_audio import prepare_engine
 except ImportError:
     import smoke_libretro as smoke
     from benchmark_capture import sha
+    from prepare_audio import prepare_engine
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -60,16 +62,20 @@ def measure_length(onset, tail, rate):
     return result
 
 
-def check(core, out, length=False, retrigger=False, sweep_reload=False, sweep_no_reload=False):
-    if sum((length, retrigger, sweep_reload, sweep_no_reload)) > 1:
+def check(core, out, length=False, retrigger=False, sweep_reload=False, sweep_no_reload=False, triangle=False, unpatched_engine=False):
+    if sum((length, retrigger, sweep_reload, sweep_no_reload, triangle)) > 1:
         raise ValueError('Audio probes are distinct profiles')
     out.mkdir(parents=True, exist_ok=False)
+    original_engine = (ROOT/'.deps/upernes/source/asm/Memblers_2a03.bin').read_bytes()
+    engine = prepare_engine(original_engine)
+    (out/'Memblers_2a03.bin').write_bytes(original_engine if unpatched_engine else engine)
     subprocess.run([str(ROOT/'.deps/cc65/bin/ca65'), '-D', 'AUDIO_SCRIPT=1',
                     *(['-D', 'AUDIO_LENGTH=1'] if length else []),
+                    *(['-D', 'AUDIO_TRIANGLE=1'] if triangle else []),
                     *(['-D', 'AUDIO_RETRIGGER=1'] if retrigger else []),
                     *(['-D', 'AUDIO_SWEEP_RELOAD=1'] if sweep_reload or sweep_no_reload else []),
                     *(['-D', 'AUDIO_SWEEP_NO_RELOAD=1'] if sweep_no_reload else []),
-                    '--bin-include-dir', str(ROOT/'.deps/upernes/source/asm'),
+                    '--bin-include-dir', str(out),
                     '-o', str(out/'script.o'), str(ROOT/'snes/bringup.asm')], check=True)
     rom = out/'script.sfc'
     subprocess.run([str(ROOT/'.deps/cc65/bin/ld65'), '-C', str(ROOT/'snes/lorom.cfg'),
@@ -104,6 +110,8 @@ def check(core, out, length=False, retrigger=False, sweep_reload=False, sweep_no
                 rows.append({'phase': ram[0xA23], 'start_sample': start, 'end_sample': total,
                              'driver_frame': int.from_bytes(ram[0xA20:0xA22], 'little'),
                              'periodic_retriggers': ram[0xA24],
+                             'channel_enable': ram[0xA15], 'triangle_control': ram[0xA08],
+                             'triangle_period': ram[0xA0A] | ((ram[0xA0B] & 7) << 8),
                              'sweep_control': ram[0xA01], 'sweep_reloads': ram[0xA25]})
         lib.retro_run = step
         return lib
@@ -129,10 +137,16 @@ def check(core, out, length=False, retrigger=False, sweep_reload=False, sweep_no
         expected_phase = 0 if frame < 120 else 1 if frame < 180 else 2 if frame < 240 else 3
         if row['phase'] != expected_phase:
             raise RuntimeError('Audio script changed phase at the wrong driver frame')
+        if triangle and (row['channel_enable'] != (0 if expected_phase == 1 else 4)
+                         or row['triangle_control'] != 255
+                         or row['triangle_period'] != (126 if expected_phase == 3 else 253)):
+            raise RuntimeError('Triangle probe register schedule is incorrect')
         if row['periodic_retriggers'] != (frame//32 if retrigger else 0):
             raise RuntimeError('Periodic retrigger execution does not match schedule')
     results = []
     for phase, expected in enumerate((1789773/(16*254), None, 1789773/(16*254), 1789773/(16*127))):
+        if triangle and expected is not None:
+            expected /= 2
         frames = [r for r in rows if r['phase'] == phase]
         start, end = frames[0]['start_sample']+rate//10, frames[-1]['end_sample']-rate//10
         result = measure(pcm[start:end], rate, expected)
@@ -149,12 +163,16 @@ def check(core, out, length=False, retrigger=False, sweep_reload=False, sweep_no
         results.append(result)
     (out/'timeline.json').write_text(json.dumps(rows, indent=2)+'\n')
     report = {'schema': 'rcr-spc-signal-test-v1', 'receipt': receipt,
-              'scope': ('controlled sweep period reload; NOT autonomous sweep timing, envelope, length, noise, DMC or game fidelity'
+              'scope': ('isolated sustained triangle, disable/restart/pitch; NOT linear-counter timing, NES mixing or game fidelity'
+                        if triangle else
+                        'controlled sweep period reload; NOT autonomous sweep timing, envelope, length, noise, DMC or game fidelity'
                         if sweep_reload or sweep_no_reload else
                         'pulse length-index-zero expiry and retrigger; NOT full frame-sequencer/envelope/sweep/noise/DMC or game fidelity'
                         if length else 'constant pulse, channel disable, restart, pitch change; NOT length/envelope/sweep/noise/DMC or game fidelity'),
-              'profile': 'sweep-no-reload' if sweep_no_reload else ('sweep-reload' if sweep_reload else ('length-expiry' if length else ('periodic-retrigger' if retrigger else 'pulse-script'))),
+              'profile': 'triangle-script' if triangle else ('sweep-no-reload' if sweep_no_reload else ('sweep-reload' if sweep_reload else ('length-expiry' if length else ('periodic-retrigger' if retrigger else 'pulse-script')))),
               'tool_sha256': sha(Path(__file__)), 'source_sha256': sha(ROOT/'snes/bringup.asm'),
+              'spc_sha256': sha(out/'Memblers_2a03.bin'),
+              'engine_patch_tool_sha256': sha(ROOT/'tools/prepare_audio.py'),
               'wav_sha256': sha(out/'audio.wav'), 'timeline_sha256': sha(out/'timeline.json'),
               'phases': results, 'passed': all(r['passed'] for r in results), 'release_ready': False}
     if sweep_reload:
@@ -169,7 +187,28 @@ def check(core, out, length=False, retrigger=False, sweep_reload=False, sweep_no
             raise RuntimeError('Missing reload did not reproduce the specific stale-pitch failure')
         report['negative_control'] = {'report_sha256': sha(negative_out/'report.json'),
                                       'expected_failure': 'phase 3 stays near 440 Hz instead of 880 Hz'}
+    if triangle and not unpatched_engine:
+        negative_out = out/'unpatched-engine'
+        negative_passed = check(core, negative_out, triangle=True, unpatched_engine=True)
+        negative = json.loads((negative_out/'report.json').read_text())
+        if (negative_passed or not negative['phases'][1]['passed']
+                or any(p['ac_rms'][0] < 128 or p['ac_rms'][1] != 0
+                       for p in negative['phases'] if p['phase'] != 1)):
+            raise RuntimeError('Unpatched engine did not reproduce left-only triangle')
+        report['negative_control'] = {'report_sha256': sha(negative_out/'report.json'),
+                                      'expected_failure': 'triangle absent on right output'}
     (out/'report.json').write_text(json.dumps(report, indent=2)+'\n')
+    if triangle and not unpatched_engine:
+        table = ''.join('<tr><td>'+str(p['phase'])+'</td><td>'+str(p['ac_rms'])+
+                        '</td><td>'+str(negative['phases'][p['phase']]['ac_rms'])+'</td></tr>'
+                        for p in results)
+        (out/'index.html').write_text('<!doctype html><meta charset="utf-8"><title>Triangle output audit</title>'
+            '<h1>Triangle output: corrected vs original engine</h1>'
+            '<p>Isolated tone, disable, restart and pitch change. Not a full NES mix or gameplay verdict.</p>'
+            '<h2>Corrected</h2><audio controls src="audio.wav"></audio>'
+            '<h2>Original (right output missing)</h2><audio controls src="unpatched-engine/audio.wav"></audio>'
+            '<table border="1"><tr><th>Phase</th><th>Corrected RMS [L,R]</th><th>Original RMS [L,R]</th></tr>'
+            +table+'</table><p><a href="report.json">Verified measurements and hashes</a></p>')
     print(json.dumps(report, indent=2))
     return report['passed']
 
@@ -182,5 +221,6 @@ if __name__ == '__main__':
     parser.add_argument('--retrigger', action='store_true', help='Probe periodic same-note retriggering and sub-millisecond dropouts')
     parser.add_argument('--sweep-reload', action='store_true', help='Probe repeated sweep period reload flags')
     parser.add_argument('--sweep-no-reload', action='store_true', help='Negative control: omit period reload while sweep is enabled')
+    parser.add_argument('--triangle', action='store_true', help='Isolated sustained triangle, mute, restart and pitch probe')
     args = parser.parse_args()
-    raise SystemExit(0 if check(args.core, args.out, args.length, args.retrigger, args.sweep_reload, args.sweep_no_reload) else 1)
+    raise SystemExit(0 if check(args.core, args.out, args.length, args.retrigger, args.sweep_reload, args.sweep_no_reload, args.triangle) else 1)
