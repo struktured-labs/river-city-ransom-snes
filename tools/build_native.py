@@ -58,11 +58,11 @@ def stub(opcode, operand, entry, resume=None, dynamic_apu=False):
         # explicit FC60 coroutine wait (task $0100 == 0). No extra return frame.
         guard = b"\x08\x48\xad\x0a\x1c\xf0\x0a\xad\x00\x01\xf0\x05\x68\x28\x4c" + word(resume)
         return data + guard + b"\x68\x48\x29\x80\xf0\x05\xad\x12\x42\x30\xfb\x68\x28\x8d\x00\x42\x4c" + word(resume)
-    return (data + b"\x08\x48\xad\x0a\x1c\xd0\x14\xad\x20\x1c\x29\x80\xf0\x0d"
+    return (data + b"\x08\x48\xad\x0a\x1c\x0d\x83\x1c\xd0\x14\xad\x20\x1c\x29\x80\xf0\x0d"
             + b"\xad\x12\x42\x30\xfb\xad\x20\x1c\x29\x80\x8d\x00\x42\x68\x28\x60")
 
 
-def build(rom_path, traces, out):
+def build(rom_path, traces, out, experimental_fastrom=False):
     original = rom_path.read_bytes()
     rom = Rom.parse(original)
     rom.require_rcr_us()
@@ -77,6 +77,8 @@ def build(rom_path, traces, out):
     (out / "native_palette.inc").write_text(".word " + ",".join(f"${n:04X}" for n in colors) + "\n")
     for name in ("native_boot", "native_runtime"):
         defines = []
+        if name == 'native_boot' and experimental_fastrom:
+            defines = ['-D', 'EXPERIMENTAL_FASTROM=1']
         if name == "native_runtime":
             boot_symbols = {line.split()[2].lstrip("."): int(line.split()[1], 16)
                             for line in (out / "native_boot.lbl").read_text().splitlines()}
@@ -140,7 +142,9 @@ def build(rom_path, traces, out):
     if len(stubs) > 8192:
         raise ValueError("Hardware stubs exceed available bank space")
     for pc, expected, name in ((0xFF61, b"\xa5\xf8\x29", "nmi_task_return"),
-                               (0xF1D3, b"\x68\xa8\x68", "nmi_rti_return")):
+                               (0xF1D3, b"\x68\xa8\x68", "nmi_rti_return"),
+                               (0xFED1, b"\x48\x8a\x48", "bank_switch_enter"),
+                               (0xFEFB, b"\xcd\xff\xbf", "bank_switch_exit")):
         offset = 0x1E000 + pc - 0xE000
         if rom.prg[offset:offset + 3] != expected:
             raise ValueError("NMI adapter preimage mismatch")
@@ -163,6 +167,7 @@ def build(rom_path, traces, out):
     target = out / "native-cpu.sfc"
     target.write_bytes(image)
     report = {"schema": "rcr-native-cpu-v1", "status": "experimental-menu-and-street-not-release-ready",
+              "experimental_fastrom": experimental_fastrom,
               "source_rom_sha256": sha, "rom_sha256": hashlib.sha256(image).hexdigest(),
               "source_sha256": {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
                                 for p in [Path(__file__), *sorted((ROOT / "snes").glob("native*"))]},
@@ -187,5 +192,6 @@ if __name__ == "__main__":
     parser.add_argument("--rom", type=Path, default=ROOT / "roms/river-city-ransom-us.nes")
     parser.add_argument("--trace", type=Path, action="append", required=True)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument('--experimental-fastrom', action='store_true', help='Enable hardware FastROM timing for local regression; full-speed quality remains unverified')
     args = parser.parse_args()
-    build(args.rom, args.trace, args.out)
+    build(args.rom, args.trace, args.out, args.experimental_fastrom)

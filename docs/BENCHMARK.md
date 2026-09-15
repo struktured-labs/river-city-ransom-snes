@@ -6,6 +6,44 @@ not to rename emulator liveness as game correctness.
 
 ## September 15 local progress (not deployed)
 
+### Timing-sensitive failure reproduction
+
+Follow-up: the bank switch at `$FED1` is now protected across both MMC3 PRG
+register writes. Ordinary I/O stubs keep NMI masked while `$1C83` is nonzero;
+the `$FEFB` exit validates the selected bank and then restores NMI eligibility.
+The replaced instructions preserve the original stack layout. A failed bank
+check reports an adapter fault instead of executing the NES `$80` NOP as a
+65816 relative branch. This does not implement the missing raster IRQ.
+
+With this fix, `build/atomic-bank-fast-01` (SHA-256
+`11c97e0d11b636e8f98c7e400c58c9499efc580954adfe0e9fd5f97bf97969e4`)
+reaches all baseline phases in 2,510 frames. Its settings pixel check passes;
+idle and attack audio-presence checks pass. Four transition gates, walk/resume
+audio, and pause-tail noise still fail. Dashboard: `build/atomic-bank-quality-01/site`.
+The faster option remains opt-in. Below is the preserved **pre-fix** reproduction.
+
+`tools/build_native.py --experimental-fastrom` now preserves a diagnostic
+experiment; it is **off by default**, not a speed fix. With the title-05,
+walk-02 and inventory-02 traces it generates SHA-256
+`f91c70ee810215aa30489bdbb8271167302670ce3ebaef1556cb4d8b087f8147`.
+It selects hardware MEMSEL fast ROM timing and the matching HiROM header.
+The unchanged default still generates the jump-button candidate byte-for-byte.
+
+`build/fastrom-quality-01/site` records the failure: boot recognition takes 366
+frames, then NMI progress stops at counter 139 **before the scheduled Start
+press**, during the menu idle period. CPU ends at `$00:2020`; task/guard bytes
+change unexpectedly. Settings recognition subsequently times out at 2,400 frames.
+This is not yet proof of the same freeze seen on Rivalmage.
+
+The trace in `build/fastrom-repro-02/cpu-trace.txt` ends with the normal menu NMI
+return at counter `$008B`, entered with a deeper stack than prior interrupts.
+Next investigation is interrupt entry/return during bank-switch helper execution.
+Do not assume faster ROM is safe until this corruption is understood.
+A 600-frame coarse smoke run misleadingly passes (counter advanced between its
+two sample points); the 900-frame run correctly fails `Native NMI counter stalled
+or reset`. The phase benchmark also rejects the run. Short liveness runs cannot
+certify this failure away.
+
 Dedicated jump mapping: SNES **A** now supplies both NES action bits, equivalent
 to the existing **Y+B** chord, for either player. Y and B retain their individual
 actions. The production serial adapter latches the first nine SNES button bits

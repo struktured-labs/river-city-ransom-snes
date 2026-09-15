@@ -490,6 +490,40 @@ done:
     plp
     rtl
 
+bank_switch_enter:
+    ; Keep R6/R7 pair writes atomic against the NMI's audio-bank switch.
+    ; Replay the three replaced original instructions with identical stack ABI.
+    stz $4200
+    inc a:$1C83
+    pha
+    txa
+    pha
+    jmp $FED4
+bank_switch_exit:
+    cmp $BFFF
+    beq @valid
+    ; Do not execute the NES undocumented $80 NOP as a 65816 BRA.
+    inc a:$1C06
+@invalid:
+    bra @invalid
+@valid:
+    php
+    pha
+    dec a:$1C83
+    lda a:$1C0A
+    ora a:$1C83
+    bne @return
+@outside:
+    lda $4212
+    bmi @outside
+    lda a:$1C20
+    and #$80
+    sta $4200
+@return:
+    pla
+    plp
+    rts
+
 nmi_task_return:
     ; RCR's coroutine NMI deliberately consumes its interrupt frame and the
     ; FC60 wait routine's saved task/A, then RTSes to the caller of FC60.

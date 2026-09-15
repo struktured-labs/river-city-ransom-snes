@@ -105,6 +105,13 @@ class RendererControls(unittest.TestCase):
 
 
 class NativeControls(unittest.TestCase):
+    def test_io_stub_keeps_nmi_masked_during_paired_bank_switch(self):
+        # Both independent reasons to mask NMI must reach the same branch:
+        # an active original NMI, or a main-thread R6/R7 critical section.
+        for opcode, operand in ((0x8D, 0x8000), (0x8D, 0x8001), (0xAD, 0x4016)):
+            code = stub(opcode, operand, 0x2000)
+            self.assertIn(bytes.fromhex('ad0a1c0d831cd014'), code)
+
     def test_progress_and_fault_negative_controls(self):
         ram = bytearray(8192)
         ram[0x1C04] = 10

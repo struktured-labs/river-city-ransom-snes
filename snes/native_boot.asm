@@ -22,6 +22,13 @@ reset:
     stz $4200
     stz $420B
     stz $420C
+.ifdef EXPERIMENTAL_FASTROM
+    ; Opt-in timing regression until full-game validation is complete.
+    ; Program/runtime banks C0-C8 and DB mirrors 81-88 are FastROM-capable.
+    ; Select the real SNES 6-master-clock ROM timing (not emulator overclocking).
+    lda #1
+    sta $420D
+.endif
     stz $212C
     stz $212D
     stz $2130
@@ -198,7 +205,12 @@ native_interrupt:
 .include "native_audio.asm"
 .segment "HEADER"
     .byte "RCR NATIVE CPU PROOF "
-    .byte $21, $00, $0B, $00, $01, $00, $00
+.ifdef EXPERIMENTAL_FASTROM
+    .byte $31
+.else
+    .byte $21
+.endif
+    .byte $00, $0B, $00, $01, $00, $00
     .word $FFFF, $0000
 .segment "VECTORS"
     .word 0,0,native_interrupt,native_interrupt,native_interrupt,native_interrupt,0,native_interrupt
