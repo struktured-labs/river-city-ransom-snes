@@ -223,3 +223,35 @@ checks direct switches through each pair, final equality/carry, A/X/Y, PB/DB,
 FB/FC/FD/R6/R7, and cleared critical depth. An incorrect R7 calculation fails
 executed assertion 9. Existing ordinary-bank, controller, jump, CHR and OAM
 positive/negative tests still pass, as do 49 unit tests. Rivalmage is unchanged.
+
+### Pending interrupts after ordinary I/O
+
+`build/late-io-01/native-cpu.sfc`, SHA
+`09194e5524ee25d7c7108308b19c814043473915a6678fff9b2d8c2d281e6fcc`,
+removes the wait-outside-VBlank loop from completed ordinary mailbox stubs.
+The enable path uses its existing masked PPUCTRL value without reloading it.
+Both the active-NMI and paired-bank guards still suppress enable. PPUCTRL's
+special coroutine tail and the original NMI return path are unchanged. The
+publisher's late-entry checks remain essential to this pending-edge delivery.
+
+In the 12,000-frame workload, NMI rate rises to 58.26/second from 56.99, but
+sampled game ticks fall to 25.20 from 25.90 and picture changes fall to 28.24
+from 29.78. No overrun/adapter/SPC fault is detected. The phase audit takes
+2530 frames versus the previous 2533 and original 1936, with all four timing
+gates still failing. Basic audio/settings gates pass, not full audio fidelity.
+This is improved interrupt delivery, **not a demonstrated game-speed win**.
+
+The matched recovery run likewise does not establish improved traversal:
+final native camera bytes are 4400 versus the prior 2500 and NES 0000.
+Encounter differences remain a confounder; do not promote this experiment as
+original speed. Its verified contact sheet/audio is
+`build/late-io-recovery-01/site/index.html`, and its baseline phase audit is
+`build/late-io-quality-01/site/index.html`. Further reduction of CPU work per
+interrupt is needed; increasing delivery alone is insufficient.
+
+The asset-free adapter now also includes the actual generated STA PPUDATA
+stub in each replicated bank. Assertion 10 executes it while each of the two
+depth guards is separately active, checks preserved A/X/Y/carry, and waits
+across VBlank while a hardware interrupt counter must stay zero. Separate
+mutants ignoring either guard each fail assertion 10. All existing adapter
+positive/negative controls and 49 unit tests pass. Rivalmage is unchanged.

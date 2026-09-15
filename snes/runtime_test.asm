@@ -324,6 +324,21 @@ tests:
     lda $1C8B
     cmp #8
     jcc @bank_loop
+    ; Execute the production-generated mailbox stub, not just its handler.
+    ; Each independent guard must suppress real hardware NMIs across VBlank.
+    lda #10
+    sta $1C61
+    lda #$80
+    sta $1C20
+    lda #1
+    sta $1C0A
+    jsr guarded_io_test
+    stz $1C0A
+    lda #1
+    sta $1C83
+    jsr guarded_io_test
+    stz $1C83
+    stz $1C20
     lda #1
     sta $1C60
     stz $2121
@@ -347,6 +362,32 @@ failed:
     lda #$EE
     sta $1C60
     bra failed
+guarded_io_test:
+    lda #$A5
+    ldx #$34
+    ldy #$56
+    sec
+    jsr io_write_stub
+    jcc failed
+    cmp #$A5
+    jne failed
+    cpx #$34
+    jne failed
+    cpy #$56
+    jne failed
+@visible:
+    lda $4212
+    bmi @visible
+@blank:
+    lda $4212
+    bpl @blank
+@after:
+    lda $4212
+    bmi @after
+    stz $4200
+    lda $1C8D
+    jne failed
+    rts
 ppu_write_test:
     sta $1B22
     stx $1B20
@@ -363,6 +404,10 @@ ppu_read_test:
     jsl $C10000+dispatch_read
     rts
 interrupt:
+    pha
+    lda $4210
+    inc $1C8D
+    pla
     rti
 .segment "HEADER"
     .byte "RCR ADAPTER TESTS    "

@@ -59,6 +59,18 @@ def check(core):
     if not result.returncode or 'WRAM status=ee, adapter case=9' not in result.stderr:
         raise RuntimeError('Incorrect direct R7 did not fail pair assertion 9')
     print('All eight direct bank pairs preserve registers/state; wrong R7 fails case 9.')
+    guard = bytes.fromhex('ad0a1c0d831cd00a')
+    if original.count(guard) != 8:
+        raise RuntimeError('Expected one generated I/O guard per runtime bank')
+    for label, replacement in (
+            ('nmi-depth', bytes.fromhex('a900ea0d831cd00a')),
+            ('bank-depth', bytes.fromhex('ad0a1ceaeaead00a'))):
+        mutant = out/f'missing-{label}-guard.sfc'
+        mutant.write_bytes(original.replace(guard, replacement))
+        result = subprocess.run(command + ['--rom', str(mutant)], capture_output=True, text=True, timeout=30)
+        if not result.returncode or 'WRAM status=ee, adapter case=10' not in result.stderr:
+            raise RuntimeError(f'Missing {label} guard did not fail hardware NMI assertion 10')
+    print('Generated I/O stub preserves registers and masks NMI; either missing guard fails case 10.')
     controls = ROOT / "build/controller-test"
     build(controls, controllers=True)
     control_cmd = command + ["--rom", str(controls / "adapter-test.sfc")]

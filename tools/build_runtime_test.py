@@ -3,6 +3,11 @@ from pathlib import Path
 import struct
 import subprocess
 
+try:
+    from .build_native import stub
+except ImportError:
+    from build_native import stub
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -14,9 +19,11 @@ def build(out, controllers=False, jump=False):
                     "-o", str(out / "runtime.bin"), str(out / "runtime.o")], check=True)
     symbols = {line.split()[2].lstrip("."): int(line.split()[1], 16)
                for line in (out / "runtime.lbl").read_text().splitlines()}
+    io_stub = stub(0x8D, 0x2007, symbols['dispatch_write'])
     subprocess.run([ca65, *(["-D", "CONTROLLER_TEST=1"] if controllers or jump else []), *(["-D", "JUMP_TEST=1"] if jump else []), "-D", f'dispatch_read={symbols["dispatch_read"]}',
                     "-D", f'dispatch_write={symbols["dispatch_write"]}',
-                    "-D", f'bank_switch_enter={symbols["bank_switch_enter"]}', "-o", str(out / "test.o"),
+                    "-D", f'bank_switch_enter={symbols["bank_switch_enter"]}',
+                    "-D", 'io_write_stub=24576', "-o", str(out / "test.o"),
                     str(ROOT / "snes/runtime_test.asm")], check=True)
     subprocess.run([ld65, "-C", str(ROOT / "snes/native_boot.cfg"), "-o", str(out / "test.bin"),
                     str(out / "test.o")], check=True)
@@ -27,6 +34,7 @@ def build(out, controllers=False, jump=False):
         image[bank * 0x10000 + 0x8000:(bank + 1) * 0x10000] = program
         image[bank * 0x10000 + 0x2000:bank * 0x10000 + 0x6000] = (out / "runtime.bin").read_bytes()
         image[bank * 0x10000 + 0xBFFF] = bank - 1
+        image[bank * 0x10000 + 0x6000:bank * 0x10000 + 0x6000 + len(io_stub)] = io_stub
     image[0xF0000 + 0x42 * 1024 + 0x15] = 0xD3
     image[0xFFDC:0xFFE0] = b"\xff\xff\0\0"
     checksum = sum(image) & 65535

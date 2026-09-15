@@ -110,7 +110,8 @@ class NativeControls(unittest.TestCase):
         # an active original NMI, or a main-thread R6/R7 critical section.
         for opcode, operand in ((0x8D, 0x8000), (0x8D, 0x8001), (0xAD, 0x4016)):
             code = stub(opcode, operand, 0x2000)
-            self.assertIn(bytes.fromhex('ad0a1c0d831cd014'), code)
+            self.assertIn(bytes.fromhex('ad0a1c0d831cd00a'), code)
+            self.assertNotIn(bytes.fromhex('ad124230fb'), code)
 
     def test_progress_and_fault_negative_controls(self):
         ram = bytearray(8192)

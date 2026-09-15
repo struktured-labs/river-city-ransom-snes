@@ -58,8 +58,11 @@ def stub(opcode, operand, entry, resume=None, dynamic_apu=False):
         # explicit FC60 coroutine wait (task $0100 == 0). No extra return frame.
         guard = b"\x08\x48\xad\x0a\x1c\xf0\x0a\xad\x00\x01\xf0\x05\x68\x28\x4c" + word(resume)
         return data + guard + b"\x68\x48\x29\x80\xf0\x05\xad\x12\x42\x30\xfb\x68\x28\x8d\x00\x42\x4c" + word(resume)
-    return (data + b"\x08\x48\xad\x0a\x1c\x0d\x83\x1c\xd0\x14\xad\x20\x1c\x29\x80\xf0\x0d"
-            + b"\xad\x12\x42\x30\xfb\xad\x20\x1c\x29\x80\x8d\x00\x42\x68\x28\x60")
+    # The mailbox transaction is complete. Deliver a pending edge instead of
+    # waiting out VBlank; NMI entry acknowledges $4210 and the publisher now
+    # budgets late entry. Both nesting/paired-bank guards still suppress enable.
+    return (data + b"\x08\x48\xad\x0a\x1c\x0d\x83\x1c\xd0\x0a\xad\x20\x1c\x29\x80\xf0\x03"
+            + b"\x8d\x00\x42\x68\x28\x60")
 
 
 def build(rom_path, traces, out, experimental_fastrom=False):
