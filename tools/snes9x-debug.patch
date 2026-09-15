@@ -1,8 +1,8 @@
 diff --git a/cpuexec.cpp b/cpuexec.cpp
-index aa43b2f..d594dd6 100644
+index aa43b2f..f4db169 100644
 --- a/cpuexec.cpp
 +++ b/cpuexec.cpp
-@@ -135,6 +135,22 @@ void S9xMainLoop (void)
+@@ -135,6 +135,38 @@ void S9xMainLoop (void)
  			break;
  		}
  
@@ -21,6 +21,22 @@ index aa43b2f..d594dd6 100644
 +                        Memory.RAM[0x1c0a], Memory.RAM[0x1c04] | Memory.RAM[0x1c05] << 8);
 +                fflush(rcr_trace);
 +            }
++        }
++        // Observe the production adapter's STA $0A00,X without executing a
++        // memory read or changing the emulated cycle count. Raw CPU writes,
++        // not per-frame snapshots; enabled only by an explicit output path.
++        static FILE *rcr_apu = getenv("RCR_APU_TRACE") ? fopen(getenv("RCR_APU_TRACE"), "w") : NULL;
++        if (rcr_apu && CPU.PCBase && Registers.PB >= 0xc1 && Registers.PB <= 0xc8 &&
++            Registers.PCw >= 0x2000 && Registers.PCw < 0x6000 &&
++            !(Registers.DB & 0x40) && Registers.X.W < 0x18 &&
++            CPU.PCBase[Registers.PCw] == 0x9d &&
++            CPU.PCBase[Registers.PCw + 1] == 0x00 && CPU.PCBase[Registers.PCw + 2] == 0x0a)
++        {
++            fprintf(rcr_apu, "%u,%d,%d,%u,%u,%u,%06x\n",
++                IPPU.TotalEmulatedFrames, CPU.V_Counter, CPU.Cycles,
++                Memory.RAM[0x1c04] | Memory.RAM[0x1c05] << 8,
++                0x4000 + Registers.X.W, Registers.A.B.l, Registers.PBPC);
++            fflush(rcr_apu);
 +        }
  		uint8				Op;
  		struct	SOpcodes	*Opcodes;
