@@ -106,7 +106,31 @@ tests:
     jmp failed
 :
     ; Nonzero D must be preserved across long calls.
-    inc $1C61
+    ; Read a unique sentinel from every raw CHR bank, crossing CF -> D0.
+    lda #13
+    sta $1C61
+    stz $1C8F
+    stz $1C19
+    stz $1C20
+@chr_banks:
+    lda $1C8F
+    sta $1C12             ; R2 is the 1-KiB slot at PPU $1000
+    lda #$10
+    ldx #6
+    jsr ppu_write_test
+    lda #$15
+    jsr ppu_write_test
+    ldx #7
+    jsr ppu_read_test     ; discard previous buffer
+    jsr ppu_read_test
+    lda $1C8F
+    eor #$91
+    cmp $1B24
+    jne failed
+    inc $1C8F
+    bpl @chr_banks
+    lda #3
+    sta $1C61
     lda #$12
     xba
     lda #$34

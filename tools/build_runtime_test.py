@@ -39,7 +39,8 @@ def build(out, controllers=False, jump=False):
         image[bank * 0x10000 + 0x2000:bank * 0x10000 + 0x6000] = (out / "runtime.bin").read_bytes()
         image[bank * 0x10000 + 0xBFFF] = bank - 1
         image[bank * 0x10000 + 0x6000:bank * 0x10000 + 0x6000 + len(io_stub)] = io_stub
-    image[0xF0000 + 0x42 * 1024 + 0x15] = 0xD3
+    for bank in range(128):
+        image[0xF0000 + bank * 1024 + 0x15] = bank ^ 0x91
     image[0xFFDC:0xFFE0] = b"\xff\xff\0\0"
     checksum = sum(image) & 65535
     struct.pack_into("<HH", image, 0xFFDC, checksum ^ 65535, checksum)

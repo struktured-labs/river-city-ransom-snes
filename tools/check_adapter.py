@@ -26,6 +26,14 @@ def check(core):
     if not result.returncode or "WRAM status=ee, adapter case=2" not in result.stderr:
         raise RuntimeError("Corrupted CHR did not fail the expected executed adapter assertion")
     print("Adapter positive control passed; corrupted-CHR negative control failed at the expected assertion.")
+    wrong_bank = bytearray((out / 'adapter-test.sfc').read_bytes())
+    wrong_bank[0xF0000 + 64 * 1024 + 0x15] ^= 1
+    bank_negative = out / 'corrupted-chr-boundary.sfc'
+    bank_negative.write_bytes(wrong_bank)
+    result = subprocess.run(command + ['--rom', str(bank_negative)], capture_output=True, text=True, timeout=30)
+    if not result.returncode or 'WRAM status=ee, adapter case=13' not in result.stderr:
+        raise RuntimeError('Corrupted CF/D0 boundary sentinel did not fail all-bank assertion 13')
+    print('All 128 raw CHR banks read correctly; corrupted bank 64 fails case 13.')
     short_copy = bytearray((out/'adapter-test.sfc').read_bytes())
     sequence = bytes.fromhex('a9ff00547e7e')
     if short_copy.count(sequence) != 8:

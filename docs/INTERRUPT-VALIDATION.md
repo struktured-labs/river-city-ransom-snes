@@ -426,6 +426,32 @@ both pattern halves. Existing graphics/cache/late-entry controls and 54 unit
 tests pass. Rivalmage remains unchanged.
 # Frame-boundary attribution of remaining long NMI gaps
 
+## CHR pointer arithmetic follow-up
+
+The raw CHR read path now derives the 24-bit bank offset using two ASLs:
+the byte result is the high pointer byte and carry selects CF versus D0.
+This removes redundant shifts/reloads without changing mapper selection,
+buffering, or PPU address increment. The adapter fixture reads independent
+bank-number-derived sentinels from all 128 raw CHR banks; corrupting bank 64
+must fail executed assertion 13. Existing buffered-read, flags, controller,
+bank-switch, NMI-guard, and negative controls still pass; 56 unit tests pass.
+
+Candidate `build/chr-pointer-01/native-cpu.sfc`, SHA
+`08df062532c99094b0b24738505fbe316e062f97f68bc1b6d4d4a0ef3f33c89d`,
+completes the baseline in 2,228 frames versus 2,229 before this change and
+1,936 for NES. `build/chr-pointer-quality-01/site/index.html` passes bundle
+integrity and settings pixels but still fails all four transition timing
+gates. This is a small optimization, not a speed-fidelity pass.
+
+The 12,000-frame walk still has a maximum NMI interval of 41 display frames.
+It now contains ten long stall runs instead of five, at different later
+frames (the first two remain after 1821 and 1863). Picture changes average
+30.02/sec and NMIs 58.54/sec, with no detected VBlank overrun. These aggregate
+values are not an improvement certificate: movement/encounter divergence
+changes the amount of loading within the fixed capture window. Long load
+stalls remain unresolved, as do audio fidelity and full scrolling validation.
+No Rival deployment was performed.
+
 `tools/profile_native.py` now retains the frame immediately before each NMI
 stall, every stalled sample, and the first resumed sample (or null if the run
 ends stalled). Samples include optional debug-core PC, task `$0100`, PPUCTRL,

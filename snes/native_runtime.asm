@@ -470,20 +470,14 @@ chr_read_pointer:
     lda a:$1C10,x
 @bank:
     and #$7F
-    sta $04
-    lsr
-    lsr
-    lsr
-    lsr
-    lsr
-    lsr
-    clc
-    adc #$CF
-    sta $02
-    lda $04
+    ; bank * 1024: two shifts give the pointer high byte and carry is
+    ; original bank bit 6, selecting CF/D0. STA/LDA preserve that carry.
     asl
     asl
     sta $01
+    lda #$CF
+    adc #0
+    sta $02
     lda a:$1C27
     and #3
     ora $01
