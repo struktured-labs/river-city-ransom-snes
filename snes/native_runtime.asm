@@ -519,14 +519,42 @@ done_banked:
     rtl
 
 bank_switch_enter:
-    ; Keep R6/R7 pair writes atomic against the NMI's audio-bank switch.
-    ; Replay the three replaced original instructions with identical stack ABI.
+    ; Direct translation of FED1's paired-bank operation. The original routine
+    ; uses four generic mapper writes, but their effect is fully determined by
+    ; input A. Preserve its FB/FC/FD, R6/R7, A/X/Y and final CMP result.
     stz $4200
     inc a:$1C83
     pha
-    txa
+    asl
+    sta $FC
+    sta a:$1C16
+    clc
+    adc #1
+    sta $FD
+    sta a:$1C17
+    lda #7
+    sta $FB
+    sta a:$1C19
+    ; Match the adapter's existing 16-KiB-pair mapping, then jump into the
+    ; replicated exit in the new bank. No extra return frame survives.
+    pla
     pha
-    jmp $FED4
+    and #7
+    clc
+    adc #$C1
+    sta a:$1C03
+    sta a:$1C02
+    sta a:$1C8A
+    and #$3F
+    ora #$80
+    pha
+    plb
+    lda #<bank_switch_exit
+    sta a:$1C88
+    lda #>bank_switch_exit
+    sta a:$1C89
+    pla
+    jml [$1C88]
 bank_switch_exit:
     cmp $BFFF
     beq @valid

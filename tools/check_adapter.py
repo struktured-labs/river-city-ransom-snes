@@ -28,7 +28,7 @@ def check(core):
     print("Adapter positive control passed; corrupted-CHR negative control failed at the expected assertion.")
     short_copy = bytearray((out/'adapter-test.sfc').read_bytes())
     sequence = bytes.fromhex('a9ff00547e7e')
-    if short_copy.count(sequence) != 2:
+    if short_copy.count(sequence) != 8:
         raise RuntimeError('Expected one OAM block-copy per replicated runtime bank')
     short_copy = short_copy.replace(sequence, bytes.fromhex('a9fe00547e7e'))
     truncated = out/'truncated-oam.sfc'
@@ -42,7 +42,7 @@ def check(core):
     banked = b'\x4c' + symbols['done_banked'].to_bytes(2, 'little')
     plain = b'\x4c' + symbols['done'].to_bytes(2, 'little')
     original = (out/'adapter-test.sfc').read_bytes()
-    if original.count(banked) != 2:
+    if original.count(banked) != 8:
         raise RuntimeError('Expected one bank-retarget jump per runtime bank')
     missing_bank = out/'missing-bank-return.sfc'
     missing_bank.write_bytes(original.replace(banked, plain))
@@ -50,6 +50,15 @@ def check(core):
     if not result.returncode or 'WRAM status=ee, adapter case=8' not in result.stderr:
         raise RuntimeError('Missing bank retarget did not fail executed bank assertion 8')
     print('C1→C2 retarget and ordinary C2 returns pass; missing retarget fails case 8.')
+    pair = bytes.fromhex('18690185fd8d171c')
+    if original.count(pair) != 8:
+        raise RuntimeError('Expected one direct R7 calculation per runtime bank')
+    wrong_pair = out/'wrong-direct-pair.sfc'
+    wrong_pair.write_bytes(original.replace(pair, bytes.fromhex('18690085fd8d171c')))
+    result = subprocess.run(command + ['--rom', str(wrong_pair)], capture_output=True, text=True, timeout=30)
+    if not result.returncode or 'WRAM status=ee, adapter case=9' not in result.stderr:
+        raise RuntimeError('Incorrect direct R7 did not fail pair assertion 9')
+    print('All eight direct bank pairs preserve registers/state; wrong R7 fails case 9.')
     controls = ROOT / "build/controller-test"
     build(controls, controllers=True)
     control_cmd = command + ["--rom", str(controls / "adapter-test.sfc")]

@@ -15,16 +15,18 @@ def build(out, controllers=False, jump=False):
     symbols = {line.split()[2].lstrip("."): int(line.split()[1], 16)
                for line in (out / "runtime.lbl").read_text().splitlines()}
     subprocess.run([ca65, *(["-D", "CONTROLLER_TEST=1"] if controllers or jump else []), *(["-D", "JUMP_TEST=1"] if jump else []), "-D", f'dispatch_read={symbols["dispatch_read"]}',
-                    "-D", f'dispatch_write={symbols["dispatch_write"]}', "-o", str(out / "test.o"),
+                    "-D", f'dispatch_write={symbols["dispatch_write"]}',
+                    "-D", f'bank_switch_enter={symbols["bank_switch_enter"]}', "-o", str(out / "test.o"),
                     str(ROOT / "snes/runtime_test.asm")], check=True)
     subprocess.run([ld65, "-C", str(ROOT / "snes/native_boot.cfg"), "-o", str(out / "test.bin"),
                     str(out / "test.o")], check=True)
     image = bytearray(b"\xff" * 2097152)
     program = (out / "test.bin").read_bytes()
     image[0x8000:0x10000] = program
-    for bank in (1, 2):
+    for bank in range(1, 9):
         image[bank * 0x10000 + 0x8000:(bank + 1) * 0x10000] = program
         image[bank * 0x10000 + 0x2000:bank * 0x10000 + 0x6000] = (out / "runtime.bin").read_bytes()
+        image[bank * 0x10000 + 0xBFFF] = bank - 1
     image[0xF0000 + 0x42 * 1024 + 0x15] = 0xD3
     image[0xFFDC:0xFFE0] = b"\xff\xff\0\0"
     checksum = sum(image) & 65535

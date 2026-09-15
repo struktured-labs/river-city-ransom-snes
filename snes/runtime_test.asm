@@ -1,5 +1,5 @@
 ; Asset-free tests of the ACTUAL bank-replicated native adapter.
-; Program copies in C0/C1/C2 exercise real cross-bank returns.
+; Program copies in C0..C8 exercise real cross-bank returns.
 .setcpu "65816"
 .macpack longbranch
 .a8
@@ -271,6 +271,59 @@ tests:
     pla
     cmp #$82
     jne failed
+    lda #9
+    sta $1C61
+    stz $1C8B
+@bank_loop:
+    lda $1C8B
+    ldx #$34
+    ldy #$56
+    jsr bank_switch_enter
+    jne failed              ; final bank-tag CMP must report equality
+    jcc failed
+    cmp $1C8B
+    jne failed
+    cpx #$34
+    jne failed
+    cpy #$56
+    jne failed
+    lda $1C8B
+    clc
+    adc #$C1
+    sta $1C8C
+    phk
+    pla
+    cmp $1C8C
+    jne failed
+    lda $1C8B
+    clc
+    adc #$81
+    sta $1C8C
+    phb
+    pla
+    cmp $1C8C
+    jne failed
+    lda $1C8B
+    asl
+    cmp $FC
+    jne failed
+    cmp $1C16
+    jne failed
+    clc
+    adc #1
+    cmp $FD
+    jne failed
+    cmp $1C17
+    jne failed
+    lda $FB
+    cmp #7
+    jne failed
+    lda $1C83
+    jne failed
+    inc $1C8B
+    lda $1C8B
+    cmp #8
+    jcc @bank_loop
     lda #1
     sta $1C60
     stz $2121

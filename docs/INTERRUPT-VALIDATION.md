@@ -187,3 +187,39 @@ A/X/Y. An ordinary PPU call from C2 into the C1 helper must return to C2 with
 DB unchanged. A mutant that bypasses the bank retarget fails assertion 8.
 The existing truncated-OAM mutant now changes both runtime copies. Adapter
 positive/negative controls and all 46 unit tests pass. Rivalmage is unchanged.
+
+### Direct paired-bank translation
+
+`build/direct-bank-01/native-cpu.sfc`, SHA
+`a0c9e320821e74cb0f4dd117e5b639e7ea3e00126262201a176f950494a86df9`,
+replaces FED1's four general mapper accesses with their direct paired-bank
+effect. The recognized ROM routine computes R6=2*A and R7=2*A+1, leaves FB=7,
+FC=R6, FD=R7, preserves A/X/Y, and compares A with the destination bank's BFFF
+tag. The new code does those updates while NMI remains masked, then uses an
+indirect long jump through $1C88–1C8A to the replicated checked exit. The exit
+still validates the bank tag and only re-enables NMI when both depth guards
+allow it. The old diagnostic count of generic R6 dispatches is no longer
+incremented by this direct path. No original artwork or gameplay wait threshold
+is changed; input ROM PRG/CHR checksums remain enforced.
+
+The 12,000-frame walk measures 56.99 NMIs/second, 29.78 picture changes/second,
+and 25.90 sampled game-counter changes/second, compared with 56.98/18.80/22.93
+for lean-return-01. No adapter/SPC fault or graphics overrun is detected.
+The phase audit at `build/direct-bank-quality-01/site/index.html` verifies
+bundle integrity and basic audio/settings gates, but all four transition
+timing gates still fail: capture length 2533 versus NES 1936. These remain
+experimental results, not proof of original-speed gameplay or clean sound.
+
+The matched direction-reversal capture is visibly closer to the original:
+after the same 1440 Left frames, the old native candidate's camera bytes were
+3501 and the new candidate's are 2500; NES is at 0000. The new native image is
+near the school entrance, rather than farther down the initial street. Different
+encounters preclude an exact speed ratio. The retained paired images/audio are
+at `build/direct-recovery-01/site/index.html`; full original-speed and audio
+fidelity requirements remain open.
+
+The asset-free fixture now replicates all eight runtime/program banks and
+checks direct switches through each pair, final equality/carry, A/X/Y, PB/DB,
+FB/FC/FD/R6/R7, and cleared critical depth. An incorrect R7 calculation fails
+executed assertion 9. Existing ordinary-bank, controller, jump, CHR and OAM
+positive/negative tests still pass, as do 49 unit tests. Rivalmage is unchanged.
