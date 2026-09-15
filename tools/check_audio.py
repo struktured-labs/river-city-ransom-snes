@@ -34,13 +34,19 @@ def measure(pcm, rate, expected_hz):
         spectrum[(frequency < 50) | (frequency > 5000)] = 0
         frequencies.append(float(frequency[spectrum.argmax()]))
     clipped = float(np.mean(abs(samples) >= 32767))
+    quiet_ms = []
+    for channel in range(2):
+        quiet = abs(ac[:, channel]) < 32
+        edges = np.flatnonzero(np.diff(np.r_[False, quiet, False]))
+        quiet_ms.append(float(max(edges[1::2]-edges[::2], default=0)*1000/rate))
     passed = (max(rms) < 8 and np.max(abs(samples)) < 8 if expected_hz is None else
               min(rms) > 128 and np.all(activity.mean(axis=0) >= .98)
               and all(abs(f-expected_hz) < expected_hz*.015 for f in frequencies)
-              and clipped < .0001)
+              and clipped < .0001 and max(quiet_ms) <= .5)
     return {'passed': bool(passed), 'expected_hz': expected_hz,
             'dominant_hz': frequencies, 'ac_rms': rms.tolist(),
-            'active_10ms_fraction': activity.mean(axis=0).tolist(), 'clipped_fraction': clipped}
+            'active_10ms_fraction': activity.mean(axis=0).tolist(), 'clipped_fraction': clipped,
+            'longest_near_zero_ms': quiet_ms}
 
 
 def measure_length(onset, tail, rate):
@@ -54,10 +60,13 @@ def measure_length(onset, tail, rate):
     return result
 
 
-def check(core, out, length=False):
+def check(core, out, length=False, retrigger=False):
+    if length and retrigger:
+        raise ValueError('Length and periodic-retrigger probes are distinct profiles')
     out.mkdir(parents=True, exist_ok=False)
     subprocess.run([str(ROOT/'.deps/cc65/bin/ca65'), '-D', 'AUDIO_SCRIPT=1',
                     *(['-D', 'AUDIO_LENGTH=1'] if length else []),
+                    *(['-D', 'AUDIO_RETRIGGER=1'] if retrigger else []),
                     '--bin-include-dir', str(ROOT/'.deps/upernes/source/asm'),
                     '-o', str(out/'script.o'), str(ROOT/'snes/bringup.asm')], check=True)
     rom = out/'script.sfc'
@@ -91,7 +100,8 @@ def check(core, out, length=False):
             ram = C.string_at(lib.retro_get_memory_data(2), 8192)
             if ram[0xA22] == 1:
                 rows.append({'phase': ram[0xA23], 'start_sample': start, 'end_sample': total,
-                             'driver_frame': int.from_bytes(ram[0xA20:0xA22], 'little')})
+                             'driver_frame': int.from_bytes(ram[0xA20:0xA22], 'little'),
+                             'periodic_retriggers': ram[0xA24]})
         lib.retro_run = step
         return lib
 
@@ -112,6 +122,8 @@ def check(core, out, length=False):
         expected_phase = 0 if frame < 120 else 1 if frame < 180 else 2 if frame < 240 else 3
         if row['phase'] != expected_phase:
             raise RuntimeError('Audio script changed phase at the wrong driver frame')
+        if row['periodic_retriggers'] != (frame//32 if retrigger else 0):
+            raise RuntimeError('Periodic retrigger execution does not match schedule')
     results = []
     for phase, expected in enumerate((1789773/(16*254), None, 1789773/(16*254), 1789773/(16*127))):
         frames = [r for r in rows if r['phase'] == phase]
@@ -132,7 +144,7 @@ def check(core, out, length=False):
     report = {'schema': 'rcr-spc-signal-test-v1', 'receipt': receipt,
               'scope': ('pulse length-index-zero expiry and retrigger; NOT full frame-sequencer/envelope/sweep/noise/DMC or game fidelity'
                         if length else 'constant pulse, channel disable, restart, pitch change; NOT length/envelope/sweep/noise/DMC or game fidelity'),
-              'profile': 'length-expiry' if length else 'pulse-script',
+              'profile': 'length-expiry' if length else ('periodic-retrigger' if retrigger else 'pulse-script'),
               'tool_sha256': sha(Path(__file__)), 'source_sha256': sha(ROOT/'snes/bringup.asm'),
               'wav_sha256': sha(out/'audio.wav'), 'timeline_sha256': sha(out/'timeline.json'),
               'phases': results, 'passed': all(r['passed'] for r in results), 'release_ready': False}
@@ -146,5 +158,6 @@ if __name__ == '__main__':
     parser.add_argument('--core', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--length', action='store_true', help='Probe automatic NES pulse length expiry (currently unimplemented)')
+    parser.add_argument('--retrigger', action='store_true', help='Probe periodic same-note retriggering and sub-millisecond dropouts')
     args = parser.parse_args()
-    raise SystemExit(0 if check(args.core, args.out, args.length) else 1)
+    raise SystemExit(0 if check(args.core, args.out, args.length, args.retrigger) else 1)

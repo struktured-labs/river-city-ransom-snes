@@ -8,6 +8,7 @@ APU_PACKET = $0A00
 FRAME = $0A20
 STATUS = $0A22                 ; 1=running, $EE=SPC timeout
 PHASE = $0A23                  ; observable scripted-audio phase
+RETRIGGERS = $0A24
 
 .segment "CODE"
 reset:
@@ -39,6 +40,7 @@ reset:
     stz FRAME+1
     stz STATUS
     stz PHASE
+    stz RETRIGGERS
     ldx #$0016
 @clear:
     stz APU_PACKET,x
@@ -127,6 +129,17 @@ reset:
     lda #3
     sta PHASE
 @send_frame:
+.endif
+.ifdef AUDIO_RETRIGGER
+    ; Periodic same-period high-register writes: retain the existing waveform
+    ; and transport but exercise repeated note starts about twice per second.
+    lda FRAME
+    and #31
+    bne :+
+    lda #1
+    sta APU_PACKET+$16
+    inc RETRIGGERS
+:
 .endif
     jsr spc_frame
     bcs failed

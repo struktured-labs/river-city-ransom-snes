@@ -31,6 +31,14 @@ class AudioSignalControls(unittest.TestCase):
         for pcm in (wrong, one_channel, sputter, np.full((48000, 2), 1000)):
             self.assertFalse(measure(pcm, 48000, 440)['passed'])
 
+    def test_submillisecond_gap_is_not_hidden_by_10ms_activity(self):
+        tone = self.tone()
+        tone[24000:24048] = 0
+        result = measure(tone, 48000, 440)
+        self.assertGreaterEqual(min(result['active_10ms_fraction']), .98)
+        self.assertGreater(max(result['longest_near_zero_ms']), .5)
+        self.assertFalse(result['passed'])
+
     def test_noise_during_mute_and_clipping_fail(self):
         self.assertFalse(measure(self.tone(), 48000, None)['passed'])
         self.assertFalse(measure(np.full((48000, 2), 1000), 48000, None)['passed'])

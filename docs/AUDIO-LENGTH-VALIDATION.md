@@ -53,3 +53,29 @@ Rivalmage deployment.
 python3 tools/check_audio.py --core /path/to/snes9x_libretro.so \
   --out build/new-length-probe --length
 ```
+
+## Periodic-retrigger/dropout follow-up
+
+`--retrigger` retains the constant-volume pulse test but sets the note-start
+flag every 32 diagnostic frames. A WRAM counter records actual scheduled
+triggers; the capture verifier requires it to equal floor(driver_frame/32).
+This makes missing scheduled execution an error, not a passing quiet signal.
+
+The tone oracle now also measures consecutive near-zero samples independently
+in each channel. The active-tone limit is 0.5 ms; a synthetic 1-ms dropout
+fails even though the existing 10-ms activity gate accepts that window. This
+threshold applies only to controlled sustained tones, not arbitrary music
+rests or waveform shapes. The explicit mute gate still requires silence.
+
+Both `build/audio-retrigger-final-01` and `build/audio-fine-final-01` pass.
+Active windows show at most one near-zero sample (about 0.0312 ms at 32040 Hz)
+in either channel. Periodic retriggering therefore does not reproduce audible
+dropouts under this steady diagnostic update schedule. This is not a matched
+NES waveform/phase-reset oracle, nor evidence that gameplay SFX are correct.
+The length-expiry defect and full envelope/sweep/triangle/noise/DMC requirements
+remain open.
+
+CI now executes the periodic-retrigger profile in addition to the standard
+SPC profile. Fifty-one unit tests pass. No game audio runtime or Rivalmage
+deployment changes are made by this diagnostic follow-up. Long game interrupt
+gaps during loading remain a concrete cadence problem to address next.
