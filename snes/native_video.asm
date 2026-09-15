@@ -298,6 +298,22 @@ native_video:
     lda #2
     sta $420C
 @no_split:
+    ; NES PPUMASK bits 1/2 independently expose the leftmost eight BG/OBJ
+    ; pixels. Window 1 masks exactly x=0..7 on the main screen.
+    stz $2126
+    lda #7
+    sta $2127
+    lda #$11
+    sta $212E
+    lda $1C21
+    and #2
+    eor #2
+    sta $2123
+    lda $1C21
+    and #4
+    lsr
+    eor #2
+    sta $2125
     lda $1C21
     and #8
     lsr

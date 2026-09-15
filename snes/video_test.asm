@@ -71,7 +71,11 @@ reset:
     sta $1003
     lda #8
     sta $1C20
-    lda #$18
+.ifdef LEFT_MASK
+    lda #(LEFT_MASK ^ 6)  ; begin with opposite clipping, then change it live
+.else
+    lda #$1E             ; this fixture intentionally draws at x=0
+.endif
     sta $1C21
     lda #1
     sta f:$7F2000
@@ -152,7 +156,13 @@ reset:
     sta $1D07
     sta $1D18
     sta $1C85
+.ifdef LEFT_MASK
+    lda #LEFT_MASK
+    sta $1C21
+    lda #4               ; straddle the eight-pixel window boundary
+.else
     lda #32
+.endif
     sta $1003
     lda #$18
     sta $1C20

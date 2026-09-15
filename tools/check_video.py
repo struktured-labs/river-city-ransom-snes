@@ -10,13 +10,13 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def check(core, out=None, source=None, negative=False, scrolling=False, late=False, expected_case=None, last_chr=False):
+def check(core, out=None, source=None, negative=False, scrolling=False, late=False, expected_case=None, last_chr=False, left_mask=None):
     out = out or ROOT / "build/video-test"
     source = source or ROOT / "snes/video_test.asm"
     out.mkdir(parents=True, exist_ok=True)
     palette = [0, 0x001F, 0x7C00] + [0] * 61
     (out / "native_palette.inc").write_text(".word " + ",".join(map(str, palette)) + "\n")
-    subprocess.run([str(ROOT / ".deps/cc65/bin/ca65"), *(['-D','SCROLL_TEST=1'] if scrolling else []), *(['-D', 'LATE_TEST=1'] if late else []), *(['-D', 'LAST_CHR_TEST=1'] if last_chr else []), "-I", str(out), "-o", str(out / "test.o"),
+    subprocess.run([str(ROOT / ".deps/cc65/bin/ca65"), *(['-D', f'LEFT_MASK={left_mask}'] if left_mask is not None else []), *(['-D','SCROLL_TEST=1'] if scrolling else []), *(['-D', 'LATE_TEST=1'] if late else []), *(['-D', 'LAST_CHR_TEST=1'] if last_chr else []), "-I", str(out), "-o", str(out / "test.o"),
                     str(source)], check=True)
     subprocess.run([str(ROOT / ".deps/cc65/bin/ld65"), "-C", str(ROOT / "snes/native_boot.cfg"),
                     "-o", str(out / "test.bin"), str(out / "test.o")], check=True)
@@ -55,7 +55,12 @@ def check(core, out=None, source=None, negative=False, scrolling=False, late=Fal
         expected.paste((255, 0, 0), (0, 192, 8, 200))
     # Assert the producer's explicit SNES OAM coordinate (NES byte 15 + 2).
     # NES/SNES capture alignment is tested separately against original frames.
-    expected.paste((0, 0, 255), (32, 17, 40, 25))
+    if left_mask is None:
+        expected.paste((0, 0, 255), (32, 17, 40, 25))
+    else:
+        if not left_mask & 2:
+            expected.paste((0, 0, 0), (0, 0, 8, 239))
+        expected.paste((0, 0, 255), (4 if left_mask & 4 else 8, 17, 12, 25))
     if actual.tobytes() != expected.tobytes():
         raise RuntimeError("Incremental BG/OBJ/palette output differs from synthetic pixel oracle")
     print("Native producer, bounded NMI queue draining and exact BG/OBJ pixels passed.")
@@ -146,6 +151,29 @@ def check_last_chr_control(core):
     print('Final CHR slot drains and restores pixels; omitted bitmap word fails case 8.')
 
 
+def check_left_controls(core):
+    for mask in (0x18, 0x1A, 0x1C, 0x1E):
+        check(core, ROOT/f'build/left-clip-test-{mask:02x}', left_mask=mask)
+    with tempfile.TemporaryDirectory(prefix='rcr-left-clip-negative-') as temporary:
+        out = Path(temporary)
+        for name in ('video_test.asm', 'native_prepare.asm', 'native_video.asm'):
+            (out/name).write_text((ROOT/'snes'/name).read_text())
+        source = out/'native_video.asm'
+        original = source.read_text()
+        boundary = '    lda #7\n    sta $2127'
+        if original.count(boundary) != 1:
+            raise RuntimeError('Cannot identify left-window boundary')
+        source.write_text(original.replace(boundary, '    lda #8\n    sta $2127'))
+        try:
+            check(core, out, out/'video_test.asm', left_mask=0x18)
+        except RuntimeError as error:
+            if 'differs from synthetic pixel oracle' not in str(error):
+                raise
+        else:
+            raise RuntimeError('Nine-pixel clipping incorrectly passed the oracle')
+    print('Independent BG/OBJ clipping passes all four masks; off-by-one boundary fails.')
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--core", type=Path, required=True)
@@ -156,3 +184,4 @@ if __name__ == "__main__":
     check_late_control(core)
     check_cache_controls(core)
     check_last_chr_control(core)
+    check_left_controls(core)

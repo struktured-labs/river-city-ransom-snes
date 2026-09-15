@@ -216,6 +216,16 @@ def build(reference_dir, candidate_dir, out):
         settings, heat = compare(candidate_dir / "reference-settings.png", candidate_dir / "settings.png")
         heat.save(out / "settings-difference.png")
         gates.append({"gate": "settings_pixels", "passed": settings["mismatch_pixels"] == 0})
+    street_background = None
+    if 'idle' in rmetrics and 'idle' in cmetrics:
+        # Fixed upper-building strip in the initial idle scene, above the
+        # actors. Includes the left edge; never align/search away clipping.
+        _, heat = compare(reference_dir/'idle.png', candidate_dir/'idle.png')
+        strip = np.asarray(heat.crop((0, 32, 256, 112)))
+        mismatch = int(np.any(strip != 0, axis=2).sum())
+        street_background = {'region': [0, 32, 256, 112], 'pixels_compared': 20480,
+                             'mismatch_pixels': mismatch, 'passed': mismatch == 0}
+        gates.append({'gate': 'initial_street_background_pixels', 'passed': mismatch == 0})
     tails = {}
     for name, rows in (("reference", rrows), ("candidate", crows)):
         paused = [r for r in rows if r["phase"] == "pause_requested"][POLICY["pause_tail_grace_frames"]:]
@@ -228,7 +238,7 @@ def build(reference_dir, candidate_dir, out):
     result = {"schema": "rcr-quality-benchmark-v1", "release_ready": False,
               "status": "failed" if any(g["passed"] is False for g in gates) else "incomplete",
               "policy": POLICY, "gates": gates, "reference": rmetrics, "candidate": cmetrics,
-              "settings_pixels": settings, "pause_tail": tails,
+              "settings_pixels": settings, "initial_street_background_pixels": street_background, "pause_tail": tails,
               "candidate_rom_sha256": cand["rom_sha256"], "reference_rom_sha256": ref["rom_sha256"],
               "reference_capture_sha256": sha(reference_dir / "capture.json"),
               "candidate_capture_sha256": sha(candidate_dir / "capture.json"),
