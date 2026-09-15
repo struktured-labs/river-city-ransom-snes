@@ -39,6 +39,9 @@ def profile(core_path, rom_path, frames=3600, warmup=1800):
             elapsed = time.perf_counter() - begin
             ram = C.string_at(core.retro_get_memory_data(2), 8192)
             rows.append({"frame": len(rows) + 1, "nmi": int.from_bytes(ram[0x1C04:0x1C06], "little"),
+                         "camera_x": int.from_bytes(ram[0xDC:0xDE], 'little'),
+                         "street_scroll_x": ram[0xF6] | ((ram[0x3D] & 1) << 8),
+                         "hdma_street_scroll_x": ram[0x1C94] | ((ram[0x1C95] & 1) << 8),
                          "game_tick": ram[0x52B], "guard_ready": ram[0x1C79] == 1,
                          "vblank_overrun": ram[0x1C79] == 1 and ram[0x1C7B] == 1,
                          "host_seconds": elapsed})
@@ -64,6 +67,9 @@ def profile(core_path, rom_path, frames=3600, warmup=1800):
     return {"schema": "rcr-frame-pacing-v1", "receipt": receipt,
             "profile_tool_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             "measurement_frames": [warmup + 1, frames], "input_profile": "walk",
+            "camera_x_range": [min(r['camera_x'] for r in rows[warmup:]), max(r['camera_x'] for r in rows[warmup:])],
+            "street_scroll_x_range": [min(r['street_scroll_x'] for r in rows[warmup:]), max(r['street_scroll_x'] for r in rows[warmup:])],
+            "hdma_street_scroll_x_range": [min(r['hdma_street_scroll_x'] for r in rows[warmup:]), max(r['hdma_street_scroll_x'] for r in rows[warmup:])],
             "nmi_per_second": len(events)/seconds,
             "nmi_gap_display_frames": dict(sorted(collections.Counter(intervals).items())),
             "max_nmi_gap_display_frames": max(intervals, default=0),

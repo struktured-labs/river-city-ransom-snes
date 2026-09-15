@@ -6,6 +6,39 @@ not to rename emulator liveness as game correctness.
 
 ## September 15 local progress (not deployed)
 
+### Horizontal scroll and split-display implementation
+
+`build/scroll-hdma-02` (`6f5c3e6cb1090f62f649d121fc53cc8768d4a7d2e0b79ff1710fc5d0ab4fd2c8`)
+uses a 64-tile-wide BG map and HDMA for the HUD/street/lower-text horizontal
+scroll bands. The initial split policy is lines 32 and 194; exact original-game
+split alignment still needs frame comparison. The producer's original tile
+data are unchanged. Vertical nametable wrapping/mirroring and full raster IRQ
+semantics remain incomplete.
+
+The executed asset-free pixel test now includes a neighboring-nametable tile
+entering at x=248 while HUD pixels remain fixed, including the lower split through
+a tile. Disabling HDMA deliberately fails the pixel oracle. Relocated direct-page
+aliases are poisoned so accidentally reading renderer scratch instead of game
+camera RAM cannot pass. An initial local prototype had exactly that addressing
+error; `scroll-hdma-01` is superseded and must not be deployed.
+
+The 12,000-frame `scroll-hdma-02/pacing.json` run shows both game and HDMA street
+scroll ranges reaching 447, across the 256-pixel boundary. This is not yet a
+verified scene-exit/gameplay pass. Raw `$DC/DD` camera sampling also observes
+65535, so its maximum alone is not a valid progression metric. NMI cadence is
+still only 32.49/sec, with a 64-display-frame maximum gap; speed is not fixed.
+The phase benchmark (`build/scroll-quality-02/site`) reaches all phases in 2,521
+frames, passes settings pixels, but fails eight timing/audio gates.
+
+A new 7,200-frame authentic NES trace in `build/reference-walk-long-01` captures
+camera boundary crossing and later scene transitions. It adds one covered I/O
+patch (206 total). Next is a matched long-walk audit with game-state transition
+oracles, not simply an attractive scrolled screenshot.
+
+Audio-service telemetry moved from `$1C7C` (already used by the consumer beam
+diagnostic) to `$1C84`. Earlier `gameplay_sound_services` fields at `$1C7C` were
+invalid counts; audio PCM measurements remain valid. Rivalmage was untouched.
+
 ### Timing-sensitive failure reproduction
 
 Follow-up: the bank switch at `$FED1` is now protected across both MMC3 PRG

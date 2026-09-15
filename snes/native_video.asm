@@ -205,11 +205,69 @@ native_video:
         sta $420B
     .endrepeat
     lda $1C20
-    and #3
+    and #2
     asl
     asl
-    ora #$20
+    ora #$21                ; 64x32: adjacent NES nametables, not 32-tile wrap
     sta $2107
+    lda $1C28
+    sta $210D
+    lda $1C20
+    and #1
+    sta $210D              ; nametable X select is scroll bit 8
+    rep #$20
+    .a16
+    lda $1C29
+    and #$00FF
+    dec
+    sta $08
+    sep #$20
+    .a8
+    lda $08
+    sta $210E
+    lda $09
+    sta $210E              ; preserve existing NES/SNES -1-line alignment
+    ; RCR uses three horizontal bands: HUD, scrolling street, lower text.
+    ; HDMA applies their scroll values at scanline boundaries independently
+    ; of CPU game/audio service. Tables are rebuilt only during VBlank.
+    stz $420C
+    lda $0100
+    and #$C0
+    cmp #$C0
+    bne @no_split
+    lda #32
+    sta $1C90
+    lda a:$00DE
+    sta $1C91
+    stz $1C92
+    lda #127
+    sta $1C93
+    lda #35
+    sta $1C96
+    lda a:$00F6
+    sta $1C94
+    sta $1C97
+    lda a:$003D
+    and #1
+    sta $1C95
+    sta $1C98
+    lda #45
+    sta $1C99
+    lda a:$00DF
+    sta $1C9A
+    stz $1C9B
+    stz $1C9C
+    lda #2                 ; HDMA mode 2: two writes to BG1HOFS
+    sta $4310
+    lda #$0D
+    sta $4311
+    ldx #$1C90
+    stx $4312
+    lda #$7E
+    sta $4314
+    lda #2
+    sta $420C
+@no_split:
     lda $1C21
     and #8
     lsr

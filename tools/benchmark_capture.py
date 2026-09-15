@@ -270,7 +270,8 @@ def capture(core_path, rom_path, system, references, out, scenario_name='baselin
                     rows[-1]['native'] = {'pc':getter(0), 'p':getter(5), 'db':getter(6),
                         'task':ram[0x100], 'guard':ram[0x107], 'nmi_depth':ram[0x1C0A],
                         'ppu_ctrl':ram[0x1C20], 'ppu_mask':ram[0x1C21],
-                        'gameplay_sound_services':ram[0x1C7C],
+                        'gameplay_sound_services':ram[0x1C84],
+                        'scroll_x':ram[0x1C28], 'scroll_y':ram[0x1C29],
                         'publish_count':ram[0x1C7A], 'apu_packet':ram[0xA00:0xA17].hex()}
                 pcm.extend(frame_audio)
                 if "until" in phase:

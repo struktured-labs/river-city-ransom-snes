@@ -1,5 +1,6 @@
 ; Asset-free producer/NMI consumer test: red BG tile and blue OBJ tile.
 .setcpu "65816"
+.macpack longbranch
 .a8
 .i16
 .segment "CODE"
@@ -97,10 +98,10 @@ reset:
     cmp #60
     bcc @wait
     lda $1C7B
-    bne failed
+    jne failed
     lda $1D00
     cmp #1
-    bne failed
+    jne failed
     ; Second generation: nonadjacent dirty rows and moved OAM must drain too.
     stz $4200
     lda #1
@@ -112,6 +113,25 @@ reset:
     sta $1003
     lda #$18
     sta $1C20
+.ifdef SCROLL_TEST
+    ; Poison the relocated direct-page aliases: game camera bytes are in
+    ; absolute low WRAM, not in the renderer's D=$1E00 scratch page.
+    lda #$40
+    sta a:$1EF6
+    sta a:$1EDE
+    sta a:$1EDF
+    lda #1
+    sta a:$1E3D
+    lda #$C0
+    sta $0100
+    lda #8
+    sta a:$00F6
+    lda #1
+    sta f:$7F24E0
+    sta f:$7F2700
+    sta $1D27
+    sta $1D38
+.endif
     rep #$20
     .a16
     jsr native_prepare

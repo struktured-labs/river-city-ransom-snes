@@ -10,13 +10,13 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def check(core, out=None, source=None, negative=False):
+def check(core, out=None, source=None, negative=False, scrolling=False):
     out = out or ROOT / "build/video-test"
     source = source or ROOT / "snes/video_test.asm"
     out.mkdir(parents=True, exist_ok=True)
     palette = [0, 0x001F, 0x7C00] + [0] * 61
     (out / "native_palette.inc").write_text(".word " + ",".join(map(str, palette)) + "\n")
-    subprocess.run([str(ROOT / ".deps/cc65/bin/ca65"), "-I", str(out), "-o", str(out / "test.o"),
+    subprocess.run([str(ROOT / ".deps/cc65/bin/ca65"), *(['-D','SCROLL_TEST=1'] if scrolling else []), "-I", str(out), "-o", str(out / "test.o"),
                     str(source)], check=True)
     subprocess.run([str(ROOT / ".deps/cc65/bin/ld65"), "-C", str(ROOT / "snes/native_boot.cfg"),
                     "-o", str(out / "test.bin"), str(out / "test.o")], check=True)
@@ -44,8 +44,13 @@ def check(core, out=None, source=None, negative=False):
         raise RuntimeError("Unexpected SNES viewport")
     expected = Image.new("RGB", actual.size)
     expected.paste((255, 0, 0), (0, 0, 8, 8))
-    expected.paste((255, 0, 0), (0, 56, 8, 64))
-    expected.paste((255, 0, 0), (0, 192, 8, 200))
+    if scrolling:
+        expected.paste((255, 0, 0), (248, 56, 256, 64))
+        expected.paste((255, 0, 0), (248, 192, 256, 194))
+        expected.paste((255, 0, 0), (0, 194, 8, 200))
+    else:
+        expected.paste((255, 0, 0), (0, 56, 8, 64))
+        expected.paste((255, 0, 0), (0, 192, 8, 200))
     # Assert the producer's explicit SNES OAM coordinate (NES byte 15 + 2).
     # NES/SNES capture alignment is tested separately against original frames.
     expected.paste((0, 0, 255), (32, 17, 40, 25))
@@ -68,7 +73,19 @@ def check_lost_row_control(core):
             raise RuntimeError('Negative control mutation no longer identifies exactly one consumer')
         source.write_text(original.replace(good, bad))
         check(core, out, out/'video_test.asm', negative=True)
+        good_split = '    lda #2\n    sta $420C'
+        if original.count(good_split) != 1:
+            raise RuntimeError('Split negative control no longer identifies exactly one enable')
+        source.write_text(original.replace(good_split, '    lda #0\n    sta $420C'))
+        try:
+            check(core, out, out/'video_test.asm', scrolling=True)
+        except RuntimeError as error:
+            if 'differs from synthetic pixel oracle' not in str(error):
+                raise
+        else:
+            raise RuntimeError('Disabling split scrolling incorrectly passed the pixel oracle')
     print('Lost-row consumer negative control failed the executed assertion as expected.')
+    print('Disabled HDMA negative control failed the split-scroll pixel oracle as expected.')
 
 
 if __name__ == "__main__":
@@ -76,4 +93,5 @@ if __name__ == "__main__":
     parser.add_argument("--core", type=Path, required=True)
     core = parser.parse_args().core
     check(core)
+    check(core, ROOT/'build/scroll-test', scrolling=True)
     check_lost_row_control(core)

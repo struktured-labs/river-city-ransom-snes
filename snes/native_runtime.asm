@@ -570,7 +570,7 @@ nmi_rti_return:
     pla
     sta $FB
     jsr $FF29
-    inc a:$1C7C
+    inc a:$1C84             ; $1C7C/D belongs to the VBlank beam diagnostic
 @prepared:
     ; Prepare the next frame after original game updates, not in the bounded
     ; SNES VBlank consumer. The bridge preserves the saved NES interrupt frame.
