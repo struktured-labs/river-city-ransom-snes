@@ -102,6 +102,9 @@ reset:
     lda $1D00
     cmp #1
     jne failed
+    lda $1C85
+    cmp #1
+    jne failed
     ; Second generation: nonadjacent dirty rows and moved OAM must drain too.
     stz $4200
     lda #1
@@ -109,6 +112,7 @@ reset:
     sta f:$7F2300
     sta $1D07
     sta $1D18
+    sta $1C85
     lda #32
     sta $1003
     lda #$18
@@ -159,6 +163,8 @@ reset:
     sta $4200
     bra @wait_second
 @ready_second:
+    lda $1C85
+    bne failed
     lda $1C7B
     bne failed
     lda $1D07

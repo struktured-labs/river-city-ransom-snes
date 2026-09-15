@@ -125,6 +125,9 @@ native_video:
     lda $1D00,x
     and #1
     sta $1D00,x
+    beq :+
+    sta $1C85              ; a queued newer shadow write can now be prepared
+:
     rep #$20
     .a16
     txa

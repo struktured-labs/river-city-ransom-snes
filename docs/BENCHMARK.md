@@ -6,6 +6,34 @@ not to rename emulator liveness as game correctness.
 
 ## September 15 local progress (not deployed)
 
+### Adapter hot-path reductions
+
+The current local candidate is `build/block-oam-02`, SHA-256
+`b792566e9498c433636dd0b29f191298d5a465196676754af54475d29e0ef5ca`.
+Caller-stack tracing is now conditional on `TRACE_CALLERS` instead of running
+on every hardware access. Row conversion uses a `$1C85` work-pending summary:
+shadow writes, pattern invalidation and consumer release of a re-dirtied row
+schedule scanning; a clean producer skips the 128-row search. Row and DMA
+budgets are unchanged. Executed tests assert notification and eventual clearing.
+OAM page copies use a native 256-byte block move with NMI masked. Its executed
+oracle checks all 256 distinct bytes and A/X/Y preservation; a 255-byte mutant
+must fail case 6.
+
+Separate builds measured caller-trace removal and the row summary before adding
+the block move. The combined baseline sequence takes 2,423 frames (NES: 1,936),
+down from 2,521. The same long-run script measures 37.27 NMIs/sec, up from 32.49;
+this is **not** an original-speed certification. Maximum NMI gap remains 56
+display frames, and long-run picture-change rate is not improved in this run
+(combat/scene state differs). No VBlank overrun was observed in 12,000 frames.
+Scroll data reaches 511 on both game and HDMA sides, but scene-exit verification
+is still pending. `build/block-oam-quality-02/site` retains six failed gates:
+four transition timings plus walking/attack audio presence. Other activity gates
+passing does not establish music/SFX fidelity or eliminate random sputtering.
+The initial block-move prototype encoded banks 00/00 because ca65 derives MVN
+bank operands from full addresses. The final version explicitly uses 7E/7E;
+the byte-level mutation guard caught this mismatch. Both runs have identical
+measured cadence and PCM, but only `block-oam-02` is the intended encoding.
+
 ### Horizontal scroll and split-display implementation
 
 `build/scroll-hdma-02` (`6f5c3e6cb1090f62f649d121fc53cc8768d4a7d2e0b79ff1710fc5d0ab4fd2c8`)

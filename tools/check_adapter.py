@@ -26,6 +26,17 @@ def check(core):
     if not result.returncode or "WRAM status=ee, adapter case=2" not in result.stderr:
         raise RuntimeError("Corrupted CHR did not fail the expected executed adapter assertion")
     print("Adapter positive control passed; corrupted-CHR negative control failed at the expected assertion.")
+    short_copy = bytearray((out/'adapter-test.sfc').read_bytes())
+    sequence = bytes.fromhex('a9ff00547e7e')
+    if short_copy.count(sequence) != 1:
+        raise RuntimeError('Cannot uniquely identify OAM block-copy length for negative control')
+    short_copy[short_copy.index(sequence)+1] = 254
+    truncated = out/'truncated-oam.sfc'
+    truncated.write_bytes(short_copy)
+    result = subprocess.run(command + ['--rom', str(truncated)], capture_output=True, text=True, timeout=30)
+    if not result.returncode or 'WRAM status=ee, adapter case=6' not in result.stderr:
+        raise RuntimeError('Truncated OAM copy did not fail its executed byte oracle')
+    print('255-byte OAM negative control failed; all 256 bytes are required.')
     controls = ROOT / "build/controller-test"
     build(controls, controllers=True)
     control_cmd = command + ["--rom", str(controls / "adapter-test.sfc")]

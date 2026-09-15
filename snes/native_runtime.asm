@@ -7,7 +7,9 @@
 .i8
 .segment "CODE"
 dispatch_write:
+.ifdef TRACE_CALLERS
     jsr trace_caller
+.endif
     php
     pha
     phx
@@ -145,18 +147,27 @@ console_write:
 @joy_done:
     jmp done
 @dma:
-    lda #0
-    sta $00
+    ; NES OAM DMA is a page copy in low WRAM. Native block move avoids
+    ; 256 indirect-load/store loop iterations; NMI is already masked.
+    phb
+    clc
+    xce
+    rep #$30
+    .a16
+    .i16
     lda $22
-    sta $01
-    lda #$7E
-    sta $02
-    ldy #0
-@copy:
-    lda [$00],y
-    sta a:$1000,y
-    iny
-    bne @copy
+    and #$00FF
+    xba
+    tax
+    ldy #$1000
+    lda #255
+    mvn $7E0000,$7E0000     ; ca65 derives bank operands from full addresses
+    sep #$30
+    .a8
+    .i8
+    sec
+    xce
+    plb
     jmp done
 ppu_write:
     lda $20
@@ -228,6 +239,10 @@ mark_ppu_dirty:
     bcc @end
     cmp #$30
     bcs @end
+    pha
+    lda #1
+    sta a:$1C85
+    pla
     and #3
     cmp #3
     bne @tile
@@ -279,7 +294,9 @@ mark_ppu_dirty:
     rts
 
 dispatch_read:
+.ifdef TRACE_CALLERS
     jsr trace_caller
+.endif
     php
     pha
     phx
@@ -427,6 +444,7 @@ chr_read_pointer:
     sta $01
 @done:
     rts
+.ifdef TRACE_CALLERS
 trace_caller:
     ; JSR here adds two bytes to the hook's JSL/PHP/PHA/JSR frame.
     php
@@ -445,6 +463,7 @@ trace_caller:
     pla
     plp
     rts
+.endif
 ppu_increment:
     lda a:$1C20
     and #4

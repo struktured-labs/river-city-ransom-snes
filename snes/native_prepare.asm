@@ -12,6 +12,8 @@ native_prepare:
     cmp $1C78
     beq @rows_start
     sta $1C78
+    lda #1
+    sta $1C85
     ldx #0
     lda #1
 @invalidate:
@@ -20,6 +22,13 @@ native_prepare:
     cpx #128
     bne @invalidate
 @rows_start:
+    lda $1C79
+    beq @scan_rows
+    lda $1C85
+    bne @scan_rows
+    jmp prepare_palette
+@scan_rows:
+    stz $1C85
     rep #$20
     .a16
     lda $1C76
@@ -171,6 +180,10 @@ native_prepare:
     lda #2
     sta $1D00,x
     dec $1C6B
+    bne :+
+    lda #1
+    sta $1C85              ; work beyond this call's two-row budget may remain
+:
     jmp @next
 prepare_palette:
     ldy #0

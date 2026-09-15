@@ -69,6 +69,9 @@ tests:
     lda $1D00
     cmp #3
     jne failed
+    lda $1C85
+    cmp #1
+    jne failed
     lda $1C26
     cmp #$11
     jne failed
@@ -187,6 +190,38 @@ tests:
     dey
     bne @read_buttons
 .endif
+    ; Real OAM DMA path: copy all 256 distinct bytes and preserve caller ABI.
+    lda #6
+    sta $1C61
+    ldx #0
+@dma_source:
+    txa
+    sta $0200,x
+    inx
+    bne @dma_source
+    lda #$40
+    sta $1B21
+    lda #$14
+    sta $1B20
+    lda #2
+    sta $1B22
+    lda #$78
+    ldx #$34
+    ldy #$56
+    jsl $C10000+dispatch_write
+    cmp #$78
+    jne failed
+    cpx #$34
+    jne failed
+    cpy #$56
+    jne failed
+    ldx #0
+@dma_check:
+    txa
+    cmp $1000,x
+    jne failed
+    inx
+    bne @dma_check
     lda #1
     sta $1C60
     stz $2121
