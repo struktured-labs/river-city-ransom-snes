@@ -107,6 +107,45 @@ reset:
     jne failed
     ; Second generation: nonadjacent dirty rows and moved OAM must drain too.
     stz $4200
+    ; Cache invalidation must depend on palette bytes and the sprite pattern
+    ; bit, even when the OAM source itself is unchanged.
+    lda #7
+    sta $1C61
+    lda #2
+    sta f:$7F3F01
+    rep #$20
+    .a16
+    jsr native_prepare
+    lda f:$7E5402
+    cmp #$7C00
+    jne failed
+    sep #$20
+    .a8
+    lda #1
+    sta f:$7F3F01
+    stz $1C20
+    rep #$20
+    .a16
+    jsr native_prepare
+    lda f:$7E5402
+    cmp #$001F
+    jne failed
+    sep #$20
+    .a8
+    lda f:$7E5003
+    and #1
+    jne failed
+    lda #8
+    sta $1C20
+    rep #$20
+    .a16
+    jsr native_prepare
+    sep #$20
+    .a8
+    lda f:$7E5003
+    and #1
+    cmp #1
+    jne failed
     lda #1
     sta f:$7F20E0
     sta f:$7F2300
@@ -183,6 +222,8 @@ reset:
     wai
     bra @idle
 failed:
+    sep #$20
+    .a8
     lda #$EE
     sta $1C60
     bra failed
@@ -202,7 +243,35 @@ nmi:
     pha
     plb
     lda $4210
+.ifdef LATE_TEST
+    ; Defer the first consumer to line 260, like a completed bank switch.
+    ; It must leave the immutable queued row intact and avoid all DMA.
+    lda $1C04
+    ora $1C05
+    bne @ordinary
+@late_wait:
+    lda $2137
+    lda $213D
+    sta $1C7C
+    lda $213D
+    and #1
+    beq @late_wait
+    lda $1C7C
+    cmp #4
+    bcc @late_wait
     jsr native_video
+    lda $1D00
+    cmp #3
+    jne failed
+    lda $1C7B
+    jne failed
+    bra @consumed
+@ordinary:
+.endif
+    jsr native_video
+.ifdef LATE_TEST
+@consumed:
+.endif
     rep #$20
     .a16
     inc $1C04

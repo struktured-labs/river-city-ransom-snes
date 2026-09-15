@@ -532,9 +532,9 @@ bank_switch_exit:
     lda a:$1C0A
     ora a:$1C83
     bne @return
-@outside:
-    lda $4212
-    bmi @outside
+    ; The pair is complete. Allow a pending VBlank NMI instead of discarding
+    ; it by waiting for visible scanout. NMI entry acknowledges $4210, so an
+    ; already-serviced edge cannot retrigger here. Late graphics are deferred.
     lda a:$1C20
     and #$80
     sta $4200

@@ -14,6 +14,17 @@ native_video:
     lda $213D
     and #1
     sta $1C7D
+    ; Deferred bank-switch NMIs may arrive too late for the final OAM/CGRAM
+    ; batch. Keep all queued data intact unless the full publisher fits.
+    bne @late
+    lda $1C7C
+    cmp #243
+    bcs @late
+    lda $4212
+    bmi @on_time
+@late:
+    rts
+@on_time:
     lda #$80
     sta $2115
     lda #1
@@ -173,6 +184,12 @@ native_video:
     txa
     and #$7F
     sta $1C74
+    ; Recheck after scanning/draining queues: late entry and variable scan
+    ; work must not push the unconditional final batch into active video.
+    jsr final_room
+    bcs :+
+    rts
+:
     ; Publish prepared OAM.
     stz $2102
     stz $2103
@@ -324,6 +341,25 @@ dma_room:
     clc
     rts
 
+final_room:
+    .a8
+    lda $4212
+    bpl @no
+    lda $2137
+    lda $213D
+    sta $1C
+    lda $213D
+    and #1
+    bne @no
+    lda $1C
+    cmp #250
+    bcs @no
+    sec
+    rts
+@no:
+    clc
+    rts
+
 row_room:
     .a8
     lda $4212
@@ -335,7 +371,7 @@ row_room:
     and #1
     bne @no
     lda $1C
-    cmp #247
+    cmp #246
     bcs @no
     sec
     rts

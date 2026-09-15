@@ -186,6 +186,38 @@ native_prepare:
 :
     jmp @next
 prepare_palette:
+    ; Compare the actual shadow, not write flags: original code may rewrite
+    ; identical palettes every frame. The first publication always converts.
+    lda $1C79
+    beq @changed
+    rep #$20
+    .a16
+    ldx #0
+@compare:
+    lda f:$7F3F00,x
+    cmp f:$7E5580,x
+    bne @snapshot
+    inx
+    inx
+    cpx #32
+    bne @compare
+    sep #$20
+    .a8
+    jmp prepare_sprites
+@changed:
+    rep #$20
+    .a16
+@snapshot:
+    ldx #0
+@copy:
+    lda f:$7F3F00,x
+    sta f:$7E5580,x
+    inx
+    inx
+    cpx #32
+    bne @copy
+    sep #$20
+    .a8
     ldy #0
 @bg:
     tya
@@ -235,6 +267,43 @@ prepare_palette:
     iny
     cpy #16
     bne @obj
+prepare_sprites:
+    lda $1C79
+    beq @changed
+    lda $1C20
+    and #8
+    cmp $1C86
+    bne @changed
+    rep #$20
+    .a16
+    ldx #0
+@compare:
+    lda $1000,x
+    cmp f:$7E5600,x
+    bne @snapshot
+    inx
+    inx
+    cpx #256
+    bne @compare
+    sep #$20
+    .a8
+    jmp prepare_tail
+@changed:
+    rep #$20
+    .a16
+@snapshot:
+    ; Native block copy is safe inside the already-masked producer bridge.
+    phb
+    ldx #$1000
+    ldy #$5600
+    lda #255
+    mvn $7E0000,$7E0000
+    plb
+    sep #$20
+    .a8
+    lda $1C20
+    and #8
+    sta $1C86
     ; 8x8 NES sprites, preserved ordering, flips and palette indices.
     ldx #0
 @sprites:
@@ -280,6 +349,8 @@ prepare_palette:
     inx
     cpx #256
     bne @sprites
+    lda $1C79
+    bne prepare_tail
 @hidden:
     lda #240
     sta f:$7E5001,x
@@ -297,6 +368,7 @@ prepare_palette:
     cpx #32
     bne @high_oam
 
+prepare_tail:
     jsr prepare_chr
     lda #1
     sta $1C79

@@ -48,3 +48,21 @@ index 6060767..fd912ae 100644
 +        default: return 0;
 +    }
 +}
+diff --git a/ppu.cpp b/ppu.cpp
+--- a/ppu.cpp
++++ b/ppu.cpp
+@@ -1402,6 +1402,14 @@ void S9xSetCPU (uint8 Byte, uint16 Address)
+ 		switch (Address)
+ 		{
+ 			case 0x4200: // NMITIMEN
++                // Opt-in NTSC interrupt-mask diagnostics after warmup.
++                if (IPPU.TotalEmulatedFrames >= 1800 && Byte != Memory.FillRAM[Address])
++                {
++                    static FILE *trace = getenv("RCR_ENABLE_TRACE") ? fopen(getenv("RCR_ENABLE_TRACE"), "w") : NULL;
++                    if (trace) fprintf(trace, "%u,%d,%d,%06x,%u,%u,%u,%u,%u\n",
++                        IPPU.TotalEmulatedFrames, CPU.V_Counter, CPU.Cycles, Registers.PBPC, Byte,
++                        Memory.RAM[0x100], Memory.RAM[0x1c0a], Memory.RAM[0x1c83], Memory.RAM[0x1c20]);
++                }
+ 				#ifdef DEBUGGER
+ 				if (Settings.TraceHCEvent)
+ 					S9xTraceFormattedMessage("Write to 0x4200. Byte is %2x was %2x\n", Byte, Memory.FillRAM[Address]);

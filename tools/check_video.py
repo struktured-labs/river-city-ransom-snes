@@ -10,13 +10,13 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def check(core, out=None, source=None, negative=False, scrolling=False):
+def check(core, out=None, source=None, negative=False, scrolling=False, late=False, expected_case=None):
     out = out or ROOT / "build/video-test"
     source = source or ROOT / "snes/video_test.asm"
     out.mkdir(parents=True, exist_ok=True)
     palette = [0, 0x001F, 0x7C00] + [0] * 61
     (out / "native_palette.inc").write_text(".word " + ",".join(map(str, palette)) + "\n")
-    subprocess.run([str(ROOT / ".deps/cc65/bin/ca65"), *(['-D','SCROLL_TEST=1'] if scrolling else []), "-I", str(out), "-o", str(out / "test.o"),
+    subprocess.run([str(ROOT / ".deps/cc65/bin/ca65"), *(['-D','SCROLL_TEST=1'] if scrolling else []), *(['-D', 'LATE_TEST=1'] if late else []), "-I", str(out), "-o", str(out / "test.o"),
                     str(source)], check=True)
     subprocess.run([str(ROOT / ".deps/cc65/bin/ld65"), "-C", str(ROOT / "snes/native_boot.cfg"),
                     "-o", str(out / "test.bin"), str(out / "test.o")], check=True)
@@ -36,7 +36,9 @@ def check(core, out=None, source=None, negative=False, scrolling=False):
                     capture_output=negative, text=True, timeout=30)
     if negative:
         if not result.returncode or 'WRAM status=ee' not in result.stderr:
-            raise RuntimeError('Lost-row mutation did not fail an executed graphics assertion')
+            raise RuntimeError('Graphics mutation did not fail an executed assertion')
+        if expected_case is not None and f'adapter case={expected_case}' not in result.stderr:
+            raise RuntimeError('Graphics mutation failed at the wrong assertion')
         return
     result.check_returncode()
     actual = Image.open(screenshot).convert("RGB")
@@ -88,6 +90,46 @@ def check_lost_row_control(core):
     print('Disabled HDMA negative control failed the split-scroll pixel oracle as expected.')
 
 
+def check_late_control(core):
+    check(core, ROOT/'build/late-video-test', late=True)
+    with tempfile.TemporaryDirectory(prefix='rcr-late-negative-') as temporary:
+        out = Path(temporary)
+        for name in ('video_test.asm', 'native_prepare.asm', 'native_video.asm'):
+            (out/name).write_text((ROOT/'snes'/name).read_text())
+        source = out/'native_video.asm'
+        original = source.read_text()
+        guard = '    bne @late\n    lda $1C7C\n    cmp #243\n    bcs @late\n    lda $4212\n    bmi @on_time\n@late:\n    rts\n@on_time:'
+        if original.count(guard) != 1:
+            raise RuntimeError('Late-entry negative control cannot identify guard')
+        final_guard = '    jsr final_room\n    bcs :+\n    rts\n:\n'
+        if original.count(final_guard) != 1:
+            raise RuntimeError('Late-entry negative control cannot identify final guard')
+        source.write_text(original.replace(guard, '').replace(final_guard, ''))
+        check(core, out, out/'video_test.asm', late=True, negative=True)
+    print('Late VBlank preserves queued graphics; removed-budget-guards control fails.')
+
+
+def check_cache_controls(core):
+    with tempfile.TemporaryDirectory(prefix='rcr-cache-negative-') as temporary:
+        out = Path(temporary)
+        for name in ('video_test.asm', 'native_prepare.asm', 'native_video.asm'):
+            (out/name).write_text((ROOT/'snes'/name).read_text())
+        source = out/'native_prepare.asm'
+        original = source.read_text()
+        mutations = (
+            ('    cmp f:$7E5580,x\n    bne @snapshot',
+             '    cmp f:$7E5580,x\n    nop\n    nop'),
+            ('    cmp $1C86\n    bne @changed',
+             '    cmp $1C86\n    nop\n    nop'),
+        )
+        for good, bad in mutations:
+            if original.count(good) != 1:
+                raise RuntimeError('Cache negative control cannot identify invalidation')
+            source.write_text(original.replace(good, bad))
+            check(core, out, out/'video_test.asm', negative=True, expected_case=7)
+    print('Missing palette and sprite-pattern invalidation each fail cache assertion 7.')
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--core", type=Path, required=True)
@@ -95,3 +137,5 @@ if __name__ == "__main__":
     check(core)
     check(core, ROOT/'build/scroll-test', scrolling=True)
     check_lost_row_control(core)
+    check_late_control(core)
+    check_cache_controls(core)
