@@ -1,11 +1,13 @@
 ; SNES hardware/audio diagnostic, NOT the River City Ransom game.
 ; All routines use DB=0, D=0, A8/X16 unless explicitly stated.
 .setcpu "65816"
+.macpack longbranch
 .a8
 .i16
 APU_PACKET = $0A00
 FRAME = $0A20
 STATUS = $0A22                 ; 1=running, $EE=SPC timeout
+PHASE = $0A23                  ; observable scripted-audio phase
 
 .segment "CODE"
 reset:
@@ -36,13 +38,14 @@ reset:
     stz FRAME
     stz FRAME+1
     stz STATUS
+    stz PHASE
     ldx #$0016
 @clear:
     stz APU_PACKET,x
     dex
     bpl @clear
     jsr spc_upload
-    bcs failed
+    jcs failed
     ; Constant-volume square wave, NES timer $FD (~440 Hz NTSC).
     ; Loop/length-disable keeps this diagnostic independent of the host counters.
     lda #$BF
@@ -51,11 +54,11 @@ reset:
     sta APU_PACKET+2
     lda #$01
     sta APU_PACKET+$15
-    lda #$21                  ; mono + square 0 retrigger
+    lda #$01                  ; square 0 retrigger; bit 5 clear for mono output
     sta APU_PACKET+$16
     jsr spc_frame
-    bcs failed
-    lda #$20
+    jcs failed
+    lda #$00
     sta APU_PACKET+$16
     lda #1
     sta STATUS
@@ -78,8 +81,52 @@ reset:
     bne :+
     inc FRAME+1
 :
+.ifdef AUDIO_SCRIPT
+    rep #$20
+    .a16
+    lda FRAME
+    cmp #120
+    beq @mute
+    cmp #180
+    beq @restart
+    cmp #240
+    beq @pitch
+    sep #$20
+    .a8
+    bra @send_frame
+@mute:
+    sep #$20
+    .a8
+    stz APU_PACKET+$15
+    lda #1
+    sta PHASE
+    bra @send_frame
+@restart:
+    sep #$20
+    .a8
+    lda #1
+    sta APU_PACKET+$15
+    lda #$01
+    sta APU_PACKET+$16
+    lda #2
+    sta PHASE
+    bra @send_frame
+@pitch:
+    sep #$20
+    .a8
+    lda #$7E
+    sta APU_PACKET+2
+    lda #$01
+    sta APU_PACKET+$16
+    lda #3
+    sta PHASE
+@send_frame:
+.endif
     jsr spc_frame
-    bcc @frame
+    bcs failed
+    lda #$00
+    sta APU_PACKET+$16
+    jmp @frame
 failed:
     lda #$EE
     sta STATUS

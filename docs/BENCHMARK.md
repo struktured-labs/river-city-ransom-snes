@@ -6,6 +6,35 @@ not to rename emulator liveness as game correctness.
 
 ## September 15 local progress (not deployed)
 
+### Automated SPC signal test and mono-routing correction
+
+`tools/check_audio.py --core /path/to/snes9x_libretro.so --out build/audio-signal`
+builds an asset-free scripted cartridge, executes it, and checks PCM against
+RAM-observed phase boundaries: ~440 Hz pulse, channel disabled, restarted pulse,
+then ~881 Hz. Phase timing must match driver frames 120/180/240. Measurements
+exclude 100 ms on each side of a transition; they do not certify immediate
+note-edge latency. Tests cover both channels, frequency within 1.5%, 10-ms-window
+activity, clipping, and mute residuals. Synthetic negative controls reject wrong
+pitch, dead channels, dropouts, clipping, DC, and non-silent mute phases. CI runs
+the actual SPC execution, not just the signal-analysis unit tests.
+
+This test found the legacy engine's `$0A16` bit 5 was incorrectly labeled mono.
+With bit 5 set, the isolated first pulse appeared only on the left. Clearing it
+produces equal left/right output and passes all four phases. Both bringup and
+game now clear that flag while retaining per-channel retrigger bits. The failing
+pre-fix result is `build/audio-signal-02`; the passing test is
+`build/audio-signal-final-01`. This is a verified routing correction, **not** a
+claim to have eliminated gameplay sputtering or resolved the OBS replay discrepancy.
+
+Game candidate `build/mono-audio-01` has SHA-256
+`d058e05d038513bbb703c20d82b75525a878e12821d0187fb610328dc06c7f36`.
+Its baseline takes 2,425 frames and still fails four timing and four audio-presence
+gates (`build/mono-quality-01/site`). The tests must not be relaxed because correct
+mono mixing changes measured activity. Length/envelope/sweep/noise/DMC behavior,
+full game speed, and physical capture remain unfinished. The upstream CPU-side
+length routine is not safe to copy blindly: its square-0 reload reads the DMC
+length shadow (`4013`) rather than square-0 timer-high (`4003`).
+
 ### Adapter hot-path reductions
 
 The current local candidate is `build/block-oam-02`, SHA-256

@@ -25,6 +25,8 @@ jobs:
         run: python3 tools/bootstrap_core.py
       - name: Verify real SNES execution and SPC sound without commercial assets
         run: python3 tools/smoke_libretro.py --core .deps/snes9x/libretro/snes9x_libretro.so
+      - name: Measure SPC pitch, mute, restart, channel routing and dropouts
+        run: python3 tools/check_audio.py --core .deps/snes9x/libretro/snes9x_libretro.so --out build/audio-signal-ci
       - name: Exercise native PPU and CPU register ABI without commercial assets
         run: python3 tools/check_adapter.py --core .deps/snes9x/libretro/snes9x_libretro.so
       - name: Verify incremental producer, bounded NMI and exact synthetic pixels

@@ -72,7 +72,7 @@ reset:
     lda #$EE
     sta $1C0B
 :
-    lda #$20
+    lda #$00                ; legacy engine bit 5 clear: NES mono on both outputs
     sta $0A16
     lda #$4F
     sta $1C00
@@ -142,7 +142,7 @@ publish_video:
     lda #$EE
     sta $1C0B
 :
-    lda #$20
+    lda #$00
     sta $0A16
     sep #$30
     .a8
