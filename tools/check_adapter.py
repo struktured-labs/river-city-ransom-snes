@@ -71,6 +71,15 @@ def check(core):
         if not result.returncode or 'WRAM status=ee, adapter case=10' not in result.stderr:
             raise RuntimeError(f'Missing {label} guard did not fail hardware NMI assertion 10')
     print('Generated I/O stub preserves registers and masks NMI; either missing guard fails case 10.')
+    fast_write = b'\x4c' + symbols['ppu_write_data'].to_bytes(2, 'little')
+    if original.count(fast_write) != 8:
+        raise RuntimeError('Expected one fast PPUDATA entry jump per runtime bank')
+    skipped = out/'missing-fast-write.sfc'
+    skipped.write_bytes(original.replace(fast_write, plain))
+    result = subprocess.run(command + ['--rom', str(skipped)], capture_output=True, text=True, timeout=30)
+    if not result.returncode or 'WRAM status=ee, adapter case=10' not in result.stderr:
+        raise RuntimeError('Skipped fast PPU write did not fail data/dirty-state assertion 10')
+    print('Fast PPUDATA writes/increments/dirties correctly; skipped write fails case 10.')
     controls = ROOT / "build/controller-test"
     build(controls, controllers=True)
     control_cmd = command + ["--rom", str(controls / "adapter-test.sfc")]

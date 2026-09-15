@@ -255,3 +255,33 @@ depth guards is separately active, checks preserved A/X/Y/carry, and waits
 across VBlank while a hardware interrupt counter must stay zero. Separate
 mutants ignoring either guard each fail assertion 10. All existing adapter
 positive/negative controls and 49 unit tests pass. Rivalmage is unchanged.
+
+### Specialized PPUDATA writes
+
+Candidate `build/fast-ppudata-01/native-cpu.sfc`, SHA
+`7bb5583fb6ca8d17ce21fa5cbc0adaf60040e175deb918ff8668bb72691b2577`,
+uses a specialized entry for traced plain STA $2007 instructions. Their
+destination is known, so the generated stub only stores the data byte, and
+the runtime skips general address dispatch. Indexed writes and all other I/O
+retain the existing path. The specialized entry shares the existing buffered
+PPU shadow write, address increment, and dirty-row implementation; register
+preservation and both interrupt-depth guards remain.
+
+The baseline phase capture takes 2490 frames versus 2530 before this change
+and NES 1936. All four transition timing gates still fail; settings pixels and
+basic audio gates pass. The verified audit is at
+`build/fast-ppudata-quality-01/site/index.html`. The 12,000-frame walk reports
+no adapter/SPC fault or graphics overrun, with a maximum observed NMI gap of
+41 display frames rather than 49. These workload-dependent gap counts are not
+a universal latency bound. Game-counter/picture rates (24.95/26.83 per second)
+do not establish a gameplay improvement over the previous run (25.20/28.24),
+and black-frame count is higher as scene occupancy diverges.
+
+The executed generated-stub test poisons the unused effective-address mailbox,
+writes $A5 to shadow $2010, checks the address advances to $2011, and verifies
+queued row state 2 becomes state 3 without losing the staged version. It also
+checks registers/carry and both NMI guards. A mutant bypassing the fast write
+fails assertion 10. The builder rejects fast mode for reads, indexed writes,
+different addresses, and incompatible tail/dynamic modes. All adapter controls
+and 52 unit tests pass. This checkpoint does not claim original speed or clean
+game audio, and does not deploy to Rivalmage.

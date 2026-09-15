@@ -24,7 +24,9 @@ def word(value):
     return struct.pack("<H", value)
 
 
-def stub(opcode, operand, entry, resume=None, dynamic_apu=False):
+def stub(opcode, operand, entry, resume=None, dynamic_apu=False, fast_ppudata=False):
+    if fast_ppudata and (opcode != 0x8D or operand != 0x2007 or resume is not None or dynamic_apu):
+        raise ValueError('Fast PPUDATA requires a plain STA $2007')
     # Disable NMI before filling the shared mailbox. Otherwise an interrupt
     # can overwrite a half-written command or a just-returned read result.
     data = bytearray((0x9C, 0x00, 0x42, 0x08, 0x48))  # STZ $4200; PHP; PHA
@@ -34,7 +36,9 @@ def stub(opcode, operand, entry, resume=None, dynamic_apu=False):
         elif WRITES[opcode] == "y":
             data.append(0x98)
         data += b"\x8d" + word(0x1B22)
-    if dynamic_apu:
+    if fast_ppudata:
+        pass  # known destination; dispatch_ppudata only consumes $1B22
+    elif dynamic_apu:
         data += b"\xad\xf9\x07\x8d" + word(0x1B20)
         data += b"\xad\xfa\x07\x8d" + word(0x1B21)
     elif opcode in (0x9D, 0xBD, 0x99, 0xB9):
@@ -137,8 +141,12 @@ def build(rom_path, traces, out, experimental_fastrom=False):
             if key not in hooks:
                 address = 0x6000 + len(stubs)
                 entry = symbols["dispatch_write" if opcode in WRITES else "dispatch_read"]
+                fast_ppudata = opcode == 0x8D and operand == 0x2007
+                if fast_ppudata:
+                    entry = symbols['dispatch_ppudata']
                 hooks[key] = address
-                stubs += stub(opcode, operand, entry, row["pc"] + 3 if tail else None)
+                stubs += stub(opcode, operand, entry, row["pc"] + 3 if tail else None,
+                              fast_ppudata=fast_ppudata)
             prg[offset:offset + 3] = bytes((0x4C if tail else 0x20,)) + word(hooks[key])
             patched.append({"offset": offset, "pc": row["pc"], "opcode": opcode,
                             "operand": operand, "stub": hooks[key]})

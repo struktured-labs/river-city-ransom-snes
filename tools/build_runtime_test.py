@@ -19,7 +19,7 @@ def build(out, controllers=False, jump=False):
                     "-o", str(out / "runtime.bin"), str(out / "runtime.o")], check=True)
     symbols = {line.split()[2].lstrip("."): int(line.split()[1], 16)
                for line in (out / "runtime.lbl").read_text().splitlines()}
-    io_stub = stub(0x8D, 0x2007, symbols['dispatch_write'])
+    io_stub = stub(0x8D, 0x2007, symbols['dispatch_ppudata'], fast_ppudata=True)
     subprocess.run([ca65, *(["-D", "CONTROLLER_TEST=1"] if controllers or jump else []), *(["-D", "JUMP_TEST=1"] if jump else []), "-D", f'dispatch_read={symbols["dispatch_read"]}',
                     "-D", f'dispatch_write={symbols["dispatch_write"]}',
                     "-D", f'bank_switch_enter={symbols["bank_switch_enter"]}',

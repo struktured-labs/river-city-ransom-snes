@@ -169,6 +169,23 @@ console_write:
     xce
     plb
     jmp done
+dispatch_ppudata:
+.ifdef TRACE_CALLERS
+    jsr trace_caller
+.endif
+    ; STA $2007 has a known destination: only the data mailbox is needed.
+    ; Keep the same saved-register and non-reentrant shadow-write ABI.
+    php
+    pha
+    phx
+    phy
+    phd
+    stz $4200
+    lda #$1B
+    xba
+    lda #0
+    tcd
+    jmp ppu_write_data
 ppu_write:
     lda $20
     and #7
@@ -225,6 +242,7 @@ ppu_write:
     stz a:$1C25
     jmp done
 @data:
+ppu_write_data:
     jsr ppu_pointer
     lda $22
     sta [$00]

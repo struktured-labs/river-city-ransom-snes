@@ -105,6 +105,16 @@ class RendererControls(unittest.TestCase):
 
 
 class NativeControls(unittest.TestCase):
+    def test_fast_ppudata_is_scoped_and_omits_address_mailbox(self):
+        code = stub(0x8D, 0x2007, 0x2100, fast_ppudata=True)
+        self.assertIn(bytes.fromhex('8d221b'), code)
+        self.assertNotIn(bytes.fromhex('8d201b'), code)
+        self.assertNotIn(bytes.fromhex('8d211b'), code)
+        self.assertIn(bytes.fromhex('ad0a1c0d831cd00a'), code)
+        for opcode, address in ((0xAD, 0x2007), (0x9D, 0x2007), (0x8D, 0x2006)):
+            with self.assertRaises(ValueError):
+                stub(opcode, address, 0x2100, fast_ppudata=True)
+
     def test_io_stub_keeps_nmi_masked_during_paired_bank_switch(self):
         # Both independent reasons to mask NMI must reach the same branch:
         # an active original NMI, or a main-thread R6/R7 critical section.

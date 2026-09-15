@@ -363,6 +363,15 @@ failed:
     sta $1C60
     bra failed
 guarded_io_test:
+    lda #$20
+    sta $1C27
+    lda #$10
+    sta $1C26
+    lda #2
+    sta $1D00
+    lda #$FF
+    sta $1B20
+    sta $1B21              ; specialized stub must not consult stale address
     lda #$A5
     ldx #$34
     ldy #$56
@@ -374,6 +383,15 @@ guarded_io_test:
     cpx #$34
     jne failed
     cpy #$56
+    jne failed
+    lda f:$7F2010
+    cmp #$A5
+    jne failed
+    lda $1C26
+    cmp #$11
+    jne failed
+    lda $1D00
+    cmp #3
     jne failed
 @visible:
     lda $4212
