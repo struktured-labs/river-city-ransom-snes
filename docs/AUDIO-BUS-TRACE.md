@@ -52,3 +52,47 @@ packet formation in this baseline but does not certify original NES write
 timing, engine playback, or all gameplay. Next work needs original write timing
 and waveform evidence; blindly sending every intermediate write as another
 packet is not justified by these counts. No ROM or Rival change was made.
+
+## Acknowledgement observer, 2026-09-15
+
+The optional `RCR_SPC_ACK_TRACE` observer recognizes the complete 15-byte
+`wait_port0` opcode signature and records entry to its success or timeout exit.
+It peeks existing opcode/register state, not emulated I/O. This deliberately
+fails to produce usable evidence if the routine's signature changes; it is not
+a generic SPC observer. CSV fields are success `S` / timeout `T`, raw core
+frame, scanline, cycle, NMI count, echoed token, Y, and PC.
+
+`tools/analyze_spc_ack.py` starts packet validation after the explicit firmware
+upload-ready marker (token $7D, Y=$2C02). It requires ready $7D, handshake $D7,
+then all 23 byte acknowledgements in order with the matching Y index. Timeouts,
+missing/reordered echoes, absent initialization, and truncated packets fail.
+The initial firmware byte sequence is not itself validated.
+
+Separate observer core `/tmp/rcr-snes9x/libretro/rcr_spc_ack_libretro.so` SHA:
+`dbe1e28e54de8f32c28eeeb3c4340df6ea42113fa228ff5f70ca80aa43bf010f`.
+Build using the tracked patch and `TARGET_NAME=rcr_spc_ack`; the patch passes
+an apply check against the pinned original emulator sources.
+
+The no-input menu capture is `build/menu-ack-01/snes`. All 2,010 timeline records
+are exactly identical to `build/menu-audio-01/snes`, including video hashes,
+audio measurements, RAM, native state and delivered input. The full WAVs are
+also byte-identical: the added observer did not change this run.
+
+```sh
+python3 tools/analyze_spc_ack.py build/menu-ack-01/snes/ack.csv \
+  --out build/menu-ack-01/analysis.json
+```
+
+Result: 1,906 acknowledged packets, no timeout or protocol-order failure.
+Completion gaps during startup are raw core frames 56→65, 98→130, 162→166,
+and 167→176. After raw frame 210, 1,800 packet completions occur on successive
+frames with no gap. Trace SHA:
+`dc5078822d1d4b140c6094faa26d8bbe006e890ab805297753490dc49ba30946`.
+All 73 unit tests pass, including missing/incorrect acknowledgement controls.
+
+Together with the original write comparison, this eliminates missing frame
+deliveries and failed CPU-observed handshakes in this particular sustained
+menu run. It does not prove that the engine synthesizes the correct waveform
+or applies updates without sub-frame artifacts. DSP/PCM playback remains the
+next investigation; startup gaps and gameplay still require separate coverage.
+No cartridge or hardware deployment changed.

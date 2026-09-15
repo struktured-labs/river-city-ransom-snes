@@ -2,7 +2,7 @@ diff --git a/cpuexec.cpp b/cpuexec.cpp
 index aa43b2f..2ff940c 100644
 --- a/cpuexec.cpp
 +++ b/cpuexec.cpp
-@@ -135,6 +135,59 @@ void S9xMainLoop (void)
+@@ -135,6 +135,77 @@ void S9xMainLoop (void)
  			break;
  		}
  
@@ -58,6 +58,24 @@ index aa43b2f..2ff940c 100644
 +                CPU.V_Counter, CPU.Cycles, Memory.RAM[0x1c04] | Memory.RAM[0x1c05] << 8,
 +                Registers.Y.W, Registers.A.B.l, Registers.PBPC);
 +            fflush(rcr_bus);
++        }
++        // Observe exits of the bounded wait_port0 routine, using its complete
++        // opcode signature. No emulated reads or cycles are introduced.
++        static FILE *rcr_ack = getenv("RCR_SPC_ACK_TRACE") ? fopen(getenv("RCR_SPC_ACK_TRACE"), "w") : NULL;
++        if (rcr_ack && CPU.PCBase && (Registers.PB == 0 || Registers.PB == 0xc0) &&
++            Registers.PCw >= 0x800d && Registers.PCw < 0xfffc)
++        {
++            static const uint8 signature[] = {0xa2,0xff,0xff,0xcd,0x40,0x21,0xf0,0x05,0xca,0xd0,0xf8,0x38,0x60,0x18,0x60};
++            const unsigned pc = Registers.PCw;
++            const bool ok = memcmp(CPU.PCBase + pc - 13, signature, sizeof(signature)) == 0;
++            const bool timeout = memcmp(CPU.PCBase + pc - 11, signature, sizeof(signature)) == 0;
++            if (ok || timeout) {
++                fprintf(rcr_ack, "%c,%u,%d,%d,%u,%u,%u,%06x\n", ok ? 'S' : 'T',
++                    IPPU.TotalEmulatedFrames, CPU.V_Counter, CPU.Cycles,
++                    Memory.RAM[0x1c04] | Memory.RAM[0x1c05] << 8,
++                    Registers.A.B.l, Registers.Y.W, Registers.PBPC);
++                fflush(rcr_ack);
++            }
 +        }
  		uint8				Op;
  		struct	SOpcodes	*Opcodes;
