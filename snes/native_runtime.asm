@@ -212,7 +212,19 @@ ppu_write:
     jmp done
 @mask:
     sta a:$1C21
+    ; Both original-NMI exit adapters prepare graphics after game updates.
+    ; Do not run the same expensive producer early inside that interrupt.
+    lda a:$1C0A
+    bne @mask_done
+    ; With a running NMI pipeline, the next exit prepares the updated shadow.
+    ; Keep synchronous preparation for initial setup and NMI-disabled loads.
+    lda a:$1C79
+    beq @prepare_mask
+    lda a:$1C20
+    bmi @mask_done
+@prepare_mask:
     jsl $C00000+video_prepare_bridge
+@mask_done:
     jmp done
 @oamaddr:
     sta a:$1C23

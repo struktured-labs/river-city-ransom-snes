@@ -339,6 +339,37 @@ tests:
     jsr guarded_io_test
     stz $1C83
     stz $1C20
+    ; Verify the PPUMASK preparation scheduling contract independently from
+    ; the pixel test: initial/NMI-disabled loads prepare synchronously, while
+    ; active NMI work and established pipelines defer to the NMI exit.
+    lda #11
+    sta $1C61
+    stz $1C79
+    jsr mask_test_write
+    lda $1C8E
+    cmp #1
+    jne failed
+    lda #1
+    sta $1C79
+    jsr mask_test_write
+    lda $1C8E
+    cmp #2
+    jne failed
+    lda #$80
+    sta $1C20
+    jsr mask_test_write
+    lda $1C8E
+    cmp #2
+    jne failed
+    lda #1
+    sta $1C0A
+    stz $1C20
+    jsr mask_test_write
+    lda $1C8E
+    cmp #2
+    jne failed
+    stz $1C0A
+    stz $1C79
     lda #1
     sta $1C60
     stz $2121
@@ -404,6 +435,16 @@ guarded_io_test:
     bmi @after
     stz $4200
     lda $1C8D
+    jne failed
+    rts
+mask_test_write:
+    lda #$18
+    ldx #1
+    jsr ppu_write_test
+    cmp #$18
+    jne failed
+    lda $1C21
+    cmp #$18
     jne failed
     rts
 ppu_write_test:

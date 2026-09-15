@@ -80,6 +80,15 @@ def check(core):
     if not result.returncode or 'WRAM status=ee, adapter case=10' not in result.stderr:
         raise RuntimeError('Skipped fast PPU write did not fail data/dirty-state assertion 10')
     print('Fast PPUDATA writes/increments/dirties correctly; skipped write fails case 10.')
+    schedule = bytes.fromhex('ad791cf005ad201c3004')
+    if original.count(schedule) != 8:
+        raise RuntimeError('Expected one PPUMASK pipeline check per runtime bank')
+    duplicate_prepare = out/'duplicate-mask-prepare.sfc'
+    duplicate_prepare.write_bytes(original.replace(schedule, bytes.fromhex('ad791cf005ad201ceaea')))
+    result = subprocess.run(command + ['--rom', str(duplicate_prepare)], capture_output=True, text=True, timeout=30)
+    if not result.returncode or 'WRAM status=ee, adapter case=11' not in result.stderr:
+        raise RuntimeError('Duplicate PPUMASK preparation did not fail scheduling assertion 11')
+    print('PPUMASK prepares initial/offline loads and coalesces active pipelines; duplicate call fails case 11.')
     controls = ROOT / "build/controller-test"
     build(controls, controllers=True)
     control_cmd = command + ["--rom", str(controls / "adapter-test.sfc")]

@@ -285,3 +285,37 @@ fails assertion 10. The builder rejects fast mode for reads, indexed writes,
 different addresses, and incompatible tail/dynamic modes. All adapter controls
 and 52 unit tests pass. This checkpoint does not claim original speed or clean
 game audio, and does not deploy to Rivalmage.
+
+### Coalesced PPUMASK preparation
+
+Candidate `build/coalesced-prepare-02/native-cpu.sfc`, SHA
+`77b1c87db466e877ab364247966adf6d79b4cc525b0431b106c271d7400bb0ab`,
+stores every PPUMASK change but defers producer work when an original NMI is
+active or an initialized, NMI-enabled pipeline is running. Both original-NMI
+exit adapters already prepare graphics after the game updates. Initial setup
+and NMI-disabled loading retain synchronous preparation. This removes redundant
+preparation opportunities; it does not skip shadow writes or dirty-row marking.
+
+In the 12,000-frame workload, NMI rate is 59.00/second and the sampled game-tick
+rate is 26.17/second, compared with 58.08 and 24.95 for fast-ppudata-01.
+Picture changes are 26.47/second; max observed NMI gap remains 41 frames.
+No adapter/SPC fault or graphics overrun is detected. The baseline phase audit
+is essentially unchanged at 2489 frames versus 2490 and original 1936. All four
+transition timing gates still fail; settings pixels/basic audio gates pass.
+Its integrity-verified bundle is `build/coalesced-quality-02/site/index.html`.
+
+Per-phase sampled $052B changes also do not show an original-speed result:
+NES has 90 changes in each 180-frame idle/walk/attack/resume phase; this native
+candidate has 89/86/85/84. These are still diagnostic probes, not a validated
+full gameplay clock oracle. The direction-reversal capture completes, but ends
+with camera bytes 8E00 versus NES 0000, so traversal remains behind. Encounter
+differences confound cross-candidate positional comparisons. Paired media are
+at `build/coalesced-recovery-02/site/index.html`.
+
+The asset-free adapter fixture counts producer-bridge calls and checks four
+conditions: uninitialized setup, initialized but NMI-disabled loading, running
+pipeline, and active NMI. It also checks PPUMASK shadow/register preservation.
+A mutant restoring the duplicate pipeline call fails assertion 11. The bridge
+is a counter stub in this ABI test; exact renderer pixels remain covered by
+the separate graphics harness and game settings audit. All adapter controls
+and 52 unit tests pass. No Rivalmage deployment or full-speed claim is made.
