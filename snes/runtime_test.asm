@@ -502,6 +502,7 @@ bulk_writer_tests_done:
     jne failed
     stz $1C20
     jsr bulk_writer_tests
+    jsr bulk_reader_tests
     lda #1
     sta $1C60
     stz $2121
@@ -567,6 +568,106 @@ guarded_io_test:
     bmi @after
     stz $4200
     lda $1C8D
+    jne failed
+    rts
+bulk_reader_tests:
+    lda #15
+    sta $1C61
+    lda #64
+    sta $1C12
+    lda #$16
+    sta $2A
+    lda #$0F
+    sta $2B
+    lda #$FF
+    sta $1A
+    ldx #$34
+    ldy #$56
+    jsr bulk_source_byte
+    php
+    cmp #$D1
+    jne failed
+    pla
+    and #$83
+    cmp #2              ; index FF -> 00 gives Z; source addition has no carry
+    jne failed
+    lda $1A
+    jne failed
+    lda $1B
+    cmp #$D1
+    jne failed
+    cpx #$34
+    jne failed
+    cpy #$56
+    jne failed
+    lda $1C26
+    cmp #$17
+    jne failed
+    lda $1C27
+    cmp #$10
+    jne failed
+    lda $1C2A
+    cmp #$FF            ; buffer contains the byte AFTER the returned sentinel
+    jne failed
+    lda #$A5
+    sta f:$7F2100
+    lda #$5A
+    sta f:$7F2120
+    lda #$FF
+    sta $2A
+    lda #$20
+    sta $2B
+    lda #1
+    sta $1A
+    lda #4
+    sta $1C20
+    jsr bulk_source_byte
+    cmp #$A5
+    jne failed
+    lda $1C2A
+    cmp #$5A
+    jne failed
+    lda $1C26
+    cmp #$40
+    jne failed
+    lda $1C27
+    cmp #$21
+    jne failed
+    stz $1C20
+    lda #1
+    sta $1C25
+    sta $1A
+    lda #$3E
+    sta $2A
+    lda #$E9
+    sta f:$7F3F21
+    jsr bulk_source_byte
+    cmp #$E9            ; swapped address phase -> palette bypass at $3F21
+    jne failed
+    lda $1C26
+    cmp #$22
+    jne failed
+    lda $1C27
+    cmp #$3F
+    jne failed
+    lda $1C25
+    cmp #1
+    jne failed
+    stz $1C25
+    stz $2A
+    stz $1A
+    lda #$80
+    sta $2B
+    jsr bulk_source_byte
+    jcc failed          ; original CMP selects CPU path with carry set
+    cmp #$78            ; first byte of replicated fixture program: SEI
+    jne failed
+    cpy #0
+    jne failed
+    cpx #$34
+    jne failed
+    lda $1A
+    cmp #1
     jne failed
     rts
 bulk_test_input:

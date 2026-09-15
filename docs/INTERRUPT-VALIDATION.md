@@ -426,6 +426,36 @@ both pattern halves. Existing graphics/cache/late-entry controls and 54 unit
 tests pass. Rivalmage remains unchanged.
 # Frame-boundary attribution of remaining long NMI gaps
 
+## Whole decompression source-reader translation
+
+`bulk_source_byte` translates fixed-bank C8DB, whose PPU path previously used
+two PPUADDR writes plus two PPUDATA reads for every source byte. Address setup
+is now direct, while both production buffered reads remain. The CPU-ROM branch
+retains the original indirect-indexed load. The full original 49-byte preimage
+is checked before patching, and the translated helper is recorded in the build
+manifest. The read mailbox is consumed before NMI can be re-enabled; A and P
+are saved across that enable check. No new audio clock is introduced.
+
+Executed adapter case 15 covers CHR bank 64, source-page carry, index wrap and
+flags, X/Y preservation, the final read buffer, PPU increment 32, reversed
+address-latch phase, palette bypass, and the CPU-ROM branch. Removing the first
+of the two reads fails case 15. Existing adapter/negative controls and all 56
+unit tests pass. A separate hardware-interrupt race test for this helper is
+still not present; these tests do not certify physical SNAC or full-game timing.
+
+Candidate `build/bulk-source-02/native-cpu.sfc`, SHA
+`dcad6738f499df40ed9281f0c8c3a89e205fdb73a346c5b4b98688b25c07f71a`,
+completes the baseline in 2,176 frames (prior writer-only build 2,185; NES
+1,936). `build/bulk-source-quality-02/site/index.html` still fails all four
+transition speed gates while passing settings pixels and basic audio presence.
+The 12,000-frame walk still has a maximum NMI interval of 41 display frames;
+long stalled runs have 40/28/21/11/11 samples. Its 59.43 NMIs/sec and 23.18
+picture changes/sec are diagnostic aggregates, not original-speed certification
+or evidence of an audio fix. No detected VBlank overrun, no Rival deployment.
+The right-then-left capture completes in 7,192 frames and has a paired audit at
+`build/bulk-source-recovery-01/site/index.html`; input-sequence completion is
+not proof of matching player position or camera movement.
+
 ## Whole decompression byte-writer translation
 
 Original fixed-bank helper C90C performs two PPUADDR writes and one PPUDATA

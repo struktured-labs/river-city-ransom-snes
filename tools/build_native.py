@@ -157,6 +157,11 @@ def build(rom_path, traces, out, experimental_fastrom=False):
     if rom.prg[bulk_offset:bulk_offset + len(bulk_preimage)] != bulk_preimage:
         raise ValueError('Bulk PPU byte helper preimage mismatch')
     prg[bulk_offset:bulk_offset + 3] = b'\x4c' + word(symbols['bulk_ppu_byte'])
+    source_offset = 0x1C8DB
+    source_preimage = bytes.fromhex('a52bc980b022a51a18652a852ea52b6900852fa52f8d0620a52e8d0620ad0720ad0720851be61a60a41ab12a851be61a60')
+    if rom.prg[source_offset:source_offset + len(source_preimage)] != source_preimage:
+        raise ValueError('Bulk source helper preimage mismatch')
+    prg[source_offset:source_offset + 3] = b'\x4c' + word(symbols['bulk_source_byte'])
     for pc, expected, name in ((0xFF61, b"\xa5\xf8\x29", "nmi_task_return"),
                                (0xF1D3, b"\x68\xa8\x68", "nmi_rti_return"),
                                (0xFED1, b"\x48\x8a\x48", "bank_switch_enter"),
@@ -194,7 +199,11 @@ def build(rom_path, traces, out, experimental_fastrom=False):
               "translated_helpers": [{"pc": 0xC90C, "offset": bulk_offset,
                                       "entry": symbols['bulk_ppu_byte'],
                                       "preimage_sha256": hashlib.sha256(bulk_preimage).hexdigest(),
-                                      "kind": "whole decompression PPU byte writer"}],
+                                      "kind": "whole decompression PPU byte writer"},
+                                     {"pc": 0xC8DB, "offset": source_offset,
+                                      "entry": symbols['bulk_source_byte'],
+                                      "preimage_sha256": hashlib.sha256(source_preimage).hexdigest(),
+                                      "kind": "whole decompression source byte reader"}],
               "graphics_pipeline": "prepared dirty rows, whole CHR banks and bounded per-NMI DMA",
               "limits": {"vram_bytes_per_nmi": 2048, "chr_jobs_per_nmi": 1, "row_scan_per_nmi": 32,
                          "oam_bytes_per_nmi": 544, "cgram_bytes_per_nmi": 64,

@@ -600,6 +600,62 @@ bulk_ppu_byte:
     sta $2D
     rts
 
+; Fixed-bank C8DB reads the next compressed byte from PPU or CPU memory.
+bulk_source_byte:
+    lda $2B
+    cmp #$80
+    bcs @cpu
+    lda $1A
+    clc
+    adc $2A
+    sta $2E
+    lda $2B
+    adc #0
+    sta $2F
+    stz $4200
+    lda a:$1C25
+    bne @swapped
+    lda $2F
+    and #$3F
+    sta a:$1C27
+    lda $2E
+    sta a:$1C26
+    bra @read
+@swapped:
+    lda $2F
+    sta a:$1C26
+    lda $2E
+    and #$3F
+    sta a:$1C27
+@read:
+    ; First read fills the PPU buffer; second returns it (or bypasses it
+    ; for palette addresses). Keep both address increments and final buffer.
+    jsl $C10000+dispatch_ppudata_read
+    jsl $C10000+dispatch_ppudata_read
+    ; Consume the shared read mailbox before allowing any pending NMI.
+    lda a:$1B24
+    sta $1B
+    pha
+    php
+    lda a:$1C0A
+    ora a:$1C83
+    bne @result
+    lda a:$1C20
+    and #$80
+    beq @result
+    sta $4200
+@result:
+    plp
+    pla
+    inc $1A
+    rts
+@cpu:
+    ldy $1A
+    lda ($2A),y
+    sta $1B
+    inc $1A
+    rts
+
 bank_switch_enter:
     ; Direct translation of FED1's paired-bank operation. The original routine
     ; uses four generic mapper writes, but their effect is fully determined by

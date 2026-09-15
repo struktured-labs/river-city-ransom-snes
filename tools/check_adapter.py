@@ -60,6 +60,15 @@ def check(core):
     banked = b'\x4c' + symbols['done_banked'].to_bytes(2, 'little')
     plain = b'\x4c' + symbols['done'].to_bytes(2, 'little')
     original = (out/'adapter-test.sfc').read_bytes()
+    read_call = b'\x22' + symbols['dispatch_ppudata_read'].to_bytes(2, 'little') + b'\xC1'
+    if original.count(read_call * 2) != 8:
+        raise RuntimeError('Expected two consecutive reads in each bulk source helper')
+    bad_source = out/'missing-bulk-buffer-read.sfc'
+    bad_source.write_bytes(original.replace(read_call * 2, b'\xEA' * 4 + read_call))
+    result = subprocess.run(command + ['--rom', str(bad_source)], capture_output=True, text=True, timeout=30)
+    if not result.returncode or 'WRAM status=ee, adapter case=15' not in result.stderr:
+        raise RuntimeError('Missing bulk dummy read did not fail assertion 15')
+    print('Bulk reader buffer/latch/CPU/CHR cases pass; missing dummy read fails case 15.')
     if original.count(banked) != 8:
         raise RuntimeError('Expected one bank-retarget jump per runtime bank')
     missing_bank = out/'missing-bank-return.sfc'
@@ -78,8 +87,8 @@ def check(core):
         raise RuntimeError('Incorrect direct R7 did not fail pair assertion 9')
     print('All eight direct bank pairs preserve registers/state; wrong R7 fails case 9.')
     guard = bytes.fromhex('ad0a1c0d831cd00a')
-    if original.count(guard) != 24:
-        raise RuntimeError('Expected two generated I/O guards and one bulk helper guard per runtime bank')
+    if original.count(guard) != 32:
+        raise RuntimeError('Expected two generated I/O guards and two bulk helper guards per runtime bank')
     for label, replacement in (
             ('nmi-depth', bytes.fromhex('a900ea0d831cd00a')),
             ('bank-depth', bytes.fromhex('ad0a1ceaeaead00a'))):
