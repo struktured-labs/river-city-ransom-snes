@@ -103,77 +103,68 @@ native_prepare:
     asl
     asl
     asl
-    tax
-@tile:
-    txa
     tay
-    lda [$00],y
-    and #$00FF
-    sta $08
-    lda $1C20
-    and #$0010
-    beq :+
-    lda $08
-    ora #$0100
-    sta $08
-:
-    txa
-    lsr
-    lsr
-    lsr
-    lsr
-    and #$0038
-    sta $0A
-    txa
-    and #$001F
-    lsr
-    lsr
-    ora $0A
-    tay
-    lda [$04],y
-    and #$00FF
-    sta $0C
-    txa
-    and #$0040
-    lsr
-    lsr
-    lsr
-    lsr
-    sta $0A
-    txa
-    and #2
-    ora $0A
-    tay
-    lda $0C
-    cpy #0
-    beq @shifted
-@shift:
-    lsr
-    dey
-    bne @shift
-@shifted:
-    and #3
-    xba
-    asl
-    asl
-    ora $08
-    phx
-    pha
-    txa
     asl
     clc
     adc $16
     tax
-    pla
-    sta f:$7E3000,x
-    plx
-    inx
-
-    txa
-    and #31
+    lda $1C20
+    and #$0010
+    asl
+    asl
+    asl
+    asl
+    sta $0E                 ; pattern-half tile bit, constant across the row
+    lda $14
+    and #$001C
+    asl
+    sta $10                 ; first attribute byte for this tile row
+    lda $14
+    and #2
+    sta $12                 ; bottom half of the attribute quadrant
+    lda #8
+    sta $18                 ; eight groups of four tiles
+@group:
+    phy
+    ldy $10
+    lda [$04],y
+    and #$00FF
+    sta $0C
+    lda $12
     beq :+
-    jmp @tile
+    lda $0C
+    lsr
+    lsr
+    lsr
+    lsr
+    sta $0C
 :
+    ply
+    .repeat 2, pair
+        lda $0C
+        .if pair
+            lsr
+            lsr
+        .endif
+        and #3
+        xba
+        asl
+        asl
+        ora $0E
+        sta $0A
+        .repeat 2
+            lda [$00],y
+            and #$00FF
+            ora $0A
+            sta f:$7E3000,x
+            inx
+            inx
+            iny
+        .endrepeat
+    .endrepeat
+    inc $10
+    dec $18
+    bne @group
     ldx $14
     sep #$20
     .a8
@@ -182,7 +173,7 @@ native_prepare:
     dec $1C6B
     bne :+
     lda #1
-    sta $1C85              ; work beyond this call's two-row budget may remain
+    sta $1C85              ; work beyond this call's row budget may remain
 :
     jmp @next
 prepare_palette:

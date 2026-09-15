@@ -285,6 +285,9 @@ def capture(core_path, rom_path, system, references, out, scenario_name='baselin
                         'task':ram[0x100], 'guard':ram[0x107], 'nmi_depth':ram[0x1C0A],
                         'ppu_ctrl':ram[0x1C20], 'ppu_mask':ram[0x1C21],
                         'gameplay_sound_services':ram[0x1C84],
+                        'row_states': [ram[0x1D00:0x1D80].count(state) for state in range(4)],
+                        'chr_jobs_pending': sum(bool(value) for value in ram[0x1D80:0x1D98]),
+                        'game_nmi_ticks_010b': ram[0x10B],
                         'scroll_x':ram[0x1C28], 'scroll_y':ram[0x1C29],
                         'publish_count':ram[0x1C7A], 'apu_packet':ram[0xA00:0xA17].hex()}
                 pcm.extend(frame_audio)

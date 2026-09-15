@@ -347,3 +347,40 @@ adapter controls and 52 unit tests pass. Next profiling should
 separate actual scene-load CPU work from producer scheduling/backlog rather
 than assuming another dispatcher shortcut will remove the remaining stalls.
 Rivalmage is unchanged.
+
+### Grouped attribute conversion and load-queue evidence
+
+The baseline capture now records counts of all four row states, queued CHR
+jobs, and original $010B ticks. In `build/load-queues-01`, settings takes 158
+frames and story 156; only 21/20 of those frames have entirely clean row/CHR
+queues. Up to 96 rows are pending. This identifies conversion/backlog as a
+material part of loading, but does not isolate every original game wait.
+
+The producer now computes attribute-row/quadrant selection once per four-tile
+group and palette bits once per tile pair, rather than recomputing and looping
+over shifts for every tile. Source/destination indices advance directly. The
+two-row production budget, immutable staged-row states, and VBlank consumer
+limits remain unchanged.
+
+Retained candidate `build/grouped-rows-01/native-cpu.sfc`, SHA
+`f3b915a75ad3532c175afded05163703936b62307ec3f9a3886ef9a30ebe751a`,
+completes 12,000 frames without detected adapter/SPC fault or graphics overrun.
+The sampled game-tick rate is 28.11/second versus fast-read-01's 25.19. Baseline
+capture length barely changes (2485 versus 2487; NES 1936); all four timing
+gates still fail. Settings pixels and basic audio gates pass. The verified
+bundle is `build/grouped-quality-01/site/index.html`. This is not original-speed
+or audio-fidelity certification.
+
+An additional four-row menu-budget experiment (`grouped-rows-02`, SHA
+`73827395501657f486ad2d4953ac380fa809b5360d3adf16a1505732ee38363c`)
+reduced capture length to 2378 but failed settings pixels: lower text was
+missing at the audit checkpoint. The budget change was removed, not accepted
+as a performance win. Its evidence remains in `build/grouped-quality-02`.
+
+`tools/check_rows.py` executes the production converter on prescribed distinct
+data in all four nametables, then checks all 3840 visible tiles and unused
+rows against an independent Python attribute oracle, in both pattern halves.
+It verifies the source fixture itself, not merely output derived from whatever
+RAM happened to contain. A wrong vertical-quadrant mutant fails. CI runs this
+test alongside the existing rendered-pixel and late-entry controls. Fifty-four
+unit tests pass. No hardware deployment was performed.

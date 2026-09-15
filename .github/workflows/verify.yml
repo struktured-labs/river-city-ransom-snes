@@ -33,3 +33,5 @@ jobs:
         run: python3 tools/check_adapter.py --core .deps/snes9x/libretro/snes9x_libretro.so
       - name: Verify incremental producer, bounded NMI and exact synthetic pixels
         run: python3 tools/check_video.py --core .deps/snes9x/libretro/snes9x_libretro.so
+      - name: Verify all row attribute quadrants against an independent oracle
+        run: python3 tools/check_rows.py --core .deps/snes9x/libretro/snes9x_libretro.so
