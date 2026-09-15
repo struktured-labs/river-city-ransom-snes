@@ -210,10 +210,17 @@ mark_ppu_dirty:
     asl
     ora $04
     tax
-    lda #1
+    lda a:$1D00,x
+    ora #1
     sta a:$1D00,x
+    lda a:$1D01,x
+    ora #1
     sta a:$1D01,x
+    lda a:$1D02,x
+    ora #1
     sta a:$1D02,x
+    lda a:$1D03,x
+    ora #1
     sta a:$1D03,x
     rts
 @tile:
@@ -231,7 +238,8 @@ mark_ppu_dirty:
     lsr
     ora $04
     tax
-    lda #1
+    lda a:$1D00,x
+    ora #1
     sta a:$1D00,x
 @end:
     rts
@@ -453,6 +461,33 @@ nmi_task_return:
 
 nmi_rti_return:
     stz $4200
+    ; Gameplay ($0100 bits 7:6 == 11) ticks sound from the first MMC3 IRQ,
+    ; unlike menu NMIs. Until raster IRQ translation exists, service that
+    ; driver once here. This does NOT reproduce the original scanline timing.
+    ; Match the IRQ's bank-variable save/restore around FA54. Original A/X/Y
+    ; remain on the interrupt stack and are restored below.
+    lda a:$0100
+    and #$C0
+    cmp #$C0
+    bne @prepared
+    lda a:$0107
+    bmi @prepared
+    lda $FB
+    pha
+    lda $FC
+    pha
+    lda $FD
+    pha
+    jsr $FA54
+    pla
+    sta $FD
+    pla
+    sta $FC
+    pla
+    sta $FB
+    jsr $FF29
+    inc a:$1C7C
+@prepared:
     ; Prepare the next frame after original game updates, not in the bounded
     ; SNES VBlank consumer. The bridge preserves the saved NES interrupt frame.
     jsl $C00000+video_prepare_bridge

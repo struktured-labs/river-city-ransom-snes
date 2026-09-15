@@ -109,8 +109,8 @@ native_video:
     sep #$20
     .a8
     lda $1D00,x
-    cmp #2
-    bne @next_row
+    and #2
+    beq @next_row
     rep #$20
     .a16
     lda $1A
@@ -121,7 +121,10 @@ native_video:
     ; Reserve enough time for the final palette/OAM batch after this small row.
     jsr row_room
     bcc @finish
-    stz $1D00,x
+    ; Consume the immutable staged row, retaining a newer shadow write.
+    lda $1D00,x
+    and #1
+    sta $1D00,x
     rep #$20
     .a16
     txa

@@ -82,10 +82,17 @@ emu.poweron()
 for n=1,total do
     frame = n
     local buttons = {up=false,down=false,left=false,right=false,A=false,B=false,start=false,select=false}
-    if profile == "walk" then
+    if profile == "walk" or profile == "inventory" then
         if n == 360 or n == 720 then buttons.start = true end
-        if n >= 1000 then buttons.right = true end
-        if n >= 1200 and n % 20 < 5 then buttons.A = true end
+        if profile == "walk" then
+            if n >= 1000 then buttons.right = true end
+            if n >= 1200 and n % 20 < 5 then buttons.A = true end
+        else
+            if n >= 1200 and n < 1212 then buttons.A = true end
+            if n >= 1800 and n < 1812 then buttons.start = true end
+            if n >= 2100 and n < 2112 then buttons.A = true end
+            if n >= 2700 and n < 2712 then buttons.B = true end
+        end
     end
     joypad.set(1, buttons)
     joypad.set(2, {up=false,down=false,left=false,right=false,A=false,B=false,start=false,select=false})

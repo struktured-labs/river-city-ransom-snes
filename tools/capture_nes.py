@@ -27,7 +27,7 @@ def main():
     parser.add_argument("--rom", type=Path, default=ROOT / "roms/river-city-ransom-us.nes")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--frames", type=int, default=1800)
-    parser.add_argument("--profile", choices=("title", "walk"), default="title")
+    parser.add_argument("--profile", choices=("title", "walk", "inventory"), default="title")
     parser.add_argument("--timeout", type=int, default=180)
     args = parser.parse_args()
     Rom.parse(args.rom.read_bytes()).require_rcr_us()

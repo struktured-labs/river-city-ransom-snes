@@ -42,6 +42,9 @@ reset:
     xce
     jml $C10000+tests
 tests:
+    ; Re-dirtying a staged row retains its ready bit; DMA must not starve.
+    lda #2
+    sta $1D00
     ; Ordinary buffered PPUDATA write/read, post-increment and register ABI.
     lda #1
     sta $1C61
@@ -62,6 +65,9 @@ tests:
     jne failed
     lda f:$7F2010
     cmp #$AB
+    jne failed
+    lda $1D00
+    cmp #3
     jne failed
     lda $1C26
     cmp #$11

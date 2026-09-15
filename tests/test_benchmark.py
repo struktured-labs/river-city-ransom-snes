@@ -9,7 +9,7 @@ import wave
 import numpy as np
 from PIL import Image
 
-from tools.benchmark_capture import SCENARIO, MAPPING, RECTS, audio_stats, decode_frame, matches, sha
+from tools.benchmark_capture import SCENARIO, MAPPING, RECTS, audio_stats, decode_frame, matches, sha, scenario_for
 from tools.benchmark_report import POLICY, evaluate, longest_run, phase_metrics, verify_capture, pause_gate
 from tools.verify_benchmark import verify as verify_bundle
 
@@ -78,6 +78,44 @@ class SignalControls(unittest.TestCase):
 
 
 class EvidenceControls(unittest.TestCase):
+    def test_named_scenarios_and_unknown_names(self):
+        for name in ('start', 'select', 'start-select', 'start-confirm'):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temp:
+                out = Path(temp)
+                report, _ = self.fixture(out)
+                report['scenario_name'] = name
+                report['scenario'] = scenario_for(name)
+                report['scenario_sha256'] = hashlib.sha256(json.dumps(report['scenario'], sort_keys=True).encode()).hexdigest()
+                (out/'capture.json').write_text(json.dumps(report))
+                self.assertFalse(verify_capture(out)[0]['capture_complete'])
+        with self.assertRaises(ValueError):
+            scenario_for('invented')
+
+    def test_ram_snapshot_bound_to_payload_and_timeline(self):
+        for mutation in (None, 'payload', 'timeline', 'path'):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temp:
+                out = Path(temp)
+                report, rows = self.fixture(out)
+                snapshot = out/'boot_to_menu.ram'
+                snapshot.write_bytes(bytes(2048))
+                rows[-1]['ram_sha256'] = sha(snapshot)
+                segment = report['segments'][0]
+                segment.update(ram_snapshot=snapshot.name, ram_snapshot_sha256=sha(snapshot))
+                if mutation == 'payload':
+                    snapshot.write_bytes(bytes(2049))
+                if mutation == 'timeline':
+                    rows[-1]['ram_sha256'] = '0'*64
+                if mutation == 'path':
+                    segment['ram_snapshot'] = '../outside.ram'
+                (out/'timeline.json').write_text(json.dumps(rows))
+                report['timeline_sha256'] = sha(out/'timeline.json')
+                (out/'capture.json').write_text(json.dumps(report))
+                if mutation:
+                    with self.assertRaises(ValueError):
+                        verify_capture(out)
+                else:
+                    verify_capture(out)
+
     def fixture(self, out):
         # A short recognized initial phase is valid evidence but an incomplete run.
         pixels=np.zeros((240,256,3),np.uint8)

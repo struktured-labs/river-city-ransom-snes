@@ -1,7 +1,8 @@
 ; Producer: E=0, A16/X16, DB=0, D=$1E00. No hardware PPU writes.
 ; Called after original game interrupt work / PPUMASK writes, never by the
 ; bounded SNES VBlank consumer. Caller masks NMI for the native-mode bridge.
-; Dirty rows: $1D00..7F (1=needs conversion, 2=ready for DMA).
+; Row flags: bit0=shadow dirty, bit1=immutable staged row ready for DMA.
+; State 3 must drain the old staged row before preparing the newer shadow.
 native_prepare:
     ; A background pattern-table change invalidates each staged tile's bit 8.
     sep #$20

@@ -72,10 +72,15 @@ def evaluate(reference, candidate):
 
 
 def verify_capture(directory):
+    try:
+        from .benchmark_capture import scenario_for
+    except ImportError:
+        from benchmark_capture import scenario_for
     report = json.loads((directory / "capture.json").read_text())
     if report["schema"] != "rcr-benchmark-capture-v1" or report["release_ready"] is not False:
         raise ValueError("Invalid capture status")
-    if report["scenario"] != SCENARIO or report["scenario_sha256"] != hashlib.sha256(json.dumps(SCENARIO, sort_keys=True).encode()).hexdigest():
+    scenario = scenario_for(report.get('scenario_name', 'baseline'))
+    if report["scenario"] != scenario or report["scenario_sha256"] != hashlib.sha256(json.dumps(scenario, sort_keys=True).encode()).hexdigest():
         raise ValueError("Scenario mismatch")
     system = report["system"]
     if system not in MAPPING or report["input_mapping"] != MAPPING[system]:
@@ -100,9 +105,9 @@ def verify_capture(directory):
     next_frame, next_sample = 1, 0
     complete = True
     for index, segment in enumerate(report["segments"]):
-        if index >= len(SCENARIO):
+        if index >= len(scenario):
             raise ValueError("Unexpected extra phase")
-        phase = SCENARIO[index]
+        phase = scenario[index]
         name = phase["name"]
         if (segment["name"] != name or segment["start_frame"] != next_frame
                 or segment["frames"] != segment["end_frame"]-next_frame+1
@@ -116,6 +121,12 @@ def verify_capture(directory):
                 raise ValueError("Continued after an unrecognized phase")
         if segment["screenshot"] != name+".png" or sha(directory / (name+".png")) != segment["screenshot_sha256"]:
             raise ValueError("Screenshot changed or unsafe path")
+        if 'ram_snapshot' in segment or 'ram_snapshot_sha256' in segment:
+            if segment.get('ram_snapshot') != name+'.ram' or sha(directory / (name+'.ram')) != segment.get('ram_snapshot_sha256'):
+                raise ValueError('RAM snapshot changed or unsafe path')
+            snapshot = (directory / (name+'.ram')).read_bytes()
+            if len(snapshot) < 2048 or hashlib.sha256(snapshot[:2048]).hexdigest() != rows[segment['end_frame']-1].get('ram_sha256'):
+                raise ValueError('RAM snapshot and telemetry disagree')
         for offset, row in enumerate(rows[next_frame-1:segment["end_frame"]]):
             if row["frame"] != next_frame+offset or row["phase"] != name:
                 raise ValueError("Non-contiguous telemetry")
@@ -146,7 +157,7 @@ def verify_capture(directory):
         next_frame = segment["end_frame"]+1
     if next_frame != len(rows)+1 or next_sample*4 != len(pcm):
         raise ValueError("Unaccounted video/audio evidence")
-    complete = complete and len(report["segments"]) == len(SCENARIO)
+    complete = complete and len(report["segments"]) == len(scenario)
     if report["capture_complete"] != complete:
         raise ValueError("False completion claim")
     return report, rows
@@ -172,6 +183,8 @@ def plot(reference, candidate):
 def build(reference_dir, candidate_dir, out):
     ref, rrows = verify_capture(reference_dir)
     cand, crows = verify_capture(candidate_dir)
+    if ref.get('scenario_name', 'baseline') != 'baseline' or cand.get('scenario_name', 'baseline') != 'baseline':
+        raise ValueError('Quality comparison requires baseline scenarios; transitions are diagnostic evidence only')
     if ref["system"] != "nes" or cand["system"] != "snes" or ref["templates"] != cand["templates"] or ref["palette_sha256"] != cand["palette_sha256"]:
         raise ValueError("Incompatible comparison inputs")
     if ref["rom_sha256"] != ref["templates"]["menu"]["source_rom"]:

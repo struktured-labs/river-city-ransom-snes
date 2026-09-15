@@ -85,6 +85,9 @@ reset:
     jsr native_prepare
     sep #$20
     .a8
+    ; A newer shadow write must not revoke an already prepared row's DMA.
+    lda #3
+    sta $1D00
     lda #5
     sta $1C61
     lda #$80
@@ -96,6 +99,7 @@ reset:
     lda $1C7B
     bne failed
     lda $1D00
+    cmp #1
     bne failed
     ; Second generation: nonadjacent dirty rows and moved OAM must drain too.
     stz $4200

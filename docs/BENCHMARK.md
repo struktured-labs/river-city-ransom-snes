@@ -4,6 +4,50 @@ The user's release bar is original NES speed and no sputtering or dead sound.
 The current candidate does not meet it. This harness is designed to expose that,
 not to rename emulator liveness as game correctness.
 
+## September 15 local progress (not deployed)
+
+Candidate `406482a448c128987266b1a37a67d10781bc7aaf64d678ee1801cf7551fdb8f3`
+is in `build/gameplay-audio-01`; its verified audio/collage dashboard is
+`build/audio-quality-01/site/index.html`. Historical evidence below is preserved.
+
+Two concrete defects were addressed:
+
+- Prepared tile rows were being revoked by subsequent NES shadow writes. Row
+  flags now encode dirty and ready independently: 0 clean, 1 dirty, 2 ready,
+  3 ready plus newer dirty data. The consumer drains the immutable staged row,
+  retaining the new dirty bit for the producer. The asset-free executed graphics
+  test passes; a disposable mutation restoring the old consumer fails. Settings
+  heads disappear and NORMAL/FAST return, but the footer still fails comparison.
+  A build without the added inventory trace has the same settings screenshot,
+  isolating that improvement from expanded code coverage.
+- Gameplay calls the sound driver at `$FA54` from its first MMC3 IRQ (`$F1D9`
+  entry), whereas menus call it from NMI. The port's disabled raster IRQ left the
+  street music initialized but never advanced. A temporary NMI-return service
+  calls that driver for gameplay tasks only, preserving bank variables as the
+  original IRQ does. **This is not accurate raster timing or a complete IRQ port.**
+
+Idle audio activity rose from 0% to 91.7%; walk/resume reach 81.1%, attack 96.7%.
+Idle/walk/resume still have 4–5-frame silent runs. The attack presence check passes,
+but fidelity is unverified and pause-tail noise fails. Transition waits remain
+409/141/136/758 frames versus NES 170/53/54/459. Nine automatic gates still fail.
+
+The 12,000-frame smoke run passes NMI-progress and adapter-fault checks only;
+it does not establish gameplay speed or audio correctness. The 2,836-frame
+Start→confirm submenu run reaches every scheduled phase without an adapter fault.
+The reported physical blue-screen freeze has **not** been reproduced or resolved.
+Rivalmage was not accessed or changed for this work.
+
+`benchmark_capture.py --scenario start|select|start-select|start-confirm` adds
+bounded street/menu input scenarios. New captures include CPU/task/PPU/APU packet
+telemetry and phase-end RAM snapshots, bound to their receipt and final-frame RAM
+hash. Old captures remain verifiable. The full quality report rejects diagnostic
+scenarios instead of mislabeling them as the baseline release benchmark.
+
+Next: implement proper interrupt scheduling and measure game/audio cadence;
+remove the provisional service when the real first-raster-IRQ path is in place.
+Keep the blue-screen reproduction, remaining settings pixels, audio dropouts and
+pause behavior open. No playable handoff until the original-speed/audio bar passes.
+
 ## Reproduce
 
 ```sh

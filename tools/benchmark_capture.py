@@ -48,6 +48,22 @@ SCENARIO = [
 ]
 
 
+def scenario_for(name):
+    if name == 'baseline':
+        return SCENARIO
+    if name not in ('start', 'select', 'start-select', 'start-confirm'):
+        raise ValueError('Unknown transition scenario')
+    prefix = SCENARIO[:next(i for i,p in enumerate(SCENARIO) if p['name']=='walk')]
+    buttons = {'start-select':['Start','Select'], 'start-confirm':['Start','A']}.get(name,[name.title()])
+    phases = list(prefix)
+    for index, button in enumerate(buttons):
+        phases.extend([{'name':f'press_{index}_{button}', 'frames':12, 'buttons':[button]},
+                       {'name':f'after_{index}_{button}', 'frames':300}])
+    phases.extend([{'name':'exit_menu', 'frames':12, 'buttons':['B']},
+                   {'name':'after_exit', 'frames':300}])
+    return phases
+
+
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -93,7 +109,8 @@ def audio_stats(raw):
             "peak": int(np.max(np.abs(pcm)))}
 
 
-def capture(core_path, rom_path, system, references, out):
+def capture(core_path, rom_path, system, references, out, scenario_name='baseline'):
+    scenario = scenario_for(scenario_name)
     out.mkdir(parents=True, exist_ok=False)
     # Bind classifiers to previously authenticated original-ROM captures.
     templates, template_hashes = {}, {}
@@ -127,6 +144,14 @@ def capture(core_path, rom_path, system, references, out):
                b"fceumm_overscan_v": b"disabled", b"fceumm_palette": b"custom"}
     directory_bytes = str(out.resolve()).encode()
     core = C.CDLL(str(core_path.resolve()))
+    getter = None
+    if system == 'snes':
+        try:
+            getter = core.retro_rcr_cpu_register
+        except AttributeError as error:
+            raise RuntimeError('SNES capture requires the pinned debug-export core') from error
+        getter.argtypes = [C.c_uint]
+        getter.restype = C.c_uint
     fmt, latest, calls, duplicated = 0, None, 0, False
     frame_audio = bytearray()
     callback_errors = []
@@ -210,7 +235,7 @@ def capture(core_path, rom_path, system, references, out):
         core.retro_get_system_av_info(C.byref(av))
         if not 49 < av.timing.fps < 62 or not 8000 < av.timing.sample_rate < 192001:
             raise RuntimeError("Unexpected core timing")
-        for phase in SCENARIO:
+        for phase in scenario:
             start, matched, stable = len(rows), False, 0
             for offset in range(phase["frames"]):
                 buttons = phase.get("buttons", [])
@@ -241,6 +266,12 @@ def capture(core_path, rom_path, system, references, out):
                              "probe_052b": ram[0x52B],
                              "nmi_counter": int.from_bytes(ram[0x1C04:0x1C06], "little") if system == "snes" else None,
                              "fault": fault})
+                if system == 'snes':
+                    rows[-1]['native'] = {'pc':getter(0), 'p':getter(5), 'db':getter(6),
+                        'task':ram[0x100], 'guard':ram[0x107], 'nmi_depth':ram[0x1C0A],
+                        'ppu_ctrl':ram[0x1C20], 'ppu_mask':ram[0x1C21],
+                        'gameplay_sound_services':ram[0x1C7C],
+                        'publish_count':ram[0x1C7A], 'apu_packet':ram[0xA00:0xA17].hex()}
                 pcm.extend(frame_audio)
                 if "until" in phase:
                     hit = matches(latest, templates[phase["until"]], RECTS[phase["until"]])
@@ -250,10 +281,13 @@ def capture(core_path, rom_path, system, references, out):
                         break
             name = phase["name"]
             Image.fromarray(latest).save(out / f"{name}.png")
+            size, ptr = core.retro_get_memory_size(2), core.retro_get_memory_data(2)
+            (out / f'{name}.ram').write_bytes(C.string_at(ptr, size))
             snapshots[name] = sha(out / f"{name}.png")
             segments.append({"name": name, "start_frame": start+1, "end_frame": len(rows),
                              "frames": len(rows)-start, "transition_matched": matched if "until" in phase else None,
-                             "screenshot": f"{name}.png", "screenshot_sha256": snapshots[name]})
+                             "screenshot": f"{name}.png", "screenshot_sha256": snapshots[name],
+                             "ram_snapshot": f"{name}.ram", "ram_snapshot_sha256": sha(out / f'{name}.ram')})
             if "until" in phase and not matched:
                 break  # fail closed: never label an unreached screen as gameplay/audio proof.
         with wave.open(str(out / "audio.wav"), "wb") as output:
@@ -267,12 +301,13 @@ def capture(core_path, rom_path, system, references, out):
                   "candidate_manifest_sha256": candidate_manifest,
                   "palette_sha256": palette_hash,
                   "capture_tool_sha256": sha(Path(__file__)), "templates": template_hashes,
-                  "scenario": SCENARIO, "scenario_sha256": hashlib.sha256(json.dumps(SCENARIO, sort_keys=True).encode()).hexdigest(),
+                  "scenario_name":scenario_name,
+                  "scenario": scenario, "scenario_sha256": hashlib.sha256(json.dumps(scenario, sort_keys=True).encode()).hexdigest(),
                   "input_mapping": MAPPING[system], "core_options": {k.decode(): v.decode() for k,v in options.items()},
                   "fps": av.timing.fps, "sample_rate": av.timing.sample_rate,
                   "segments": segments, "audio_sha256": sha(out / "audio.wav"),
                   "timeline_sha256": sha(out / "timeline.json"), "frames": len(rows),
-                  "capture_complete": len(segments) == len(SCENARIO) and all(s["transition_matched"] is not False for s in segments),
+                  "capture_complete": len(segments) == len(scenario) and all(s["transition_matched"] is not False for s in segments),
                   "release_ready": False}
         (out / "capture.json").write_text(json.dumps(report, indent=2) + "\n")
         print(json.dumps({"out": str(out), "frames": len(rows), "complete": report["capture_complete"]}))
@@ -287,7 +322,8 @@ if __name__ == "__main__":
     for name in ("core", "rom", "title", "walk", "out"):
         parser.add_argument("--"+name, type=Path, required=True)
     parser.add_argument("--system", choices=("nes", "snes"), required=True)
+    parser.add_argument('--scenario',choices=('baseline','start','select','start-select','start-confirm'),default='baseline')
     args = parser.parse_args()
     refs = {"menu": (args.title, 600), "settings": (args.walk, 600),
             "story": (args.walk, 900), "street": (args.walk, 1800)}
-    capture(args.core, args.rom, args.system, refs, args.out)
+    capture(args.core, args.rom, args.system, refs, args.out, args.scenario)
