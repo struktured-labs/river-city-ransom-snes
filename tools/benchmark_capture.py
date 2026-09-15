@@ -51,6 +51,13 @@ SCENARIO = [
 def scenario_for(name):
     if name == 'baseline':
         return SCENARIO
+    if name == 'traversal':
+        # Begin the walk only after the actual street has been recognized.
+        # Keep frequent immutable screenshots/RAM snapshots for scene-exit
+        # auditing; do not infer progression from a wrapping scroll register.
+        prefix = SCENARIO[:next(i for i, p in enumerate(SCENARIO) if p['name'] == 'walk')]
+        return list(prefix) + [dict(name=f'right_{i:02d}', frames=120, buttons=['Right'])
+                               for i in range(36)]
     if name not in ('start', 'select', 'start-select', 'start-confirm'):
         raise ValueError('Unknown transition scenario')
     prefix = SCENARIO[:next(i for i,p in enumerate(SCENARIO) if p['name']=='walk')]
@@ -266,6 +273,10 @@ def capture(core_path, rom_path, system, references, out, scenario_name='baselin
                              "probe_052b": ram[0x52B],
                              "nmi_counter": int.from_bytes(ram[0x1C04:0x1C06], "little") if system == "snes" else None,
                              "fault": fault})
+                if scenario_name == 'traversal':
+                    # Preserve raw original-game state for deriving/validating
+                    # position and room oracles, rather than naming guesses.
+                    rows[-1]['game_ram_hex'] = ram[:2048].hex()
                 if system == 'snes':
                     rows[-1]['native'] = {'pc':getter(0), 'p':getter(5), 'db':getter(6),
                         'task':ram[0x100], 'guard':ram[0x107], 'nmi_depth':ram[0x1C0A],
@@ -323,7 +334,7 @@ if __name__ == "__main__":
     for name in ("core", "rom", "title", "walk", "out"):
         parser.add_argument("--"+name, type=Path, required=True)
     parser.add_argument("--system", choices=("nes", "snes"), required=True)
-    parser.add_argument('--scenario',choices=('baseline','start','select','start-select','start-confirm'),default='baseline')
+    parser.add_argument('--scenario',choices=('baseline','start','select','start-select','start-confirm','traversal'),default='baseline')
     args = parser.parse_args()
     refs = {"menu": (args.title, 600), "settings": (args.walk, 600),
             "story": (args.walk, 900), "street": (args.walk, 1800)}

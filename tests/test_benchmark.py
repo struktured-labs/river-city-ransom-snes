@@ -78,6 +78,37 @@ class SignalControls(unittest.TestCase):
 
 
 class EvidenceControls(unittest.TestCase):
+    def test_traversal_inputs_start_after_recognized_street(self):
+        scenario = scenario_for('traversal')
+        walk = next(i for i, phase in enumerate(scenario) if phase['name'] == 'right_00')
+        self.assertEqual(scenario[:walk], SCENARIO[:walk])
+        self.assertTrue(any(p.get('until') == 'street' for p in scenario[:walk]))
+        self.assertEqual(len(scenario[walk:]), 36)
+        self.assertTrue(all(p['frames'] == 120 and p['buttons'] == ['Right'] for p in scenario[walk:]))
+
+    def test_traversal_raw_ram_is_bound_to_frame_hash(self):
+        for mutation in (None, 'changed', 'missing', 'short'):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temp:
+                out = Path(temp)
+                report, rows = self.fixture(out)
+                report['scenario_name'] = 'traversal'
+                report['scenario'] = scenario_for('traversal')
+                report['scenario_sha256'] = hashlib.sha256(json.dumps(report['scenario'], sort_keys=True).encode()).hexdigest()
+                for row in rows:
+                    row['game_ram_hex'] = bytes(2048).hex()
+                    row['ram_sha256'] = hashlib.sha256(bytes(2048)).hexdigest()
+                if mutation == 'changed': rows[0]['game_ram_hex'] = (b'\x01'+bytes(2047)).hex()
+                if mutation == 'missing': del rows[0]['game_ram_hex']
+                if mutation == 'short': rows[0]['game_ram_hex'] = bytes(2047).hex()
+                (out/'timeline.json').write_text(json.dumps(rows))
+                report['timeline_sha256'] = sha(out/'timeline.json')
+                (out/'capture.json').write_text(json.dumps(report))
+                if mutation:
+                    with self.assertRaisesRegex(ValueError, 'Traversal game RAM'):
+                        verify_capture(out)
+                else:
+                    self.assertFalse(verify_capture(out)[0]['capture_complete'])
+
     def test_named_scenarios_and_unknown_names(self):
         for name in ('start', 'select', 'start-select', 'start-confirm'):
             with self.subTest(name=name), tempfile.TemporaryDirectory() as temp:

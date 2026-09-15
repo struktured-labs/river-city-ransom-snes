@@ -130,6 +130,10 @@ def verify_capture(directory):
         for offset, row in enumerate(rows[next_frame-1:segment["end_frame"]]):
             if row["frame"] != next_frame+offset or row["phase"] != name:
                 raise ValueError("Non-contiguous telemetry")
+            if report.get('scenario_name') == 'traversal':
+                raw = bytes.fromhex(row.get('game_ram_hex', ''))
+                if len(raw) != 2048 or hashlib.sha256(raw).hexdigest() != row['ram_sha256']:
+                    raise ValueError('Traversal game RAM does not match frame telemetry')
             buttons = phase.get("buttons", [])
             if "pulse" in phase and offset % phase["pulse"][0] >= phase["pulse"][1]:
                 buttons = []
