@@ -1,10 +1,21 @@
 """Adversarial controls for the SPC signal oracle, independent of game assets."""
 import unittest
 import numpy as np
-from tools.check_audio import measure
+from tools.check_audio import measure, measure_length
 
 
 class AudioSignalControls(unittest.TestCase):
+    def test_length_requires_audible_onset_and_silent_tail(self):
+        onset = self.tone()[:1920]
+        silence = np.zeros((48000, 2))
+        self.assertTrue(measure_length(onset, silence, 48000)['passed'])
+        self.assertFalse(measure_length(onset, self.tone(), 48000)['passed'])
+        self.assertFalse(measure_length(onset*0, silence, 48000)['passed'])
+        dead_channel = onset.copy(); dead_channel[:, 1] = 0
+        self.assertFalse(measure_length(dead_channel, silence, 48000)['passed'])
+        with self.assertRaises(ValueError):
+            measure_length(onset[:10], silence, 48000)
+
     def tone(self, frequency=440, amplitude=2000):
         signal = amplitude*np.sin(2*np.pi*frequency*np.arange(48000)/48000)
         return np.column_stack((signal, signal))

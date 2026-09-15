@@ -48,7 +48,13 @@ reset:
     jcs failed
     ; Constant-volume square wave, NES timer $FD (~440 Hz NTSC).
     ; Loop/length-disable keeps this diagnostic independent of the host counters.
+.ifdef AUDIO_LENGTH
+    ; Same pulse, but length halt disabled and length index zero in $4003.
+    ; The NES length counter must end this note without a $4015 mute write.
+    lda #$9F
+.else
     lda #$BF
+.endif
     sta APU_PACKET
     lda #$FD
     sta APU_PACKET+2

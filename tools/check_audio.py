@@ -43,9 +43,21 @@ def measure(pcm, rate, expected_hz):
             'active_10ms_fraction': activity.mean(axis=0).tolist(), 'clipped_fraction': clipped}
 
 
-def check(core, out):
+def measure_length(onset, tail, rate):
+    onset = np.asarray(onset, dtype=float)
+    if onset.ndim != 2 or onset.shape[1] != 2 or len(onset) < rate//50:
+        raise ValueError('Need at least 20 ms of stereo onset PCM')
+    result = measure(tail, rate, None)
+    onset_rms = np.sqrt(np.mean((onset-onset.mean(axis=0))**2, axis=0))
+    result['onset_ac_rms'] = onset_rms.tolist()
+    result['passed'] = result['passed'] and bool(min(onset_rms) > 128)
+    return result
+
+
+def check(core, out, length=False):
     out.mkdir(parents=True, exist_ok=False)
     subprocess.run([str(ROOT/'.deps/cc65/bin/ca65'), '-D', 'AUDIO_SCRIPT=1',
+                    *(['-D', 'AUDIO_LENGTH=1'] if length else []),
                     '--bin-include-dir', str(ROOT/'.deps/upernes/source/asm'),
                     '-o', str(out/'script.o'), str(ROOT/'snes/bringup.asm')], check=True)
     rom = out/'script.sfc'
@@ -105,11 +117,22 @@ def check(core, out):
         frames = [r for r in rows if r['phase'] == phase]
         start, end = frames[0]['start_sample']+rate//10, frames[-1]['end_sample']-rate//10
         result = measure(pcm[start:end], rate, expected)
+        if length:
+            # Ten half-frame clocks expire in about 83 ms on NTSC NES.
+            # The late window begins after 100 ms and must be silent without
+            # software muting. Also require an audible onset after retrigger.
+            result = measure(pcm[start:end], rate, None)
+            if phase != 1:
+                onset = pcm[frames[0]['start_sample']+rate//100:
+                            frames[0]['start_sample']+rate//20].astype(float)
+                result = measure_length(onset, pcm[start:end], rate)
         result.update(phase=phase, start_sample=start, end_sample=end)
         results.append(result)
     (out/'timeline.json').write_text(json.dumps(rows, indent=2)+'\n')
     report = {'schema': 'rcr-spc-signal-test-v1', 'receipt': receipt,
-              'scope': 'constant pulse, channel disable, restart, pitch change; NOT length/envelope/sweep/noise/DMC or game fidelity',
+              'scope': ('pulse length-index-zero expiry and retrigger; NOT full frame-sequencer/envelope/sweep/noise/DMC or game fidelity'
+                        if length else 'constant pulse, channel disable, restart, pitch change; NOT length/envelope/sweep/noise/DMC or game fidelity'),
+              'profile': 'length-expiry' if length else 'pulse-script',
               'tool_sha256': sha(Path(__file__)), 'source_sha256': sha(ROOT/'snes/bringup.asm'),
               'wav_sha256': sha(out/'audio.wav'), 'timeline_sha256': sha(out/'timeline.json'),
               'phases': results, 'passed': all(r['passed'] for r in results), 'release_ready': False}
@@ -122,5 +145,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--core', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--length', action='store_true', help='Probe automatic NES pulse length expiry (currently unimplemented)')
     args = parser.parse_args()
-    raise SystemExit(0 if check(args.core, args.out) else 1)
+    raise SystemExit(0 if check(args.core, args.out, args.length) else 1)
