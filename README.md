@@ -72,11 +72,21 @@ experimental cartridge and audits, follow [the development runbook](docs/DEVELOP
 
 ## References and credit
 
-Rumbleminze's [porting template](https://github.com/rumbleminze/nes-to-snes-template)
-informs the native CPU plus hardware translation design. Infidelity's published
-NES-to-SNES development discussion informs the porting approach; no public
-assembly source from Infidelity was located during this research. Memblers
-(Joey Parsell), with assistance from Kevin Horton and others, authored the
-SPC700 sound engine used here, retrieved from
-[upernes](https://github.com/mandraga/upernes). See
-[third-party notes](docs/THIRD_PARTY.md) for exact revisions and integration limits.
+Port development and automated validation by **struktured labs**, with thanks to:
+
+- **infidelity** — NES-to-SNES porting inspiration and direct guidance on the
+  8bpp splash-screen window-mask reveal. His work and advice inform this port;
+  this is not an infidelity port or a claim that his game-port source is included.
+- **Rumbleminze** — the
+  [NES-to-SNES porting template](https://github.com/rumbleminze/nes-to-snes-template)
+  informs the native CPU and hardware-translation design. Design/source
+  inspiration; the template is not vendored here.
+- **Memblers (Joey Parsell)** — author of the **2A03 sound emulator for the
+  SNES SPC700** used by this project, with assistance from Kevin Horton and
+  others. The pinned engine is retrieved through
+  [upernes](https://github.com/mandraga/upernes); our integration and experimental
+  patches do not replace that upstream authorship credit.
+
+See [third-party provenance](docs/THIRD_PARTY.md) for exact revisions, the sound
+engine hash, and integration limits. These credits acknowledge contributions
+and inspiration, not endorsement of this unfinished port.
