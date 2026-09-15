@@ -890,6 +890,20 @@ bulk_reader_tests:
     cmp #1
     jne failed
     stz $1C25
+    ; Source-address addition $7FFF + 1 sets V. Internal CHR pointer
+    ; arithmetic must not leak its own overflow flag through the bulk ABI.
+    lda #$FF
+    sta $2A
+    lda #$7F
+    sta $2B
+    lda #1
+    sta $1A
+    jsr bulk_source_byte
+    php
+    pla
+    and #$40
+    cmp #$40
+    jne failed
     stz $2A
     stz $1A
     lda #$80

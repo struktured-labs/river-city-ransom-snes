@@ -430,6 +430,9 @@ dispatch_read:
     jmp done
 @data:
 ppu_read_data:
+    jsr ppu_read_buffer
+    jmp done
+ppu_read_buffer:
     jsr ppu_pointer
     lda a:$1C2A
     sta $24
@@ -443,7 +446,7 @@ ppu_read_data:
     sta $24
 :
     jsr ppu_increment
-    jmp done
+    rts
 
 ppu_pointer:
     lda a:$1C26
@@ -577,8 +580,8 @@ done_banked:
     rtl
 
 ; Fixed-bank C90C writes one decompressed byte after two PPUADDR writes.
-; Translate the complete helper so each byte needs one mailbox transaction,
-; not three. Preserve even an initially half-written PPUADDR latch.
+; Translate the complete helper with one guarded adapter-DP interval instead
+; of separate full I/O transactions. Preserve a half-written PPUADDR latch.
 bulk_ppu_byte:
     stz $4200
     lda a:$1C25
@@ -598,7 +601,20 @@ bulk_ppu_byte:
 @write:
     lda $1B
     sta a:$1B22
-    jsl $C10000+dispatch_ppudata
+    phx
+    phd
+    lda #$1B
+    xba
+    lda #0
+    tcd
+    jsr ppu_pointer
+    lda $22
+    sta [$00]
+    jsr mark_ppu_dirty
+    jsr ppu_increment
+    inc a:$1C09
+    pld
+    plx
     lda a:$1C0A
     ora a:$1C83
     bne @increment
@@ -608,7 +624,7 @@ bulk_ppu_byte:
     sta $4200
 @increment:
     ; Original final A/N/Z/C and source pointer update, independent of the
-    ; PPUCTRL increment (which dispatch_ppudata already applied).
+    ; PPUCTRL increment (which ppu_increment already applied).
     clc
     lda $2C
     adc #1
@@ -648,8 +664,20 @@ bulk_source_byte:
 @read:
     ; First read fills the PPU buffer; second returns it (or bypasses it
     ; for palette addresses). Keep both address increments and final buffer.
-    jsl $C10000+dispatch_ppudata_read
-    jsl $C10000+dispatch_ppudata_read
+    ; The whole reader already masks NMI. Enter the shared read primitive
+    ; once under the adapter DP instead of saving/restoring the full ABI twice.
+    php
+    phx
+    phd
+    lda #$1B
+    xba
+    lda #0
+    tcd
+    jsr ppu_read_buffer
+    jsr ppu_read_buffer
+    pld
+    plx
+    plp
     ; Consume the shared read mailbox before allowing any pending NMI.
     lda a:$1B24
     sta $1B

@@ -60,6 +60,14 @@ def check(core):
     banked = b'\x4c' + symbols['done_banked'].to_bytes(2, 'little')
     plain = b'\x4c' + symbols['done'].to_bytes(2, 'little')
     original = (out/'adapter-test.sfc').read_bytes()
+    bulk_store = bytes.fromhex('a91beba9005b20') + symbols['ppu_pointer'].to_bytes(2, 'little') + bytes.fromhex('a5228700')
+    if original.count(bulk_store) != 8:
+        raise RuntimeError('Expected one direct bulk PPU store per runtime bank')
+    missing_store = out/'missing-bulk-ppu-store.sfc'
+    missing_store.write_bytes(original.replace(bulk_store, bulk_store[:-2] + b'\xEA\xEA'))
+    result = subprocess.run(command + ['--rom', str(missing_store)], capture_output=True, text=True, timeout=30)
+    if not result.returncode or 'WRAM status=ee, adapter case=14' not in result.stderr:
+        raise RuntimeError('Missing direct bulk PPU store did not fail assertion 14')
     reload_flag = bytes.fromhex('a9400d160a8d160a')
     if original.count(reload_flag) != 8:
         raise RuntimeError('Expected one pulse-0 period reload flag per runtime bank')
@@ -96,15 +104,24 @@ def check(core):
     if not result.returncode or 'WRAM status=ee, adapter case=16' not in result.stderr:
         raise RuntimeError('Omitted attribute groups did not fail assertion 16')
     print('Incomplete attribute dirtiness also fails page fill case 16.')
-    read_call = b'\x22' + symbols['dispatch_ppudata_read'].to_bytes(2, 'little') + b'\xC1'
+    read_call = b'\x20' + symbols['ppu_read_buffer'].to_bytes(2, 'little')
     if original.count(read_call * 2) != 8:
         raise RuntimeError('Expected two consecutive reads in each bulk source helper')
     bad_source = out/'missing-bulk-buffer-read.sfc'
-    bad_source.write_bytes(original.replace(read_call * 2, b'\xEA' * 4 + read_call))
+    bad_source.write_bytes(original.replace(read_call * 2, b'\xEA' * 3 + read_call))
     result = subprocess.run(command + ['--rom', str(bad_source)], capture_output=True, text=True, timeout=30)
     if not result.returncode or 'WRAM status=ee, adapter case=15' not in result.stderr:
         raise RuntimeError('Missing bulk dummy read did not fail assertion 15')
     print('Bulk reader buffer/latch/CPU/CHR cases pass; missing dummy read fails case 15.')
+    read_restore = read_call * 2 + bytes.fromhex('2bfa28')
+    if original.count(read_restore) != 8:
+        raise RuntimeError('Expected one bulk read flags restore in each runtime bank')
+    bad_flags = out/'missing-bulk-read-flags.sfc'
+    # PLA discards the saved status while keeping the return stack balanced.
+    bad_flags.write_bytes(original.replace(read_restore, read_restore[:-1] + b'\x68'))
+    result = subprocess.run(command + ['--rom', str(bad_flags)], capture_output=True, text=True, timeout=30)
+    if not result.returncode or 'WRAM status=ee, adapter case=15' not in result.stderr:
+        raise RuntimeError('Missing bulk read flags restore did not fail assertion 15')
     if original.count(banked) != 8:
         raise RuntimeError('Expected one bank-retarget jump per runtime bank')
     missing_bank = out/'missing-bank-return.sfc'
