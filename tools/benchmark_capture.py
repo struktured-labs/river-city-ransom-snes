@@ -51,6 +51,9 @@ SCENARIO = [
 def scenario_for(name):
     if name == 'baseline':
         return SCENARIO
+    if name == 'menu-audio':
+        # No input transitions or encounters: isolate sustained menu audio.
+        return [dict(SCENARIO[0]), {'name': 'menu_audio', 'frames': 1800}]
     if name in ('traversal', 'traversal-recovery'):
         # Begin the walk only after the actual street has been recognized.
         # Keep frequent immutable screenshots/RAM snapshots for scene-exit
@@ -351,7 +354,7 @@ if __name__ == "__main__":
     for name in ("core", "rom", "title", "walk", "out"):
         parser.add_argument("--"+name, type=Path, required=True)
     parser.add_argument("--system", choices=("nes", "snes"), required=True)
-    parser.add_argument('--scenario',choices=('baseline','start','select','start-select','start-confirm','traversal','traversal-recovery'),default='baseline')
+    parser.add_argument('--scenario',choices=('baseline','menu-audio','start','select','start-select','start-confirm','traversal','traversal-recovery'),default='baseline')
     args = parser.parse_args()
     refs = {"menu": (args.title, 600), "settings": (args.walk, 600),
             "story": (args.walk, 900), "street": (args.walk, 1800)}

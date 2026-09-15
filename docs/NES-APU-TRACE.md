@@ -61,3 +61,45 @@ Normal reference builds need no observer patch.
 This provides the original write-timing baseline needed for further audio
 comparison. It is not a music/SFX fidelity verdict or a fix for remaining
 sputtering. No ROM or Rival change was made.
+
+## Sustained menu timing, 2026-09-15
+
+`benchmark_capture.py --scenario menu-audio` waits for the recognized menu,
+then runs 1,800 frames without pressing any buttons. This removes the earlier
+Start-transition divergence; it does not align or edit the resulting audio.
+Captures are `build/menu-audio-01/{nes,snes}`. The SNES cartridge is
+`build/left-clip-01/native-cpu.sfc`, SHA
+`74fe0decfe571e9f43897ffd54aa914db4ee50e1f7947d3b9e0591f3e53326dc`.
+
+```sh
+python3 tools/analyze_nes_apu.py build/menu-audio-01/nes/apu.csv \
+  --capture build/menu-audio-01/nes \
+  --snes-bus build/menu-audio-01/snes/bus.csv \
+  --timing-phase menu_audio --out build/menu-audio-01/timing-analysis.json
+```
+
+All 8,244 original writes match the candidate's first 8,244 writes, without
+skipping or realignment. Of these, 8,236 are in the sustained music phase.
+After removing one constant 32-frame observer-origin offset, **every one of
+those music writes has zero relative frame drift**. First-to-last matched
+music write spans 1,793 frames on each system. The candidate has 42 additional
+writes at its capture end, explicitly reported as an unmatched tail.
+
+The complete bus analyzer observes 1,906 SPC packets with no last-register or
+accumulated-event-flag mismatch; three CPU writes remain pending at capture
+end. Original trace SHA:
+`5b05899343e2fd818cbe8c0f32c3dc7e7f907146c11ffd27ea4559100dd18465`.
+Candidate bus trace SHA:
+`226ad188e69a44e1bc399a8afc5e39a01dcda71865e83fc2d0abbdbe43274f29`.
+
+This rules out frame-scale drift of the translated driver's observed write
+sequence in this particular uninterrupted menu run. It does **not** test
+sub-frame jitter, successful SPC acknowledgement, DSP synthesis fidelity,
+gameplay SFX timing, or hardware capture. The next audio check must examine
+delivery/consumption timing and rendered PCM, rather than infer success from
+correct register values. No production ROM or MiSTer deployment changed.
+
+The timing comparison stops at the first differing write and reports both
+unmatched tails. A synthetic delayed-event/extra-write test ensures it cannot
+erase a one-frame timing error or silently realign after a mismatch. The
+no-input scenario is also tested. All 71 unit tests pass.
