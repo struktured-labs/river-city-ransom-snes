@@ -384,3 +384,43 @@ It verifies the source fixture itself, not merely output derived from whatever
 RAM happened to contain. A wrong vertical-quadrant mutant fails. CI runs this
 test alongside the existing rendered-pixel and late-entry controls. Fifty-four
 unit tests pass. No hardware deployment was performed.
+
+### Empty CHR scan was starving row transfers
+
+Additional cursor/beam telemetry in `build/queue-cursor-01` explains the
+failed larger-batch experiment. During settings, the consumer cursor advances
+about one row per NMI (11→14→17 over successive three-frame samples), despite
+dozens of ready rows. Entry is line 240 and exit about 252. Row 25 retains a
+queued partial version plus newer shadow data (state 3) while the consumer
+traverses older queued rows. The producer was not simply failing to generate
+the complete text: the completed text is present in shadow RAM.
+
+The publisher previously searched all 24 CHR job bytes with a loop even when
+none were set, consuming much of the useful VBlank interval. It now ORs the
+actual bitmap in twelve 16-bit words and bypasses that search when empty.
+There is no separately maintained summary flag that could become stale. The
+saved cursor, transfer budgets, row readiness rules, and beam guards remain.
+
+With the original two-row producer budget, baseline capture falls from 2485
+to 2241 frames and settings pixels pass (`build/empty-chr-quality-01`). Repeating
+the four-row **menu/load-only** budget experiment after this consumer fix now
+passes settings pixels too. That combination is retained; gameplay still uses
+two rows. Its candidate is `build/empty-chr-menu4-01/native-cpu.sfc`, SHA
+`6853b707d18db51848ab74afc5ec5f82d7021bbfa34ec006a64d60882a722cfc`.
+
+Baseline capture is 2229 frames versus original NES 1936. Transition timings
+are 280/91/100/558 versus NES 170/53/54/459, so all four timing gates still fail.
+Settings pixels/basic audio gates pass and bundle integrity verifies at
+`build/empty-chr-menu4-quality-01/site/index.html`. The 12,000-frame workload
+has no detected adapter/SPC fault or overrun, 59.29 NMIs/sec, 28.16 sampled game
+ticks/sec, and max observed gap 41 frames. Sound fidelity remains unproven.
+The matched reversal capture completes but still finishes short of the NES
+endpoint (camera bytes 4200 versus 0000); paired media are at
+`build/empty-chr-recovery-01/site/index.html`.
+
+The graphics fixture now erases active tile 257 and queues only CHR slot 23 to
+restore it. The final pixel oracle passes; omitting the last bitmap word fails
+executed assertion 8. The independent row oracle now checks both menu and
+gameplay modes and counts the first prepared batch (four versus two), across
+both pattern halves. Existing graphics/cache/late-entry controls and 54 unit
+tests pass. Rivalmage remains unchanged.

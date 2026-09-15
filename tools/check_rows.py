@@ -1,5 +1,6 @@
 """Compare executed SNES row staging against an independent NES attribute oracle."""
 import argparse
+import itertools
 from pathlib import Path
 import struct
 import subprocess
@@ -28,8 +29,9 @@ def check(core, out, source=None):
     source = source or ROOT/'snes/row_test.asm'
     out.mkdir(parents=True, exist_ok=True)
     (out/'native_palette.inc').write_text('.word '+','.join(['0']*64)+'\n')
-    for half in (0, 16):
+    for half, task in itertools.product((0, 16), (0, 192)):
         subprocess.run([str(ROOT/'.deps/cc65/bin/ca65'), '-D', f'PATTERN_HALF={half}',
+                        '-D', f'GAME_TASK={task}',
                         '-I', str(out), '-I', str(ROOT/'snes'), '-o', str(out/'row.o'), str(source)], check=True)
         subprocess.run([str(ROOT/'.deps/cc65/bin/ld65'), '-C', str(ROOT/'snes/native_boot.cfg'),
                         '-o', str(out/'row.bin'), str(out/'row.o')], check=True)
@@ -38,12 +40,14 @@ def check(core, out, source=None):
         rom[0xFFDC:0xFFE0] = b'\xff\xff\0\0'
         checksum = sum(rom) & 65535
         struct.pack_into('<HH', rom, 0xFFDC, checksum^65535, checksum)
-        cart, ram = out/f'row-{half}.sfc', out/f'row-{half}.ram'
+        cart, ram = out/f'row-{half}-{task}.sfc', out/f'row-{half}-{task}.ram'
         cart.write_bytes(rom)
         subprocess.run([sys.executable, str(ROOT/'tools/smoke_libretro.py'), '--core', str(core),
                         '--rom', str(cart), '--kind', 'adapter', '--frames', '600', '--ram', str(ram),
-                        '--receipt', str(out/f'row-{half}.json')], check=True, capture_output=True, timeout=30)
+                        '--receipt', str(out/f'row-{half}-{task}.json')], check=True, capture_output=True, timeout=30)
         memory = ram.read_bytes()
+        if memory[0x1C8E] != (2 if task == 192 else 4):
+            raise RuntimeError('Producer did not respect its menu/gameplay row budget')
         if memory[0x12000:0x13000] != bytes((i^(i>>8)) & 255 for i in range(4096)):
             raise RuntimeError('Row fixture did not initialize the prescribed distinct nametables')
         expected = expected_rows(memory[0x12000:0x13000], half)

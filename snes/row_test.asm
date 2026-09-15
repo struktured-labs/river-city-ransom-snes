@@ -57,6 +57,8 @@ reset:
     bne @dirty
     lda #PATTERN_HALF
     sta $1C20
+    lda #GAME_TASK
+    sta $0100
     lda #1
     sta $1C85
     lda #64
@@ -65,6 +67,21 @@ reset:
     .a16
     lda #$1E00
     tcd
+    jsr native_prepare
+    sep #$20
+    .a8
+    ldx #0
+@first_batch:
+    lda $1D00,x
+    cmp #2
+    bne :+
+    inc $1C8E
+:
+    inx
+    cpx #128
+    bne @first_batch
+    rep #$20
+    .a16
 @prepare:
     jsr native_prepare
     sep #$20

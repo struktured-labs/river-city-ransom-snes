@@ -36,7 +36,16 @@ native_prepare:
     tax
     sep #$20
     .a8
+    ; Four rows for menu/load work; gameplay retains its two-row budget.
+    lda $0100
+    and #$C0
+    cmp #$C0
+    beq @game_budget
+    lda #4
+    bra @set_budget
+@game_budget:
     lda #2
+@set_budget:
     sta $1C6B
     lda #128
     sta $1C6C

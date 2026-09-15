@@ -10,13 +10,13 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def check(core, out=None, source=None, negative=False, scrolling=False, late=False, expected_case=None):
+def check(core, out=None, source=None, negative=False, scrolling=False, late=False, expected_case=None, last_chr=False):
     out = out or ROOT / "build/video-test"
     source = source or ROOT / "snes/video_test.asm"
     out.mkdir(parents=True, exist_ok=True)
     palette = [0, 0x001F, 0x7C00] + [0] * 61
     (out / "native_palette.inc").write_text(".word " + ",".join(map(str, palette)) + "\n")
-    subprocess.run([str(ROOT / ".deps/cc65/bin/ca65"), *(['-D','SCROLL_TEST=1'] if scrolling else []), *(['-D', 'LATE_TEST=1'] if late else []), "-I", str(out), "-o", str(out / "test.o"),
+    subprocess.run([str(ROOT / ".deps/cc65/bin/ca65"), *(['-D','SCROLL_TEST=1'] if scrolling else []), *(['-D', 'LATE_TEST=1'] if late else []), *(['-D', 'LAST_CHR_TEST=1'] if last_chr else []), "-I", str(out), "-o", str(out / "test.o"),
                     str(source)], check=True)
     subprocess.run([str(ROOT / ".deps/cc65/bin/ld65"), "-C", str(ROOT / "snes/native_boot.cfg"),
                     "-o", str(out / "test.bin"), str(out / "test.o")], check=True)
@@ -130,6 +130,22 @@ def check_cache_controls(core):
     print('Missing palette and sprite-pattern invalidation each fail cache assertion 7.')
 
 
+def check_last_chr_control(core):
+    check(core, ROOT/'build/last-chr-test', last_chr=True)
+    with tempfile.TemporaryDirectory(prefix='rcr-last-chr-negative-') as temporary:
+        out = Path(temporary)
+        for name in ('video_test.asm', 'native_prepare.asm', 'native_video.asm'):
+            (out/name).write_text((ROOT/'snes'/name).read_text())
+        path = out/'native_video.asm'
+        original = path.read_text()
+        good = '    .repeat 11, pair\n        ora $1D82+pair*2'
+        if original.count(good) != 1:
+            raise RuntimeError('Cannot identify complete CHR queue reduction')
+        path.write_text(original.replace(good, '    .repeat 10, pair\n        ora $1D82+pair*2'))
+        check(core, out, out/'video_test.asm', negative=True, expected_case=8, last_chr=True)
+    print('Final CHR slot drains and restores pixels; omitted bitmap word fails case 8.')
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--core", type=Path, required=True)
@@ -139,3 +155,4 @@ if __name__ == "__main__":
     check_lost_row_control(core)
     check_late_control(core)
     check_cache_controls(core)
+    check_last_chr_control(core)

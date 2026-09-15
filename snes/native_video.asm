@@ -38,6 +38,16 @@ native_video:
     lda $1C75
     and #$00FF
     tax
+    ; Most NMIs have no changed CHR banks. Test the actual 24-byte job bitmap
+    ; in 16-bit words instead of spending VBlank on a 24-iteration search.
+    ; Keep X at the saved cursor for @rows_start; no summary flag can go stale.
+    lda $1D80
+    .repeat 11, pair
+        ora $1D82+pair*2
+    .endrepeat
+    bne @chr_pending
+    jmp @rows_start
+@chr_pending:
     ldy #24
 @chr:
     sep #$20

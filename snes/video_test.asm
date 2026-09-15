@@ -216,6 +216,45 @@ reset:
     inx
     cpx #24
     bne @queue
+.ifdef LAST_CHR_TEST
+    ; Only the final queue byte is set. Erase active tile 257, then require slot 23
+    ; to restore it from synthetic CHR ROM before the final pixel oracle.
+    stz $4200
+    lda #8
+    sta $1C61
+    lda #$80
+    sta $2100
+    sta $2115
+    ldx #$0808
+    stx $2116
+    ldx #8
+@erase_tile:
+    stz $2118
+    stz $2119
+    dex
+    bne @erase_tile
+    ldx #$0010
+    stx $15B8
+    lda #$C9
+    sta $15BA
+    ldx #$0808
+    stx $15BC
+    ldx #16
+    stx $15BE
+    lda #1
+    sta $1D97
+@outside_last:
+    lda $4212
+    bmi @outside_last
+    lda #$80
+    sta $4200
+@wait_last:
+    lda $1C04
+    cmp #136
+    bcc @wait_last
+    lda $1D97
+    jne failed
+.endif
     lda #1
     sta $1C60
 @idle:
