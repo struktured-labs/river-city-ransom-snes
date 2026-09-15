@@ -426,6 +426,42 @@ both pattern halves. Existing graphics/cache/late-entry controls and 54 unit
 tests pass. Rivalmage remains unchanged.
 # Frame-boundary attribution of remaining long NMI gaps
 
+## Whole decompression byte-writer translation
+
+Original fixed-bank helper C90C performs two PPUADDR writes and one PPUDATA
+write per decompressed output byte, followed by a 16-bit destination increment.
+`bulk_ppu_byte` translates that entire helper, replacing the two generic
+address transactions with equivalent shadow-address updates and retaining the
+production data writer. An initially set address latch is preserved, including
+its reversed high/low write interpretation. Both NMI critical-depth guards
+remain before re-enabling interrupts. The original final ADC sequence preserves
+the helper's return A/N/Z/C and destination-pointer behavior.
+
+The builder checks the full 29-byte original helper preimage and records its
+translation in the manifest. Executed adapter assertion 14 checks both latch
+phases, PPU increments 1/32, source-pointer page carry and $FFFF wrap, X/Y,
+return flags, and the actual shadow byte. A deliberately wrong source increment
+fails case 14. Existing NMI guard mutation tests still target the generated
+I/O stubs, not a separate hardware-interrupt test of this new helper.
+
+Candidate `build/bulk-byte-02/native-cpu.sfc` (identical ROM bytes to -01), SHA
+`def9c0bd15b4158b7f6f9306448878cc52c62dd6b255ad65ddde896a392083b9`,
+completes the baseline in 2,185 frames versus 2,228 before this translation.
+Transition frames are 263/82/91/549 versus NES 170/53/54/459: all four still
+fail. Settings pixels and basic audio-presence gates pass; bundle integrity
+passes at `build/bulk-byte-quality-01/site/index.html`.
+
+The 12,000-frame walk averages 59.35 NMIs/sec and 30.47 picture changes/sec,
+with no detected VBlank overrun. Maximum NMI interval remains 41 frames.
+Long stalled runs contain 40/28/21/14/13 samples, plus an unfinished seven-frame
+run at the end of capture. The shorter later runs are encouraging but are not
+an original-speed proof: encounter/scene timing diverges. This does not resolve
+all load stalls, scrolling fidelity, or audio sputtering. Rival is unchanged.
+The matched right-then-left traversal completes in 7,201 native capture frames
+(NES reference 6,952); its diagnostic side-by-side audit is
+`build/bulk-byte-recovery-01/site/index.html`. Completion of that scripted input
+sequence is not an assertion of equal camera/player position or scene timing.
+
 ## CHR pointer arithmetic follow-up
 
 The raw CHR read path now derives the 24-bit bank offset using two ASLs:

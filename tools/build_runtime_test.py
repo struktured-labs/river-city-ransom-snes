@@ -25,6 +25,7 @@ def build(out, controllers=False, jump=False):
     subprocess.run([ca65, *(["-D", "CONTROLLER_TEST=1"] if controllers or jump else []), *(["-D", "JUMP_TEST=1"] if jump else []), "-D", f'dispatch_read={symbols["dispatch_read"]}',
                     "-D", f'dispatch_write={symbols["dispatch_write"]}',
                     "-D", f'bank_switch_enter={symbols["bank_switch_enter"]}',
+                    '-D', f'bulk_ppu_byte={symbols["bulk_ppu_byte"]}',
                     "-D", 'io_write_stub=24576', '-D', f'io_read_stub={read_address}', "-o", str(out / "test.o"),
                     str(ROOT / "snes/runtime_test.asm")], check=True)
     subprocess.run([ld65, "-C", str(ROOT / "snes/native_boot.cfg"), "-o", str(out / "test.bin"),

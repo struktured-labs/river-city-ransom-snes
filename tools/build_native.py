@@ -152,6 +152,11 @@ def build(rom_path, traces, out, experimental_fastrom=False):
                             "operand": operand, "stub": hooks[key]})
     if len(stubs) > 8192:
         raise ValueError("Hardware stubs exceed available bank space")
+    bulk_offset = 0x1C90C
+    bulk_preimage = bytes.fromhex('a52d8d0620a52c8d0620a51b8d072018a52c6901852ca52d6900852d60')
+    if rom.prg[bulk_offset:bulk_offset + len(bulk_preimage)] != bulk_preimage:
+        raise ValueError('Bulk PPU byte helper preimage mismatch')
+    prg[bulk_offset:bulk_offset + 3] = b'\x4c' + word(symbols['bulk_ppu_byte'])
     for pc, expected, name in ((0xFF61, b"\xa5\xf8\x29", "nmi_task_return"),
                                (0xF1D3, b"\x68\xa8\x68", "nmi_rti_return"),
                                (0xFED1, b"\x48\x8a\x48", "bank_switch_enter"),
@@ -186,6 +191,10 @@ def build(rom_path, traces, out, experimental_fastrom=False):
               "spc_sha256": deps["upernes"]["audio_sha256"],
               "palette_sha256": hashlib.sha256(rgb).hexdigest(),
               "covered_instructions": len(seen), "patches": patched, "stub_bytes": len(stubs),
+              "translated_helpers": [{"pc": 0xC90C, "offset": bulk_offset,
+                                      "entry": symbols['bulk_ppu_byte'],
+                                      "preimage_sha256": hashlib.sha256(bulk_preimage).hexdigest(),
+                                      "kind": "whole decompression PPU byte writer"}],
               "graphics_pipeline": "prepared dirty rows, whole CHR banks and bounded per-NMI DMA",
               "limits": {"vram_bytes_per_nmi": 2048, "chr_jobs_per_nmi": 1, "row_scan_per_nmi": 32,
                          "oam_bytes_per_nmi": 544, "cgram_bytes_per_nmi": 64,

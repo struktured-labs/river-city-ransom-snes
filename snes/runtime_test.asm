@@ -105,7 +105,6 @@ tests:
     beq :+
     jmp failed
 :
-    ; Nonzero D must be preserved across long calls.
     ; Read a unique sentinel from every raw CHR bank, crossing CF -> D0.
     lda #13
     sta $1C61
@@ -129,6 +128,66 @@ tests:
     jne failed
     inc $1C8F
     bpl @chr_banks
+    jmp bulk_writer_tests_done
+bulk_writer_tests:
+    ; Whole decompression writer: page carry, ABI, and both PPUADDR phases.
+    lda #14
+    sta $1C61
+    stz $1C25
+    jsr bulk_test_input
+    jsr bulk_ppu_byte
+    jsr bulk_test_result
+    lda f:$7F20FF
+    cmp #$B6
+    jne failed
+    lda $1C26
+    jne failed
+    lda $1C27
+    cmp #$21
+    jne failed
+    lda $1C25
+    jne failed
+    lda #1
+    sta $1C25
+    lda #4
+    sta $1C20            ; swapped phase plus PPU increment 32
+    jsr bulk_test_input
+    jsr bulk_ppu_byte
+    jsr bulk_test_result
+    lda f:$7F3F20
+    cmp #$B6
+    jne failed
+    lda $1C26
+    cmp #$40
+    jne failed
+    lda $1C27
+    cmp #$3F
+    jne failed
+    lda $1C25
+    cmp #1
+    jne failed
+    stz $1C25
+    stz $1C20
+    lda #$FF
+    sta $2C
+    sta $2D
+    jsr bulk_ppu_byte
+    php
+    cmp #0
+    jne failed
+    pla
+    and #$83
+    cmp #3               ; source $FFFF wraps to zero, Z and C set
+    jne failed
+    lda $2C
+    ora $2D
+    jne failed
+    lda f:$7F3FFF
+    cmp #$B6
+    jne failed
+    rts
+bulk_writer_tests_done:
+    ; Nonzero D must be preserved across long calls.
     lda #3
     sta $1C61
     lda #$12
@@ -442,6 +501,7 @@ tests:
     cmp #$20
     jne failed
     stz $1C20
+    jsr bulk_writer_tests
     lda #1
     sta $1C60
     stz $2121
@@ -507,6 +567,33 @@ guarded_io_test:
     bmi @after
     stz $4200
     lda $1C8D
+    jne failed
+    rts
+bulk_test_input:
+    lda #$B6
+    sta $1B
+    lda #$FF
+    sta $2C
+    lda #$20
+    sta $2D
+    ldx #$34
+    ldy #$56
+    rts
+bulk_test_result:
+    php
+    cmp #$21
+    jne failed
+    pla
+    and #$83
+    jne failed           ; final high-byte ADC gives N=Z=C=0
+    cpx #$34
+    jne failed
+    cpy #$56
+    jne failed
+    lda $2C
+    jne failed
+    lda $2D
+    cmp #$21
     jne failed
     rts
 mask_test_write:

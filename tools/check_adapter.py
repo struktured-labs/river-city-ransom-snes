@@ -34,6 +34,16 @@ def check(core):
     if not result.returncode or 'WRAM status=ee, adapter case=13' not in result.stderr:
         raise RuntimeError('Corrupted CF/D0 boundary sentinel did not fail all-bank assertion 13')
     print('All 128 raw CHR banks read correctly; corrupted bank 64 fails case 13.')
+    bulk_increment = bytes.fromhex('18a52c6901852ca52d6900852d60')
+    original_bulk = (out / 'adapter-test.sfc').read_bytes()
+    if original_bulk.count(bulk_increment) != 8:
+        raise RuntimeError('Expected one bulk pointer increment per runtime bank')
+    bad_bulk = out / 'wrong-bulk-increment.sfc'
+    bad_bulk.write_bytes(original_bulk.replace(bulk_increment, bytes.fromhex('18a52c6902852ca52d6900852d60')))
+    result = subprocess.run(command + ['--rom', str(bad_bulk)], capture_output=True, text=True, timeout=30)
+    if not result.returncode or 'WRAM status=ee, adapter case=14' not in result.stderr:
+        raise RuntimeError('Wrong bulk pointer increment did not fail assertion 14')
+    print('Bulk writer latch/increment/register cases pass; wrong increment fails case 14.')
     short_copy = bytearray((out/'adapter-test.sfc').read_bytes())
     sequence = bytes.fromhex('a9ff00547e7e')
     if short_copy.count(sequence) != 8:
@@ -68,8 +78,8 @@ def check(core):
         raise RuntimeError('Incorrect direct R7 did not fail pair assertion 9')
     print('All eight direct bank pairs preserve registers/state; wrong R7 fails case 9.')
     guard = bytes.fromhex('ad0a1c0d831cd00a')
-    if original.count(guard) != 16:
-        raise RuntimeError('Expected two generated I/O guards per runtime bank')
+    if original.count(guard) != 24:
+        raise RuntimeError('Expected two generated I/O guards and one bulk helper guard per runtime bank')
     for label, replacement in (
             ('nmi-depth', bytes.fromhex('a900ea0d831cd00a')),
             ('bank-depth', bytes.fromhex('ad0a1ceaeaead00a'))):

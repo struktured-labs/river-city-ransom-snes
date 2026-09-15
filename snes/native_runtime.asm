@@ -558,6 +558,48 @@ done_banked:
     plp
     rtl
 
+; Fixed-bank C90C writes one decompressed byte after two PPUADDR writes.
+; Translate the complete helper so each byte needs one mailbox transaction,
+; not three. Preserve even an initially half-written PPUADDR latch.
+bulk_ppu_byte:
+    stz $4200
+    lda a:$1C25
+    bne @swapped
+    lda $2D
+    and #$3F
+    sta a:$1C27
+    lda $2C
+    sta a:$1C26
+    bra @write
+@swapped:
+    lda $2D
+    sta a:$1C26
+    lda $2C
+    and #$3F
+    sta a:$1C27
+@write:
+    lda $1B
+    sta a:$1B22
+    jsl $C10000+dispatch_ppudata
+    lda a:$1C0A
+    ora a:$1C83
+    bne @increment
+    lda a:$1C20
+    and #$80
+    beq @increment
+    sta $4200
+@increment:
+    ; Original final A/N/Z/C and source pointer update, independent of the
+    ; PPUCTRL increment (which dispatch_ppudata already applied).
+    clc
+    lda $2C
+    adc #1
+    sta $2C
+    lda $2D
+    adc #0
+    sta $2D
+    rts
+
 bank_switch_enter:
     ; Direct translation of FED1's paired-bank operation. The original routine
     ; uses four generic mapper writes, but their effect is fully determined by
