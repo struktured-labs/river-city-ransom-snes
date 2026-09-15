@@ -60,13 +60,15 @@ def measure_length(onset, tail, rate):
     return result
 
 
-def check(core, out, length=False, retrigger=False):
-    if length and retrigger:
-        raise ValueError('Length and periodic-retrigger probes are distinct profiles')
+def check(core, out, length=False, retrigger=False, sweep_reload=False, sweep_no_reload=False):
+    if sum((length, retrigger, sweep_reload, sweep_no_reload)) > 1:
+        raise ValueError('Audio probes are distinct profiles')
     out.mkdir(parents=True, exist_ok=False)
     subprocess.run([str(ROOT/'.deps/cc65/bin/ca65'), '-D', 'AUDIO_SCRIPT=1',
                     *(['-D', 'AUDIO_LENGTH=1'] if length else []),
                     *(['-D', 'AUDIO_RETRIGGER=1'] if retrigger else []),
+                    *(['-D', 'AUDIO_SWEEP_RELOAD=1'] if sweep_reload or sweep_no_reload else []),
+                    *(['-D', 'AUDIO_SWEEP_NO_RELOAD=1'] if sweep_no_reload else []),
                     '--bin-include-dir', str(ROOT/'.deps/upernes/source/asm'),
                     '-o', str(out/'script.o'), str(ROOT/'snes/bringup.asm')], check=True)
     rom = out/'script.sfc'
@@ -101,7 +103,8 @@ def check(core, out, length=False, retrigger=False):
             if ram[0xA22] == 1:
                 rows.append({'phase': ram[0xA23], 'start_sample': start, 'end_sample': total,
                              'driver_frame': int.from_bytes(ram[0xA20:0xA22], 'little'),
-                             'periodic_retriggers': ram[0xA24]})
+                             'periodic_retriggers': ram[0xA24],
+                             'sweep_control': ram[0xA01], 'sweep_reloads': ram[0xA25]})
         lib.retro_run = step
         return lib
 
@@ -119,6 +122,10 @@ def check(core, out, length=False, retrigger=False):
         raise RuntimeError('Non-contiguous audio phase telemetry')
     for row in rows:
         frame = row['driver_frame']
+        if row['sweep_reloads'] != (frame % 256 if sweep_reload else 0):
+            raise RuntimeError('Missing or unexpected sweep reload events')
+        if frame and (sweep_reload or sweep_no_reload) and row['sweep_control'] != 0xF1:
+            raise RuntimeError('Sweep probe did not enable sweep')
         expected_phase = 0 if frame < 120 else 1 if frame < 180 else 2 if frame < 240 else 3
         if row['phase'] != expected_phase:
             raise RuntimeError('Audio script changed phase at the wrong driver frame')
@@ -142,12 +149,26 @@ def check(core, out, length=False, retrigger=False):
         results.append(result)
     (out/'timeline.json').write_text(json.dumps(rows, indent=2)+'\n')
     report = {'schema': 'rcr-spc-signal-test-v1', 'receipt': receipt,
-              'scope': ('pulse length-index-zero expiry and retrigger; NOT full frame-sequencer/envelope/sweep/noise/DMC or game fidelity'
+              'scope': ('controlled sweep period reload; NOT autonomous sweep timing, envelope, length, noise, DMC or game fidelity'
+                        if sweep_reload or sweep_no_reload else
+                        'pulse length-index-zero expiry and retrigger; NOT full frame-sequencer/envelope/sweep/noise/DMC or game fidelity'
                         if length else 'constant pulse, channel disable, restart, pitch change; NOT length/envelope/sweep/noise/DMC or game fidelity'),
-              'profile': 'length-expiry' if length else ('periodic-retrigger' if retrigger else 'pulse-script'),
+              'profile': 'sweep-no-reload' if sweep_no_reload else ('sweep-reload' if sweep_reload else ('length-expiry' if length else ('periodic-retrigger' if retrigger else 'pulse-script'))),
               'tool_sha256': sha(Path(__file__)), 'source_sha256': sha(ROOT/'snes/bringup.asm'),
               'wav_sha256': sha(out/'audio.wav'), 'timeline_sha256': sha(out/'timeline.json'),
               'phases': results, 'passed': all(r['passed'] for r in results), 'release_ready': False}
+    if sweep_reload:
+        negative_out = out/'missing-reload'
+        negative_passed = check(core, negative_out, sweep_no_reload=True)
+        negative = json.loads((negative_out/'report.json').read_text())
+        phases = negative['phases']
+        if (negative_passed or not all(p['passed'] for p in phases[:3])
+                or phases[3]['passed']
+                or not all(abs(hz-440) < 10 for hz in phases[3]['dominant_hz'])
+                or min(phases[3]['active_10ms_fraction']) < .98):
+            raise RuntimeError('Missing reload did not reproduce the specific stale-pitch failure')
+        report['negative_control'] = {'report_sha256': sha(negative_out/'report.json'),
+                                      'expected_failure': 'phase 3 stays near 440 Hz instead of 880 Hz'}
     (out/'report.json').write_text(json.dumps(report, indent=2)+'\n')
     print(json.dumps(report, indent=2))
     return report['passed']
@@ -159,5 +180,7 @@ if __name__ == '__main__':
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--length', action='store_true', help='Probe automatic NES pulse length expiry (currently unimplemented)')
     parser.add_argument('--retrigger', action='store_true', help='Probe periodic same-note retriggering and sub-millisecond dropouts')
+    parser.add_argument('--sweep-reload', action='store_true', help='Probe repeated sweep period reload flags')
+    parser.add_argument('--sweep-no-reload', action='store_true', help='Negative control: omit period reload while sweep is enabled')
     args = parser.parse_args()
-    raise SystemExit(0 if check(args.core, args.out, args.length, args.retrigger) else 1)
+    raise SystemExit(0 if check(args.core, args.out, args.length, args.retrigger, args.sweep_reload, args.sweep_no_reload) else 1)

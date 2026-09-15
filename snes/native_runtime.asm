@@ -78,7 +78,9 @@ mapper_write:
 console_write:
     lda $20
     cmp #$14
-    beq @dma
+    bne :+
+    jmp @dma
+:
     cmp #$16
     beq @joy
     cmp #$18
@@ -86,6 +88,22 @@ console_write:
     tax
     lda $22
     sta a:$0A00,x
+    ; Legacy SPC bits 6/7 reload the pulse period used by sweep. Track
+    ; actual timer writes (including zero), not whether the value changed.
+    txa
+    and #$FE
+    cmp #2
+    beq @reload_pulse0
+    cmp #6
+    bne @note_flags
+    lda #$80
+    bra @reload_pulse
+@reload_pulse0:
+    lda #$40
+@reload_pulse:
+    ora a:$0A16
+    sta a:$0A16
+@note_flags:
     txa
     and #3
     cmp #3

@@ -505,6 +505,7 @@ bulk_writer_tests_done:
     jsr bulk_reader_tests
     jsr page_fill_tests
     jsr ring_loop_tests
+    jsr pulse_reload_tests
     lda #1
     sta $1C60
     stz $2121
@@ -570,6 +571,42 @@ guarded_io_test:
     bmi @after
     stz $4200
     lda $1C8D
+    jne failed
+    rts
+pulse_reload_tests:
+    lda #18
+    sta $1C61
+    lda #$40
+    sta $1B21
+    stz $1B22           ; a zero timer write must not be missed
+    stz $0A16
+    lda #2
+    sta $1B20
+    jsl $C10000+dispatch_write
+    lda $0A16
+    cmp #$40
+    jne failed
+    inc $1B20
+    jsl $C10000+dispatch_write
+    lda $0A16
+    cmp #$41
+    jne failed
+    lda #6
+    sta $1B20
+    jsl $C10000+dispatch_write
+    lda $0A16
+    cmp #$C1
+    jne failed
+    inc $1B20
+    jsl $C10000+dispatch_write
+    lda $0A16
+    cmp #$C3
+    jne failed
+    stz $0A16
+    lda #$15
+    sta $1B20
+    jsl $C10000+dispatch_write
+    lda $0A16
     jne failed
     rts
 ring_loop_tests:

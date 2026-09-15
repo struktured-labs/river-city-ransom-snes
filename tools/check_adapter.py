@@ -60,6 +60,15 @@ def check(core):
     banked = b'\x4c' + symbols['done_banked'].to_bytes(2, 'little')
     plain = b'\x4c' + symbols['done'].to_bytes(2, 'little')
     original = (out/'adapter-test.sfc').read_bytes()
+    reload_flag = bytes.fromhex('a9400d160a8d160a')
+    if original.count(reload_flag) != 8:
+        raise RuntimeError('Expected one pulse-0 period reload flag per runtime bank')
+    bad_reload = out/'missing-pulse-reload.sfc'
+    bad_reload.write_bytes(original.replace(reload_flag, bytes.fromhex('a9000d160a8d160a')))
+    result = subprocess.run(command + ['--rom', str(bad_reload)], capture_output=True, text=True, timeout=30)
+    if not result.returncode or 'WRAM status=ee, adapter case=18' not in result.stderr:
+        raise RuntimeError('Missing pulse reload flag did not fail assertion 18')
+    print('Pulse timer writes flag both sweep reloads; omitted flag fails case 18.')
     ring_store = bytes.fromhex('bd45058700')
     if original.count(ring_store) != 8:
         raise RuntimeError('Expected one ring byte store per runtime bank')

@@ -29,6 +29,8 @@ jobs:
         run: python3 tools/check_audio.py --core .deps/snes9x/libretro/snes9x_libretro.so --out build/audio-signal-ci
       - name: Verify periodic SPC retriggers without sub-millisecond dropouts
         run: python3 tools/check_audio.py --core .deps/snes9x/libretro/snes9x_libretro.so --out build/audio-retrigger-ci --retrigger
+      - name: Verify sweep period reload and stale-pitch negative control
+        run: python3 tools/check_audio.py --core .deps/snes9x/libretro/snes9x_libretro.so --out build/audio-sweep-ci --sweep-reload
       - name: Exercise native PPU and CPU register ABI without commercial assets
         run: python3 tools/check_adapter.py --core .deps/snes9x/libretro/snes9x_libretro.so
       - name: Verify incremental producer, bounded NMI and exact synthetic pixels

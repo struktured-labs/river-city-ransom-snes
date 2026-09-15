@@ -41,6 +41,7 @@ reset:
     stz STATUS
     stz PHASE
     stz RETRIGGERS
+    stz $0A25
     ldx #$0016
 @clear:
     stz APU_PACKET,x
@@ -129,6 +130,18 @@ reset:
     lda #3
     sta PHASE
 @send_frame:
+.endif
+.ifdef AUDIO_SWEEP_RELOAD
+    ; Keep writing/reloading the same pulse period while sweep is enabled.
+    ; The period-reload flag is distinct from the note-start flag.
+    lda #$F1
+    sta APU_PACKET+1
+.ifndef AUDIO_SWEEP_NO_RELOAD
+    lda APU_PACKET+$16
+    ora #$40
+    sta APU_PACKET+$16
+    inc $0A25
+.endif
 .endif
 .ifdef AUDIO_RETRIGGER
     ; Periodic same-period high-register writes: retain the existing waveform
