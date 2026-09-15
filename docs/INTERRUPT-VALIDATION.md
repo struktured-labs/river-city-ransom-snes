@@ -426,6 +426,36 @@ both pattern halves. Existing graphics/cache/late-entry controls and 54 unit
 tests pass. Rivalmage remains unchanged.
 # Frame-boundary attribution of remaining long NMI gaps
 
+## Graphics-command ring loop translation
+
+The 29-frame interval remaining after page-fill translation included the C575
+graphics-command ring drain. `bulk_ring_bytes` now translates its byte loop,
+using the existing pointer, dirty marking, and increment routines without a
+full mailbox/adapter save-and-restore for every byte. The builder checks the
+entire original loop before replacing its entry and records the translation.
+X still wraps through the 64-byte ring; Y=0 still copies 256 bytes. Original
+direct page and status are restored before checking whether NMI may resume.
+
+Executed adapter assertion 17 checks ring wrap, PPU page carry, A/X/Y/C/Z,
+preservation of queued row state, unaffected neighboring rows, and all 256
+outputs in an increment-32 case. A missing store fails case 17. Existing
+adapter negative controls and 56 unit tests pass. Hardware-interrupt tests
+still exercise the generated I/O guards, not every translated helper.
+
+Candidate `build/ring-loop-01/native-cpu.sfc`, SHA
+`7cf09af5c9ad3025db90b529640b8720393583ab1bf6394b4f8cc20e7a1ede92`,
+completes the baseline in 2,035 frames (previous 2,042; NES 1,936). The audit at
+`build/ring-loop-quality-01/site/index.html` passes bundle integrity, settings
+pixels, and basic audio presence but still fails all four transition timing
+gates. Maximum observed NMI interval in the 12,000-frame walk falls from 29 to
+23 frames. Long stalled runs contain 22/4/11/11 samples; no VBlank overrun is
+detected. Encounter timing diverges, so the 59.82 NMIs/sec and 27.39 picture
+changes/sec are not fidelity certificates. Audio sputtering and full scrolling
+correctness remain open. No Rival deployment.
+The right-then-left capture completes in 7,051 frames versus NES 6,952, with a
+paired diagnostic audit at `build/ring-loop-recovery-01/site/index.html`.
+Script completion does not prove matching camera/player positions.
+
 ## Aligned page fill removes the longest observed stall
 
 The remaining 41-frame NMI interval sampled the FCD6 nametable-clear loop,

@@ -504,6 +504,7 @@ bulk_writer_tests_done:
     jsr bulk_writer_tests
     jsr bulk_reader_tests
     jsr page_fill_tests
+    jsr ring_loop_tests
     lda #1
     sta $1C60
     stz $2121
@@ -570,6 +571,116 @@ guarded_io_test:
     stz $4200
     lda $1C8D
     jne failed
+    rts
+ring_loop_tests:
+    lda #17
+    sta $1C61
+    ldx #63
+@source:
+    txa
+    eor #$A5
+    sta $0545,x
+    dex
+    bpl @source
+    ldx #127
+    lda #2
+@dirty_init:
+    sta $1D00,x
+    dex
+    bpl @dirty_init
+    stz $1C20
+    lda #$20
+    sta $1C27
+    lda #$FE
+    sta $1C26
+    ldx #61
+    ldy #5
+    sec
+    jsr bulk_ring_bytes
+    php
+    cmp #2
+    jne failed
+    pla
+    and #$83
+    cmp #3
+    jne failed
+    cpx #2
+    jne failed
+    cpy #0
+    jne failed
+    lda $1C26
+    cmp #3
+    jne failed
+    lda $1C27
+    cmp #$21
+    jne failed
+    lda f:$7F20FE
+    cmp #$98
+    jne failed
+    lda f:$7F20FF
+    cmp #$9B
+    jne failed
+    lda f:$7F2100
+    cmp #$9A
+    jne failed
+    lda f:$7F2101
+    cmp #$A5
+    jne failed
+    lda f:$7F2102
+    cmp #$A4
+    jne failed
+    lda $1D07
+    and $1D08
+    cmp #3
+    jne failed
+    lda $1D06
+    ora $1D09
+    cmp #2
+    jne failed
+    ; Y=0 means 256 bytes; cover all four ring wraps with PPU stride 32.
+    lda #4
+    sta $1C20
+    stz $1C26
+    lda #$20
+    sta $1C27
+    ldx #63
+    ldy #0
+    jsr bulk_ring_bytes
+    cmp #63
+    jne failed
+    cpx #63
+    jne failed
+    lda $1C26
+    jne failed
+    lda $1C27
+    cmp #$40
+    jne failed
+    stz $07
+    lda #$20
+    sta $08
+    lda #$7F
+    sta $09
+    stz $1C8F
+@oracle:
+    txa
+    eor #$A5
+    cmp [$07],y
+    jne failed
+    txa
+    clc
+    adc #1
+    and #63
+    tax
+    lda $07
+    clc
+    adc #32
+    sta $07
+    bcc :+
+    inc $08
+:
+    dec $1C8F
+    bne @oracle
+    stz $1C20
     rts
 page_fill_tests:
     lda #16

@@ -167,6 +167,10 @@ def build(rom_path, traces, out, experimental_fastrom=False):
     if rom.prg[fill_offset:fill_offset + len(fill_preimage)] != fill_preimage:
         raise ValueError('Aligned page fill setup/loop preimage mismatch')
     prg[0x1FCD6:0x1FCD9] = b'\x4c' + word(symbols['bulk_fill_loop'])
+    ring_preimage = bytes.fromhex('bd45058d0720e88a293faa88d0f2')
+    if rom.prg[0x1C575:0x1C575 + len(ring_preimage)] != ring_preimage:
+        raise ValueError('Graphics ring loop preimage mismatch')
+    prg[0x1C575:0x1C578] = b'\x4c' + word(symbols['bulk_ring_loop'])
     for pc, expected, name in ((0xFF61, b"\xa5\xf8\x29", "nmi_task_return"),
                                (0xF1D3, b"\x68\xa8\x68", "nmi_rti_return"),
                                (0xFED1, b"\x48\x8a\x48", "bank_switch_enter"),
@@ -212,7 +216,11 @@ def build(rom_path, traces, out, experimental_fastrom=False):
                                      {"pc": 0xFCD6, "offset": 0x1FCD6,
                                       "entry": symbols['bulk_fill_loop'],
                                       "preimage_sha256": hashlib.sha256(fill_preimage).hexdigest(),
-                                      "kind": "aligned increment-one page fill, setup preimage at FCB2"}],
+                                      "kind": "aligned increment-one page fill, setup preimage at FCB2"},
+                                     {"pc": 0xC575, "offset": 0x1C575,
+                                      "entry": symbols['bulk_ring_loop'],
+                                      "preimage_sha256": hashlib.sha256(ring_preimage).hexdigest(),
+                                      "kind": "graphics command ring byte loop"}],
               "graphics_pipeline": "prepared dirty rows, whole CHR banks and bounded per-NMI DMA",
               "limits": {"vram_bytes_per_nmi": 2048, "chr_jobs_per_nmi": 1, "row_scan_per_nmi": 32,
                          "oam_bytes_per_nmi": 544, "cgram_bytes_per_nmi": 64,

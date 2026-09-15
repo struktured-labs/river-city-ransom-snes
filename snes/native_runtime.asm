@@ -713,6 +713,51 @@ bulk_fill_pages:
     ldx #0
     rts
 
+; C575 copies Y bytes from the 64-byte graphics-command ring at $0545.
+bulk_ring_loop:
+    jsr bulk_ring_bytes
+    jmp $C583
+bulk_ring_bytes:
+    php
+    phd
+    stz $4200
+    lda #$1B
+    xba
+    lda #0
+    tcd
+@byte:
+    jsr ppu_pointer
+    lda a:$0545,x
+    sta [$00]
+    phx
+    jsr mark_ppu_dirty
+    plx
+    jsr ppu_increment
+    inc a:$1C09
+    inx
+    txa
+    and #$3F
+    tax
+    dey
+    bne @byte
+    pld
+    plp
+    php
+    pha
+    lda a:$1C0A
+    ora a:$1C83
+    bne @done
+    lda a:$1C20
+    and #$80
+    beq @done
+    sta $4200
+@done:
+    pla
+    plp
+    txa
+    ldy #0
+    rts
+
 bank_switch_enter:
     ; Direct translation of FED1's paired-bank operation. The original routine
     ; uses four generic mapper writes, but their effect is fully determined by

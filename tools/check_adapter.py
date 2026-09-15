@@ -60,6 +60,15 @@ def check(core):
     banked = b'\x4c' + symbols['done_banked'].to_bytes(2, 'little')
     plain = b'\x4c' + symbols['done'].to_bytes(2, 'little')
     original = (out/'adapter-test.sfc').read_bytes()
+    ring_store = bytes.fromhex('bd45058700')
+    if original.count(ring_store) != 8:
+        raise RuntimeError('Expected one ring byte store per runtime bank')
+    bad_ring = out/'missing-ring-store.sfc'
+    bad_ring.write_bytes(original.replace(ring_store, bytes.fromhex('bd4505eaea')))
+    result = subprocess.run(command + ['--rom', str(bad_ring)], capture_output=True, text=True, timeout=30)
+    if not result.returncode or 'WRAM status=ee, adapter case=17' not in result.stderr:
+        raise RuntimeError('Missing graphics ring store did not fail assertion 17')
+    print('Graphics ring wrap/stride/flags cases pass; missing store fails case 17.')
     fill_store = bytes.fromhex('9700c8d0fb')
     if original.count(fill_store) != 8:
         raise RuntimeError('Expected one page fill store loop per runtime bank')
@@ -105,8 +114,8 @@ def check(core):
         raise RuntimeError('Incorrect direct R7 did not fail pair assertion 9')
     print('All eight direct bank pairs preserve registers/state; wrong R7 fails case 9.')
     guard = bytes.fromhex('ad0a1c0d831cd00a')
-    if original.count(guard) != 40:
-        raise RuntimeError('Expected two generated I/O guards and three bulk helper guards per runtime bank')
+    if original.count(guard) != 48:
+        raise RuntimeError('Expected two generated I/O guards and four bulk helper guards per runtime bank')
     for label, replacement in (
             ('nmi-depth', bytes.fromhex('a900ea0d831cd00a')),
             ('bank-depth', bytes.fromhex('ad0a1ceaeaead00a'))):
