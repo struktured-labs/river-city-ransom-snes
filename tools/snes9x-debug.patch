@@ -1,8 +1,8 @@
 diff --git a/cpuexec.cpp b/cpuexec.cpp
-index aa43b2f..f4db169 100644
+index aa43b2f..2ff940c 100644
 --- a/cpuexec.cpp
 +++ b/cpuexec.cpp
-@@ -135,6 +135,38 @@ void S9xMainLoop (void)
+@@ -135,6 +135,59 @@ void S9xMainLoop (void)
  			break;
  		}
  
@@ -26,17 +26,38 @@ index aa43b2f..f4db169 100644
 +        // memory read or changing the emulated cycle count. Raw CPU writes,
 +        // not per-frame snapshots; enabled only by an explicit output path.
 +        static FILE *rcr_apu = getenv("RCR_APU_TRACE") ? fopen(getenv("RCR_APU_TRACE"), "w") : NULL;
-+        if (rcr_apu && CPU.PCBase && Registers.PB >= 0xc1 && Registers.PB <= 0xc8 &&
++        static FILE *rcr_bus = getenv("RCR_AUDIO_BUS_TRACE") ? fopen(getenv("RCR_AUDIO_BUS_TRACE"), "w") : NULL;
++        if ((rcr_apu || rcr_bus) && CPU.PCBase && Registers.PB >= 0xc1 && Registers.PB <= 0xc8 &&
 +            Registers.PCw >= 0x2000 && Registers.PCw < 0x6000 &&
 +            !(Registers.DB & 0x40) && Registers.X.W < 0x18 &&
 +            CPU.PCBase[Registers.PCw] == 0x9d &&
 +            CPU.PCBase[Registers.PCw + 1] == 0x00 && CPU.PCBase[Registers.PCw + 2] == 0x0a)
 +        {
-+            fprintf(rcr_apu, "%u,%d,%d,%u,%u,%u,%06x\n",
++            if (rcr_apu) {
++              fprintf(rcr_apu, "%u,%d,%d,%u,%u,%u,%06x\n",
 +                IPPU.TotalEmulatedFrames, CPU.V_Counter, CPU.Cycles,
 +                Memory.RAM[0x1c04] | Memory.RAM[0x1c05] << 8,
 +                0x4000 + Registers.X.W, Registers.A.B.l, Registers.PBPC);
 +            fflush(rcr_apu);
++            }
++            if (rcr_bus) {
++                fprintf(rcr_bus, "W,%u,%d,%d,%u,%u,%u,%06x\n", IPPU.TotalEmulatedFrames,
++                    CPU.V_Counter, CPU.Cycles, Memory.RAM[0x1c04] | Memory.RAM[0x1c05] << 8,
++                    Registers.X.W, Registers.A.B.l, Registers.PBPC);
++                fflush(rcr_bus);
++            }
++        }
++        // Only the packet sender's LDA $0A00,Y / STA $2141 pair, not IPL upload.
++        if (rcr_bus && CPU.PCBase && (Registers.PB == 0 || Registers.PB == 0xc0) &&
++            Registers.PCw >= 0x8003 && Registers.PCw < 0xfffd && Registers.Y.W < 23 &&
++            CPU.PCBase[Registers.PCw - 3] == 0xb9 && CPU.PCBase[Registers.PCw - 2] == 0 &&
++            CPU.PCBase[Registers.PCw - 1] == 0x0a && CPU.PCBase[Registers.PCw] == 0x8d &&
++            CPU.PCBase[Registers.PCw + 1] == 0x41 && CPU.PCBase[Registers.PCw + 2] == 0x21)
++        {
++            fprintf(rcr_bus, "P,%u,%d,%d,%u,%u,%u,%06x\n", IPPU.TotalEmulatedFrames,
++                CPU.V_Counter, CPU.Cycles, Memory.RAM[0x1c04] | Memory.RAM[0x1c05] << 8,
++                Registers.Y.W, Registers.A.B.l, Registers.PBPC);
++            fflush(rcr_bus);
 +        }
  		uint8				Op;
  		struct	SOpcodes	*Opcodes;
