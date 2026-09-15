@@ -7,6 +7,23 @@ import json
 from pathlib import Path
 
 
+def completion_timing(completed):
+    # Pinned SNES9x calls S9xStartScreenRefresh at V_Counter == FIRST_VISIBLE_LINE
+    # (1); that function increments TotalEmulatedFrames. Scanline zero belongs
+    # to the next zero-origin video frame, before that increment has happened.
+    normalized = [r['frame'] + (r['line'] == 0) for r in completed]
+    gaps = collections.Counter(b-a for a, b in zip(normalized, normalized[1:]))
+    if any(gap < 0 for gap in gaps):
+        raise ValueError('Completion video frames run backwards')
+    raw = collections.Counter(b['frame']-a['frame'] for a, b in zip(completed, completed[1:]))
+    return dict(completion_frame_gap_histogram=dict(sorted(gaps.items())),
+                raw_core_frame_gap_histogram=dict(sorted(raw.items())),
+                gap_intervals=[dict(before=a, after=b, video_frame_gap=second-first)
+                               for a, b, first, second in zip(completed, completed[1:], normalized, normalized[1:])
+                               if second-first > 1],
+                frame_convention='Pinned SNES9x raw frame + 1 at scanline zero; no sub-frame timing verdict')
+
+
 def analyze(rows):
     active = False
     expected = None
@@ -48,9 +65,8 @@ def analyze(rows):
                 expected += 1
     if not completed or expected is not None:
         raise ValueError('Missing or truncated acknowledged packet stream')
-    gaps = collections.Counter(b['frame']-a['frame'] for a, b in zip(completed, completed[1:]))
-    return dict(schema='rcr-spc-ack-v1', acknowledged_packets=len(completed),
-                completion_frame_gap_histogram=dict(sorted(gaps.items())),
+    return dict(schema='rcr-spc-ack-v2', acknowledged_packets=len(completed),
+                **completion_timing(completed),
                 completions=completed,
                 scope='CPU observed ready/handshake/all 23 byte echoes; not DSP playback fidelity')
 

@@ -96,3 +96,41 @@ menu run. It does not prove that the engine synthesizes the correct waveform
 or applies updates without sub-frame artifacts. DSP/PCM playback remains the
 next investigation; startup gaps and gameplay still require separate coverage.
 No cartridge or hardware deployment changed.
+
+## Gameplay capture and frame-boundary correction
+
+`build/game-ack-01/snes` runs the baseline through walking, attacks, and
+pause/resume requests with the corrected triangle candidate
+`727f7083265524cb7e0b79d4cc4bd429caae935a6cf81eeeaff60a36b9456614`.
+It completes 2,035 frames and acknowledges 1,864 complete packets with no
+timeout, missing echo, or order failure.
+
+The first analysis showed six zero-frame intervals paired with six two-frame
+intervals. These are **not** missing gameplay packets. The pinned emulator
+calls `S9xStartScreenRefresh()` at `FIRST_VISIBLE_LINE` (scanline 1) in
+`cpuexec.cpp`; `gfx.cpp` increments `IPPU.TotalEmulatedFrames` inside that
+function. A completion at scanline zero consequently has the previous raw
+frame number. Example completions `(raw frame, line)` are `(1476,5)`,
+`(1476,0)`, `(1478,4)`: three consecutive zero-origin video frames.
+
+Analyzer schema v2 adds one to raw frame only at scanline zero. It retains the
+raw histogram and all original completion records; it does not interpolate,
+drop, or reschedule events. Tests require the boundary example to become two
+one-frame intervals and a real 23-frame loading gap to remain a gap.
+
+`build/game-ack-01/analysis-v2.json` now reports 1,851 one-frame intervals and
+12 real gaps. The real gaps are 4 frames (four times), 8 (once), 9 (three),
+11, 12, 23 and 32 (once each). All occur before the street is recognized;
+the last is raw frame 951→974. The later baseline walk/attack/pause-request/
+resume-request portion has consecutive packet completion frames. This is
+not a complete gameplay/scroll-transition test and not a sub-frame jitter
+or waveform verdict. In particular it does not clear the user's report of
+random sputtering on hardware.
+
+Trace SHA:
+`969372771817923b13c5edc628c0c428a6c345a029b8be5f6150d41d9f777dca`.
+All 77 unit tests pass. The refreshed original-NES comparison dashboard is
+`build/triangle-quality-01/index.html`; its independent bundle integrity check
+passes while all four transition-speed gates still fail. The genuine loading
+gaps remain a speed/audio-cadence target, not something the analyzer suppresses.
+No new production ROM change or Rival deployment was made in this follow-up.
