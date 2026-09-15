@@ -127,10 +127,15 @@ def verify_capture(directory):
             snapshot = (directory / (name+'.ram')).read_bytes()
             if len(snapshot) < 2048 or hashlib.sha256(snapshot[:2048]).hexdigest() != rows[segment['end_frame']-1].get('ram_sha256'):
                 raise ValueError('RAM snapshot and telemetry disagree')
+        if 'vram_snapshot' in segment or 'vram_snapshot_sha256' in segment:
+            if (segment.get('vram_snapshot') != name+'.vram'
+                    or sha(directory/(name+'.vram')) != segment.get('vram_snapshot_sha256')
+                    or (directory/(name+'.vram')).stat().st_size != 65536):
+                raise ValueError('Video RAM snapshot changed or unsafe path')
         for offset, row in enumerate(rows[next_frame-1:segment["end_frame"]]):
             if row["frame"] != next_frame+offset or row["phase"] != name:
                 raise ValueError("Non-contiguous telemetry")
-            if report.get('scenario_name') == 'traversal':
+            if report.get('scenario_name', '').startswith('traversal'):
                 raw = bytes.fromhex(row.get('game_ram_hex', ''))
                 if len(raw) != 2048 or hashlib.sha256(raw).hexdigest() != row['ram_sha256']:
                     raise ValueError('Traversal game RAM does not match frame telemetry')

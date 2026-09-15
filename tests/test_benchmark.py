@@ -85,6 +85,31 @@ class EvidenceControls(unittest.TestCase):
         self.assertTrue(any(p.get('until') == 'street' for p in scenario[:walk]))
         self.assertEqual(len(scenario[walk:]), 36)
         self.assertTrue(all(p['frames'] == 120 and p['buttons'] == ['Right'] for p in scenario[walk:]))
+        recovery = scenario_for('traversal-recovery')
+        self.assertEqual(recovery[:len(scenario)], scenario)
+        self.assertEqual(len(recovery[len(scenario):]), 12)
+        self.assertTrue(all(p['frames'] == 120 and p['buttons'] == ['Left']
+                            for p in recovery[len(scenario):]))
+
+    def test_video_ram_snapshot_integrity(self):
+        for mutation in (None, 'changed', 'short', 'path'):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temp:
+                out = Path(temp)
+                report, _ = self.fixture(out)
+                file = out/'boot_to_menu.vram'
+                file.write_bytes(bytes(65536))
+                report['segments'][0].update(vram_snapshot=file.name, vram_snapshot_sha256=sha(file))
+                if mutation == 'changed': file.write_bytes(b'\x01'+bytes(65535))
+                if mutation == 'short':
+                    file.write_bytes(bytes(65535))
+                    report['segments'][0]['vram_snapshot_sha256'] = sha(file)
+                if mutation == 'path': report['segments'][0]['vram_snapshot'] = '../outside.vram'
+                (out/'capture.json').write_text(json.dumps(report))
+                if mutation:
+                    with self.assertRaisesRegex(ValueError, 'Video RAM snapshot'):
+                        verify_capture(out)
+                else:
+                    self.assertFalse(verify_capture(out)[0]['capture_complete'])
 
     def test_traversal_raw_ram_is_bound_to_frame_hash(self):
         for mutation in (None, 'changed', 'missing', 'short'):

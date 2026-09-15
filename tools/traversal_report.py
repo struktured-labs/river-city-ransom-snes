@@ -12,8 +12,10 @@ except ImportError:
 
 def build(reference, candidate, out):
     evidence = [verify_capture(p) for p in (reference, candidate)]
-    if any(r['scenario_name'] != 'traversal' or not r['capture_complete'] for r, _ in evidence):
+    if any(r['scenario_name'] not in ('traversal', 'traversal-recovery') or not r['capture_complete'] for r, _ in evidence):
         raise ValueError('Need two completed traversal captures')
+    if evidence[0][0]['scenario_name'] != evidence[1][0]['scenario_name']:
+        raise ValueError('Traversal schedules differ')
     if [r['system'] for r, _ in evidence] != ['nes', 'snes']:
         raise ValueError('Expected original NES followed by candidate SNES')
     out.mkdir(parents=True, exist_ok=False)
@@ -32,10 +34,13 @@ def build(reference, candidate, out):
         shutil.copyfile(directory/'audio.wav', out/f'{system}.wav')
         shutil.copyfile(directory/'capture.json', out/f'{system}-capture.json')
         html.append(f'<p>{system.upper()} full capture audio <audio controls src="{system}.wav"></audio></p>')
-    for i in range(36):
-        name = f'right_{i:02d}'
-        pair = dict(phase=name, held_right_frames=(i+1)*120)
-        html.append(f'<section><h2>Right held for {(i+1)*120} display frames</h2>')
+    phases = [p for p in evidence[0][0]['scenario'] if p['name'].startswith(('right_', 'left_'))]
+    for phase in phases:
+        name = phase['name']
+        direction, index = name.split('_')
+        duration = (int(index)+1)*120
+        pair = dict(phase=name, direction=direction, held_direction_frames=duration)
+        html.append(f'<section><h2>{direction.title()} held for {duration} display frames</h2>')
         for system, directory, (receipt, rows) in zip(('nes', 'snes'), (reference, candidate), evidence):
             group = [r for r in rows if r['phase'] == name]
             raw = bytes.fromhex(group[-1]['game_ram_hex'])
