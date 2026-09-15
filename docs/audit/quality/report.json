@@ -1,0 +1,491 @@
+{
+  "schema": "rcr-quality-benchmark-v1",
+  "release_ready": false,
+  "status": "failed",
+  "policy": {
+    "transition_tolerance_frames": 2,
+    "transition_tolerance_fraction": 0.05,
+    "active_ac_rms": 8.0,
+    "reference_active_fraction": 0.95,
+    "minimum_candidate_active_fraction": 0.9,
+    "pause_tail_grace_frames": 60,
+    "startup_partial_audio_frames": 1,
+    "max_gameplay_silent_run_frames": 3
+  },
+  "gates": [
+    {
+      "gate": "transition:boot_to_menu",
+      "passed": false,
+      "reference_frames": 170,
+      "candidate_frames": 455
+    },
+    {
+      "gate": "transition:wait_settings",
+      "passed": false,
+      "reference_frames": 53,
+      "candidate_frames": 158
+    },
+    {
+      "gate": "transition:wait_story",
+      "passed": false,
+      "reference_frames": 54,
+      "candidate_frames": 160
+    },
+    {
+      "gate": "transition:wait_street",
+      "passed": false,
+      "reference_frames": 459,
+      "candidate_frames": 749
+    },
+    {
+      "gate": "audio_presence:idle",
+      "passed": false,
+      "reference": {
+        "frames": 180,
+        "active_audio_fraction": 1.0,
+        "longest_silent_run_frames": 0,
+        "mean_ac_rms": 2591.387726248662,
+        "picture_changes": 23,
+        "probe_052b_changes": 90
+      },
+      "candidate": {
+        "frames": 180,
+        "active_audio_fraction": 0.0,
+        "longest_silent_run_frames": 180,
+        "mean_ac_rms": 0.0,
+        "picture_changes": 11,
+        "probe_052b_changes": 40
+      }
+    },
+    {
+      "gate": "audio_presence:walk",
+      "passed": false,
+      "reference": {
+        "frames": 180,
+        "active_audio_fraction": 1.0,
+        "longest_silent_run_frames": 0,
+        "mean_ac_rms": 2678.530634929277,
+        "picture_changes": 90,
+        "probe_052b_changes": 90
+      },
+      "candidate": {
+        "frames": 180,
+        "active_audio_fraction": 0.0,
+        "longest_silent_run_frames": 180,
+        "mean_ac_rms": 0.0,
+        "picture_changes": 41,
+        "probe_052b_changes": 41
+      }
+    },
+    {
+      "gate": "audio_presence:attack",
+      "passed": false,
+      "reference": {
+        "frames": 180,
+        "active_audio_fraction": 1.0,
+        "longest_silent_run_frames": 0,
+        "mean_ac_rms": 2537.7727548770977,
+        "picture_changes": 90,
+        "probe_052b_changes": 90
+      },
+      "candidate": {
+        "frames": 180,
+        "active_audio_fraction": 0.0,
+        "longest_silent_run_frames": 180,
+        "mean_ac_rms": 0.0,
+        "picture_changes": 27,
+        "probe_052b_changes": 42
+      }
+    },
+    {
+      "gate": "audio_presence:resume_requested",
+      "passed": false,
+      "reference": {
+        "frames": 180,
+        "active_audio_fraction": 1.0,
+        "longest_silent_run_frames": 0,
+        "mean_ac_rms": 2695.9143010070466,
+        "picture_changes": 162,
+        "probe_052b_changes": 90
+      },
+      "candidate": {
+        "frames": 180,
+        "active_audio_fraction": 0.0,
+        "longest_silent_run_frames": 180,
+        "mean_ac_rms": 0.0,
+        "picture_changes": 50,
+        "probe_052b_changes": 39
+      }
+    },
+    {
+      "gate": "all_phases_reached",
+      "passed": true
+    },
+    {
+      "gate": "input_delivery",
+      "passed": true
+    },
+    {
+      "gate": "adapter_faults",
+      "passed": true
+    },
+    {
+      "gate": "same_video_rate",
+      "passed": true
+    },
+    {
+      "gate": "continuous_audio_callbacks",
+      "passed": true
+    },
+    {
+      "gate": "settings_pixels",
+      "passed": false
+    },
+    {
+      "gate": "pause_tail_noise",
+      "passed": null
+    },
+    {
+      "gate": "original_speed_full_gameplay",
+      "passed": null
+    },
+    {
+      "gate": "music_and_sfx_fidelity",
+      "passed": null
+    },
+    {
+      "gate": "physical_hardware_audio",
+      "passed": null
+    }
+  ],
+  "reference": {
+    "boot_to_menu": {
+      "frames": 170,
+      "active_audio_fraction": 0.0,
+      "longest_silent_run_frames": 170,
+      "mean_ac_rms": 0.0,
+      "picture_changes": 10,
+      "probe_052b_changes": 1
+    },
+    "menu": {
+      "frames": 60,
+      "active_audio_fraction": 0.8166666666666667,
+      "longest_silent_run_frames": 8,
+      "mean_ac_rms": 1298.477366468443,
+      "picture_changes": 26,
+      "probe_052b_changes": 54
+    },
+    "open_settings": {
+      "frames": 12,
+      "active_audio_fraction": 0.0,
+      "longest_silent_run_frames": 12,
+      "mean_ac_rms": 0.18712421748043143,
+      "picture_changes": 0,
+      "probe_052b_changes": 0
+    },
+    "wait_settings": {
+      "frames": 53,
+      "active_audio_fraction": 0.0,
+      "longest_silent_run_frames": 53,
+      "mean_ac_rms": 0.0,
+      "picture_changes": 7,
+      "probe_052b_changes": 0
+    },
+    "settings": {
+      "frames": 60,
+      "active_audio_fraction": 0.8166666666666667,
+      "longest_silent_run_frames": 8,
+      "mean_ac_rms": 1294.6053087478385,
+      "picture_changes": 27,
+      "probe_052b_changes": 53
+    },
+    "start_game": {
+      "frames": 12,
+      "active_audio_fraction": 0.3333333333333333,
+      "longest_silent_run_frames": 8,
+      "mean_ac_rms": 8.460733334783432,
+      "picture_changes": 0,
+      "probe_052b_changes": 0
+    },
+    "wait_story": {
+      "frames": 54,
+      "active_audio_fraction": 0.0,
+      "longest_silent_run_frames": 54,
+      "mean_ac_rms": 0.018156793363870077,
+      "picture_changes": 6,
+      "probe_052b_changes": 0
+    },
+    "story": {
+      "frames": 60,
+      "active_audio_fraction": 0.8666666666666667,
+      "longest_silent_run_frames": 8,
+      "mean_ac_rms": 2170.052548670412,
+      "picture_changes": 0,
+      "probe_052b_changes": 0
+    },
+    "dismiss_story": {
+      "frames": 12,
+      "active_audio_fraction": 0.08333333333333333,
+      "longest_silent_run_frames": 11,
+      "mean_ac_rms": 7.508523620920606,
+      "picture_changes": 0,
+      "probe_052b_changes": 0
+    },
+    "wait_street": {
+      "frames": 459,
+      "active_audio_fraction": 0.7363834422657952,
+      "longest_silent_run_frames": 63,
+      "mean_ac_rms": 1397.8071468904982,
+      "picture_changes": 38,
+      "probe_052b_changes": 31
+    },
+    "settle_street": {
+      "frames": 60,
+      "active_audio_fraction": 1.0,
+      "longest_silent_run_frames": 0,
+      "mean_ac_rms": 2564.4729913434207,
+      "picture_changes": 4,
+      "probe_052b_changes": 30
+    },
+    "idle": {
+      "frames": 180,
+      "active_audio_fraction": 1.0,
+      "longest_silent_run_frames": 0,
+      "mean_ac_rms": 2591.387726248662,
+      "picture_changes": 23,
+      "probe_052b_changes": 90
+    },
+    "walk": {
+      "frames": 180,
+      "active_audio_fraction": 1.0,
+      "longest_silent_run_frames": 0,
+      "mean_ac_rms": 2678.530634929277,
+      "picture_changes": 90,
+      "probe_052b_changes": 90
+    },
+    "attack": {
+      "frames": 180,
+      "active_audio_fraction": 1.0,
+      "longest_silent_run_frames": 0,
+      "mean_ac_rms": 2537.7727548770977,
+      "picture_changes": 90,
+      "probe_052b_changes": 90
+    },
+    "press_pause": {
+      "frames": 12,
+      "active_audio_fraction": 1.0,
+      "longest_silent_run_frames": 0,
+      "mean_ac_rms": 2809.6347433236483,
+      "picture_changes": 4,
+      "probe_052b_changes": 6
+    },
+    "pause_requested": {
+      "frames": 180,
+      "active_audio_fraction": 0.2111111111111111,
+      "longest_silent_run_frames": 126,
+      "mean_ac_rms": 268.64004867591626,
+      "picture_changes": 24,
+      "probe_052b_changes": 90
+    },
+    "press_resume": {
+      "frames": 12,
+      "active_audio_fraction": 0.9166666666666666,
+      "longest_silent_run_frames": 1,
+      "mean_ac_rms": 1787.9765480507256,
+      "picture_changes": 11,
+      "probe_052b_changes": 6
+    },
+    "resume_requested": {
+      "frames": 180,
+      "active_audio_fraction": 1.0,
+      "longest_silent_run_frames": 0,
+      "mean_ac_rms": 2695.9143010070466,
+      "picture_changes": 162,
+      "probe_052b_changes": 90
+    }
+  },
+  "candidate": {
+    "boot_to_menu": {
+      "frames": 455,
+      "active_audio_fraction": 0.11648351648351649,
+      "longest_silent_run_frames": 382,
+      "mean_ac_rms": 61.62086981762832,
+      "picture_changes": 26,
+      "probe_052b_changes": 40
+    },
+    "menu": {
+      "frames": 60,
+      "active_audio_fraction": 0.65,
+      "longest_silent_run_frames": 8,
+      "mean_ac_rms": 328.5371489400057,
+      "picture_changes": 3,
+      "probe_052b_changes": 53
+    },
+    "open_settings": {
+      "frames": 12,
+      "active_audio_fraction": 1.0,
+      "longest_silent_run_frames": 0,
+      "mean_ac_rms": 708.9604682129478,
+      "picture_changes": 0,
+      "probe_052b_changes": 0
+    },
+    "wait_settings": {
+      "frames": 158,
+      "active_audio_fraction": 0.9620253164556962,
+      "longest_silent_run_frames": 3,
+      "mean_ac_rms": 664.7059388852887,
+      "picture_changes": 8,
+      "probe_052b_changes": 12
+    },
+    "settings": {
+      "frames": 60,
+      "active_audio_fraction": 0.7,
+      "longest_silent_run_frames": 6,
+      "mean_ac_rms": 321.12976317448835,
+      "picture_changes": 5,
+      "probe_052b_changes": 30
+    },
+    "start_game": {
+      "frames": 12,
+      "active_audio_fraction": 0.0,
+      "longest_silent_run_frames": 12,
+      "mean_ac_rms": 0.0,
+      "picture_changes": 2,
+      "probe_052b_changes": 1
+    },
+    "wait_story": {
+      "frames": 160,
+      "active_audio_fraction": 0.09375,
+      "longest_silent_run_frames": 145,
+      "mean_ac_rms": 65.6352613495039,
+      "picture_changes": 15,
+      "probe_052b_changes": 0
+    },
+    "story": {
+      "frames": 60,
+      "active_audio_fraction": 0.85,
+      "longest_silent_run_frames": 3,
+      "mean_ac_rms": 533.8577979143922,
+      "picture_changes": 0,
+      "probe_052b_changes": 0
+    },
+    "dismiss_story": {
+      "frames": 12,
+      "active_audio_fraction": 1.0,
+      "longest_silent_run_frames": 0,
+      "mean_ac_rms": 702.9928982629818,
+      "picture_changes": 0,
+      "probe_052b_changes": 0
+    },
+    "wait_street": {
+      "frames": 749,
+      "active_audio_fraction": 0.540720961281709,
+      "longest_silent_run_frames": 327,
+      "mean_ac_rms": 285.23353364377476,
+      "picture_changes": 52,
+      "probe_052b_changes": 32
+    },
+    "settle_street": {
+      "frames": 60,
+      "active_audio_fraction": 0.0,
+      "longest_silent_run_frames": 60,
+      "mean_ac_rms": 0.0,
+      "picture_changes": 5,
+      "probe_052b_changes": 14
+    },
+    "idle": {
+      "frames": 180,
+      "active_audio_fraction": 0.0,
+      "longest_silent_run_frames": 180,
+      "mean_ac_rms": 0.0,
+      "picture_changes": 11,
+      "probe_052b_changes": 40
+    },
+    "walk": {
+      "frames": 180,
+      "active_audio_fraction": 0.0,
+      "longest_silent_run_frames": 180,
+      "mean_ac_rms": 0.0,
+      "picture_changes": 41,
+      "probe_052b_changes": 41
+    },
+    "attack": {
+      "frames": 180,
+      "active_audio_fraction": 0.0,
+      "longest_silent_run_frames": 180,
+      "mean_ac_rms": 0.0,
+      "picture_changes": 27,
+      "probe_052b_changes": 42
+    },
+    "press_pause": {
+      "frames": 12,
+      "active_audio_fraction": 0.0,
+      "longest_silent_run_frames": 12,
+      "mean_ac_rms": 0.0,
+      "picture_changes": 0,
+      "probe_052b_changes": 4
+    },
+    "pause_requested": {
+      "frames": 180,
+      "active_audio_fraction": 0.0,
+      "longest_silent_run_frames": 180,
+      "mean_ac_rms": 0.0,
+      "picture_changes": 0,
+      "probe_052b_changes": 66
+    },
+    "press_resume": {
+      "frames": 12,
+      "active_audio_fraction": 0.4166666666666667,
+      "longest_silent_run_frames": 6,
+      "mean_ac_rms": 264.9304713595123,
+      "picture_changes": 2,
+      "probe_052b_changes": 3
+    },
+    "resume_requested": {
+      "frames": 180,
+      "active_audio_fraction": 0.0,
+      "longest_silent_run_frames": 180,
+      "mean_ac_rms": 0.0,
+      "picture_changes": 50,
+      "probe_052b_changes": 39
+    }
+  },
+  "settings_pixels": {
+    "pixels_compared": 61184,
+    "mismatch_pixels": 393,
+    "rgb_max_error": 231,
+    "passed": false,
+    "comparison": "top 239 rows, RGB reduced to 5 bits/channel"
+  },
+  "pause_tail": {
+    "reference": {
+      "frames": 120,
+      "active_audio_fraction": 0.0,
+      "longest_silent_run_frames": 120,
+      "mean_ac_rms": 0.02194113994661957,
+      "picture_changes": 0,
+      "probe_052b_changes": 60
+    },
+    "candidate": {
+      "frames": 120,
+      "active_audio_fraction": 0.0,
+      "longest_silent_run_frames": 120,
+      "mean_ac_rms": 0.0,
+      "picture_changes": 0,
+      "probe_052b_changes": 45
+    }
+  },
+  "candidate_rom_sha256": "2098a778f32cadfa886a6dafc59e6f9303342ba9d55d70ed6135bb12402ab4ca",
+  "reference_rom_sha256": "b95f8def04c0012604b7cc68cf4ed8f49b2dfe4beda6182051de4b2423bea7b1",
+  "reference_capture_sha256": "38cad75bea7bfa90b8426617e1d4895e92707e7f37f799c68e7e7f316d5f06a0",
+  "candidate_capture_sha256": "251b9002b384c49f56098fcb7770fada7f03c499b343d52d542a115b860f814b",
+  "report_tool_sha256": "c765e524b26d17d9af8143da2d443de4b66fcabe6c228d3818e0c71a631a1473",
+  "notice": "Phase-driven equivalent actions, NOT cycle/frame-synchronized gameplay. Captured screenshots are real execution. Audio presence is not audio fidelity; requested pause is not proof that the game entered pause. Full-speed gameplay and physical audio remain unverified.",
+  "files": {
+    "audio-timeline.svg": "8f097d199d5f9f1355542863bc1087e1006b282712ee99f08afce0081fed4d0b",
+    "collage.png": "8c348eebaddfc611710cabb4d6b19121aa193858d10dc07962aab50f0090deae",
+    "nes-audio.wav": "40da6a3c1531bfc983ecfca476bd199958f8301385ce53682eefa88db10d31d1",
+    "snes-audio.wav": "80fe50ee2061aa9cf8d8b8d2ca00b0fa744449eea7399519b069ad3220eb74b7"
+  },
+  "evidence_sha256": "c6f33d964372d869c8a5716acc05b31b84edc72de08b5cd975bd1fe5f5edf17a"
+}

@@ -130,6 +130,51 @@ tests:
     jmp failed
 :
     stz $1C06
+.ifdef CONTROLLER_TEST
+    ; Test the real serial adapter: P1 Select only, P2 Start only.
+    ; Opposite-port/cross-button leakage must fail too.
+    lda #5
+    sta $1C61
+@input_visible:
+    lda $4212
+    bmi @input_visible
+@input_blank:
+    lda $4212
+    bpl @input_blank
+    lda #$40
+    sta $1B21
+    lda #$16
+    sta $1B20
+    lda #1
+    sta $1B22
+    jsl $C10000+dispatch_write
+    stz $1B22
+    jsl $C10000+dispatch_write
+    lda #4
+    sta $1C66
+    lda #8
+    sta $1C67
+    ldy #8
+@read_buttons:
+    lda #$16
+    sta $1B20
+    jsl $C10000+dispatch_read
+    lda $1C66
+    and #1
+    cmp $1B24
+    jne failed
+    lsr $1C66
+    lda #$17
+    sta $1B20
+    jsl $C10000+dispatch_read
+    lda $1C67
+    and #1
+    cmp $1B24
+    jne failed
+    lsr $1C67
+    dey
+    bne @read_buttons
+.endif
     lda #1
     sta $1C60
     stz $2121

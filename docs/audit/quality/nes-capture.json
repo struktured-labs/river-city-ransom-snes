@@ -1,0 +1,340 @@
+{
+  "schema": "rcr-benchmark-capture-v1",
+  "system": "nes",
+  "rom_sha256": "b95f8def04c0012604b7cc68cf4ed8f49b2dfe4beda6182051de4b2423bea7b1",
+  "core_sha256": "6ef5a1bbc11f6a836685031ffd75d374e62c0319e1884521cf654ceca75a2a16",
+  "candidate_manifest_sha256": null,
+  "palette_sha256": "bbb0355bcadc4be771efeb81930b09b17d97dcb8c70167a652902a789158c5f8",
+  "capture_tool_sha256": "759a9c4213d886f754e9b0a1737f0166cfd7adb791479c92808ed0843615b33c",
+  "templates": {
+    "menu": {
+      "image": "5dd75eee3924da95d19f9fe91662d7467695ba03d2aa218dad96be8c9e4a467b",
+      "manifest": "eaa37947acc434f0a44062f490a128b327642fcff86491810b1a93ef7f97979d",
+      "source_rom": "b95f8def04c0012604b7cc68cf4ed8f49b2dfe4beda6182051de4b2423bea7b1",
+      "rect": [
+        88,
+        48,
+        184,
+        84
+      ]
+    },
+    "settings": {
+      "image": "2c30a32eb866f3221581381a16a8fb33a3d7f39254d84b4ba62661b2b8ab103d",
+      "manifest": "76590fabb16fcdb25e58facb82fe391d4baf1b7f9cd54e01f406978799fcc22f",
+      "source_rom": "b95f8def04c0012604b7cc68cf4ed8f49b2dfe4beda6182051de4b2423bea7b1",
+      "rect": [
+        64,
+        40,
+        192,
+        62
+      ]
+    },
+    "story": {
+      "image": "177cdb2c03c7d66305b169e9d57c21e32fcf45a1231866dfc87278dc1d776f9e",
+      "manifest": "76590fabb16fcdb25e58facb82fe391d4baf1b7f9cd54e01f406978799fcc22f",
+      "source_rom": "b95f8def04c0012604b7cc68cf4ed8f49b2dfe4beda6182051de4b2423bea7b1",
+      "rect": [
+        8,
+        168,
+        80,
+        188
+      ]
+    },
+    "street": {
+      "image": "ed41b117d6283bb02e062dd7fa63f3dc7bb36ded6b3bfb12110d0e8c31598259",
+      "manifest": "76590fabb16fcdb25e58facb82fe391d4baf1b7f9cd54e01f406978799fcc22f",
+      "source_rom": "b95f8def04c0012604b7cc68cf4ed8f49b2dfe4beda6182051de4b2423bea7b1",
+      "rect": [
+        8,
+        8,
+        56,
+        24
+      ]
+    }
+  },
+  "scenario": [
+    {
+      "name": "boot_to_menu",
+      "until": "menu",
+      "frames": 2400
+    },
+    {
+      "name": "menu",
+      "frames": 60
+    },
+    {
+      "name": "open_settings",
+      "frames": 12,
+      "buttons": [
+        "Start"
+      ]
+    },
+    {
+      "name": "wait_settings",
+      "until": "settings",
+      "frames": 2400
+    },
+    {
+      "name": "settings",
+      "frames": 60
+    },
+    {
+      "name": "start_game",
+      "frames": 12,
+      "buttons": [
+        "Start"
+      ]
+    },
+    {
+      "name": "wait_story",
+      "until": "story",
+      "frames": 2400
+    },
+    {
+      "name": "story",
+      "frames": 60
+    },
+    {
+      "name": "dismiss_story",
+      "frames": 12,
+      "buttons": [
+        "A"
+      ]
+    },
+    {
+      "name": "wait_street",
+      "until": "street",
+      "frames": 2400
+    },
+    {
+      "name": "settle_street",
+      "frames": 60
+    },
+    {
+      "name": "idle",
+      "frames": 180
+    },
+    {
+      "name": "walk",
+      "frames": 180,
+      "buttons": [
+        "Right"
+      ]
+    },
+    {
+      "name": "attack",
+      "frames": 180,
+      "buttons": [
+        "A"
+      ],
+      "pulse": [
+        20,
+        5
+      ]
+    },
+    {
+      "name": "press_pause",
+      "frames": 12,
+      "buttons": [
+        "Start"
+      ]
+    },
+    {
+      "name": "pause_requested",
+      "frames": 180
+    },
+    {
+      "name": "press_resume",
+      "frames": 12,
+      "buttons": [
+        "Start"
+      ]
+    },
+    {
+      "name": "resume_requested",
+      "frames": 180
+    }
+  ],
+  "scenario_sha256": "58791533f37b9c76dfacb6f8d4d24a26aafbd16f6f9cdd38288b16a738a9b37e",
+  "input_mapping": {
+    "A": 8,
+    "B": 0
+  },
+  "core_options": {
+    "snes9x_overscan": "disabled",
+    "fceumm_overscan_h": "disabled",
+    "fceumm_overscan_v": "disabled",
+    "fceumm_palette": "custom"
+  },
+  "fps": 60.099826520671044,
+  "sample_rate": 48000.0,
+  "segments": [
+    {
+      "name": "boot_to_menu",
+      "start_frame": 1,
+      "end_frame": 170,
+      "frames": 170,
+      "transition_matched": true,
+      "screenshot": "boot_to_menu.png",
+      "screenshot_sha256": "3fbdbf99eea6f2f7b41e0001ee01bbf9d4f3db9cd82ff0986b9caf3650c1be7c"
+    },
+    {
+      "name": "menu",
+      "start_frame": 171,
+      "end_frame": 230,
+      "frames": 60,
+      "transition_matched": null,
+      "screenshot": "menu.png",
+      "screenshot_sha256": "17027f97754a158b3a6724efc5f33f112b774c7bc6ed7445ba572370b76243d6"
+    },
+    {
+      "name": "open_settings",
+      "start_frame": 231,
+      "end_frame": 242,
+      "frames": 12,
+      "transition_matched": null,
+      "screenshot": "open_settings.png",
+      "screenshot_sha256": "17027f97754a158b3a6724efc5f33f112b774c7bc6ed7445ba572370b76243d6"
+    },
+    {
+      "name": "wait_settings",
+      "start_frame": 243,
+      "end_frame": 295,
+      "frames": 53,
+      "transition_matched": true,
+      "screenshot": "wait_settings.png",
+      "screenshot_sha256": "8124c5bcd5578965dc559c2b0775dd74c817826fef0253f6d26c403faba07955"
+    },
+    {
+      "name": "settings",
+      "start_frame": 296,
+      "end_frame": 355,
+      "frames": 60,
+      "transition_matched": null,
+      "screenshot": "settings.png",
+      "screenshot_sha256": "2c30a32eb866f3221581381a16a8fb33a3d7f39254d84b4ba62661b2b8ab103d"
+    },
+    {
+      "name": "start_game",
+      "start_frame": 356,
+      "end_frame": 367,
+      "frames": 12,
+      "transition_matched": null,
+      "screenshot": "start_game.png",
+      "screenshot_sha256": "2c30a32eb866f3221581381a16a8fb33a3d7f39254d84b4ba62661b2b8ab103d"
+    },
+    {
+      "name": "wait_story",
+      "start_frame": 368,
+      "end_frame": 421,
+      "frames": 54,
+      "transition_matched": true,
+      "screenshot": "wait_story.png",
+      "screenshot_sha256": "177cdb2c03c7d66305b169e9d57c21e32fcf45a1231866dfc87278dc1d776f9e"
+    },
+    {
+      "name": "story",
+      "start_frame": 422,
+      "end_frame": 481,
+      "frames": 60,
+      "transition_matched": null,
+      "screenshot": "story.png",
+      "screenshot_sha256": "177cdb2c03c7d66305b169e9d57c21e32fcf45a1231866dfc87278dc1d776f9e"
+    },
+    {
+      "name": "dismiss_story",
+      "start_frame": 482,
+      "end_frame": 493,
+      "frames": 12,
+      "transition_matched": null,
+      "screenshot": "dismiss_story.png",
+      "screenshot_sha256": "177cdb2c03c7d66305b169e9d57c21e32fcf45a1231866dfc87278dc1d776f9e"
+    },
+    {
+      "name": "wait_street",
+      "start_frame": 494,
+      "end_frame": 952,
+      "frames": 459,
+      "transition_matched": true,
+      "screenshot": "wait_street.png",
+      "screenshot_sha256": "ff563026320a9a71562db1cbe726cecba40204697883ad55c13722d1f1d237fe"
+    },
+    {
+      "name": "settle_street",
+      "start_frame": 953,
+      "end_frame": 1012,
+      "frames": 60,
+      "transition_matched": null,
+      "screenshot": "settle_street.png",
+      "screenshot_sha256": "150a70dfa50ccb079038a942f25636acda583d686eb031bde5bc9927fb94ee23"
+    },
+    {
+      "name": "idle",
+      "start_frame": 1013,
+      "end_frame": 1192,
+      "frames": 180,
+      "transition_matched": null,
+      "screenshot": "idle.png",
+      "screenshot_sha256": "a167846d557f86702940448270ced030b8637f2757e59fa5226a2644d2db070b"
+    },
+    {
+      "name": "walk",
+      "start_frame": 1193,
+      "end_frame": 1372,
+      "frames": 180,
+      "transition_matched": null,
+      "screenshot": "walk.png",
+      "screenshot_sha256": "c27ce47682b0762eff3a5882def59599e8cfcb6e6e3d9ccc1d95056b6299eef7"
+    },
+    {
+      "name": "attack",
+      "start_frame": 1373,
+      "end_frame": 1552,
+      "frames": 180,
+      "transition_matched": null,
+      "screenshot": "attack.png",
+      "screenshot_sha256": "ae0a953311931f9883c1a6af326ebb084e6717ad336dd4f3626c40fedc71361a"
+    },
+    {
+      "name": "press_pause",
+      "start_frame": 1553,
+      "end_frame": 1564,
+      "frames": 12,
+      "transition_matched": null,
+      "screenshot": "press_pause.png",
+      "screenshot_sha256": "5c3571c0f03cf49ea2f951ec631baaeb765aa5f01a36a7affe798f02010a9f4d"
+    },
+    {
+      "name": "pause_requested",
+      "start_frame": 1565,
+      "end_frame": 1744,
+      "frames": 180,
+      "transition_matched": null,
+      "screenshot": "pause_requested.png",
+      "screenshot_sha256": "77e437935ec59ae18937de71e68d7df32d92f731d874552261b0c9cec53e6f90"
+    },
+    {
+      "name": "press_resume",
+      "start_frame": 1745,
+      "end_frame": 1756,
+      "frames": 12,
+      "transition_matched": null,
+      "screenshot": "press_resume.png",
+      "screenshot_sha256": "931ee5a5decf629ba77324be92bd6fac97552e1b07402a9bcb543e949293fd9b"
+    },
+    {
+      "name": "resume_requested",
+      "start_frame": 1757,
+      "end_frame": 1936,
+      "frames": 180,
+      "transition_matched": null,
+      "screenshot": "resume_requested.png",
+      "screenshot_sha256": "020b91cac28ecaf6bb80ce4f809666c6a0c8bbc799fe074a3dd6554dec056f35"
+    }
+  ],
+  "audio_sha256": "40da6a3c1531bfc983ecfca476bd199958f8301385ce53682eefa88db10d31d1",
+  "timeline_sha256": "35412acd2ef0c977152336bad1c10b53bc79375a42555bd4e26ace6281cae31f",
+  "frames": 1936,
+  "capture_complete": true,
+  "release_ready": false
+}

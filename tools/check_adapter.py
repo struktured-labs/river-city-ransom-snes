@@ -26,6 +26,15 @@ def check(core):
     if not result.returncode or "WRAM status=ee, adapter case=2" not in result.stderr:
         raise RuntimeError("Corrupted CHR did not fail the expected executed adapter assertion")
     print("Adapter positive control passed; corrupted-CHR negative control failed at the expected assertion.")
+    controls = ROOT / "build/controller-test"
+    build(controls, controllers=True)
+    control_cmd = command + ["--rom", str(controls / "adapter-test.sfc")]
+    subprocess.run(control_cmd + ["--profile", "select-control", "--receipt", str(controls / "receipt.json")],
+                   check=True, timeout=30)
+    missing = subprocess.run(control_cmd, capture_output=True, text=True, timeout=30)
+    if not missing.returncode or "WRAM status=ee, adapter case=5" not in missing.stderr:
+        raise RuntimeError("Missing Select input did not fail the controller assertion")
+    print("P1 Select/P2 Start serial routing passed; absent-input negative control failed correctly.")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,12 @@
+{
+  "schema": "rcr-quality-bundle-v1",
+  "files": {
+    "audio-timeline.svg": "8f097d199d5f9f1355542863bc1087e1006b282712ee99f08afce0081fed4d0b",
+    "collage.png": "8c348eebaddfc611710cabb4d6b19121aa193858d10dc07962aab50f0090deae",
+    "index.html": "834704c5b8ade98911ca50e4b5805e075926c95a6b04e075dd9b5816e25f5e95",
+    "nes-audio.wav": "40da6a3c1531bfc983ecfca476bd199958f8301385ce53682eefa88db10d31d1",
+    "report.json": "10552dc2cb6bffecfada86abb5858cb008fe7ad657183027f6bcf27aa2498b5a",
+    "settings-difference.png": "6f9f821ed6b0858380e1b6a49e0207c1d5f11be08d933ea58452a5586aa889a9",
+    "snes-audio.wav": "80fe50ee2061aa9cf8d8b8d2ca00b0fa744449eea7399519b069ad3220eb74b7"
+  }
+}

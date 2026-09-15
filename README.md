@@ -13,6 +13,11 @@ Start with the [visual audit and collages](docs/audit/README.md). Renderer fixtu
 and live execution have separate evidence: a static pixel match is never called
 a gameplay pass. ROMs, extracted assets and generated cartridges stay local.
 
+The [quality benchmark](docs/BENCHMARK.md) compares original and port transitions,
+input delivery and per-frame audio, with phase-seekable local listening evidence.
+The current port fails its speed/audio/graphics gates; no new build is offered
+until original-speed gameplay and clean sound are established.
+
 Implemented:
 
 - Strict iNES parsing and US RCR PRG/CHR checksum validation.

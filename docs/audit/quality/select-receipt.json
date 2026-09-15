@@ -1,0 +1,29 @@
+{
+  "schema": "rcr-emulator-receipt-v1",
+  "emulated_frames": 300,
+  "video_frames": 300,
+  "input_profile": "select-control",
+  "rom_sha256": "901c5ea4b6aab4e919ddbd4d26ae7f1ab2901d953a9f91bd81f5cfc1b0144b6e",
+  "core_sha256": "2e05b2f9a24293fbcdd030d8c117d067dda9533025896365685078d07a1a22e5",
+  "harness_sha256": "fdeaa7e9c274ffd4a7478c9a751696330acb529512d6c361ad3b05123135b9cc",
+  "audio_pcm_sha256": "22e245347e43ccab16ac37155fc2fdbae84e11200aa72dcf2cffd8392c9c99ef",
+  "screenshot_sha256": null,
+  "game_frame_counters": [
+    124,
+    273
+  ],
+  "audio_peak": 0,
+  "sample_rate": 32040.0,
+  "status": "passed",
+  "scope": "asset-free native PPU/CHR/register-ABI adapter tests",
+  "cpu": {
+    "pc": "c18198",
+    "a": "001b83",
+    "x": "000002",
+    "y": "000000",
+    "s": "0001ff",
+    "p": "0001b4",
+    "db": "000081",
+    "d": "000000"
+  }
+}
