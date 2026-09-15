@@ -13,6 +13,25 @@ except ImportError:
     import smoke_libretro as smoke
 
 
+def nmi_stalls(rows):
+    """Retain every stalled-frame sample, including unfinished boundary runs.
+
+    PCs are frame-boundary observations, not an instruction-time profile.
+    A resumed interval of N display frames contains N-1 stalled samples.
+    """
+    stalls, active = [], None
+    for previous, current in zip(rows, rows[1:]):
+        if current['nmi'] == previous['nmi']:
+            if active is None:
+                active = {'before': previous, 'samples': [], 'after': None}
+                stalls.append(active)
+            active['samples'].append(current)
+        elif active is not None:
+            active['after'] = current
+            active = None
+    return stalls
+
+
 def profile(core_path, rom_path, frames=3600, warmup=1800):
     if not 0 < warmup < frames:
         raise ValueError("Need both warmup and measurement frames")
@@ -21,6 +40,10 @@ def profile(core_path, rom_path, frames=3600, warmup=1800):
     def loader(path):
         core = real_cdll(path)
         original_run, original_video = core.retro_run, core.retro_set_video_refresh
+        getter = getattr(core, 'retro_rcr_cpu_register', None)
+        if getter is not None:
+            getter.argtypes = [C.c_uint]
+            getter.restype = C.c_uint
         def set_video(callback):
             @type(callback)
             def hooked(data, width, height, pitch):
@@ -39,6 +62,10 @@ def profile(core_path, rom_path, frames=3600, warmup=1800):
             elapsed = time.perf_counter() - begin
             ram = C.string_at(core.retro_get_memory_data(2), 8192)
             rows.append({"frame": len(rows) + 1, "nmi": int.from_bytes(ram[0x1C04:0x1C06], "little"),
+                         "pc": f'{getter(0):06x}' if getter is not None else None,
+                         "task_0100": ram[0x100], "ppu_ctrl": ram[0x1C20],
+                         "nmi_depth": ram[0x1C0A], "bank_depth": ram[0x1C83],
+                         "sound_service": ram[0x1C84],
                          "camera_x": int.from_bytes(ram[0xDC:0xDE], 'little'),
                          "street_scroll_x": ram[0xF6] | ((ram[0x3D] & 1) << 8),
                          "hdma_street_scroll_x": ram[0x1C94] | ((ram[0x1C95] & 1) << 8),
@@ -73,6 +100,8 @@ def profile(core_path, rom_path, frames=3600, warmup=1800):
             "nmi_per_second": len(events)/seconds,
             "nmi_gap_display_frames": dict(sorted(collections.Counter(intervals).items())),
             "max_nmi_gap_display_frames": max(intervals, default=0),
+            "nmi_stalls": nmi_stalls(rows[warmup-1:]),
+            "nmi_stall_scope": "Frame-boundary samples, not instruction-time attribution; includes unfinished final stalls",
             "picture_changes_per_second": changed/seconds,
             "game_tick_changes_per_second": ticks/seconds,
             "black_display_frames": sum(image[1] for image in images[warmup:]),

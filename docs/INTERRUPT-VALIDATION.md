@@ -424,3 +424,39 @@ executed assertion 8. The independent row oracle now checks both menu and
 gameplay modes and counts the first prepared batch (four versus two), across
 both pattern halves. Existing graphics/cache/late-entry controls and 54 unit
 tests pass. Rivalmage remains unchanged.
+# Frame-boundary attribution of remaining long NMI gaps
+
+`tools/profile_native.py` now retains the frame immediately before each NMI
+stall, every stalled sample, and the first resumed sample (or null if the run
+ends stalled). Samples include optional debug-core PC, task `$0100`, PPUCTRL,
+NMI/bank critical depths, and the gameplay sound-service counter. These are
+frame-boundary observations, **not instruction-time profiling**. Unit tests
+cover resumed, unfinished, absent, and insufficient-sample cases.
+
+Reproduction on candidate SHA
+`6853b707d18db51848ab74afc5ec5f82d7021bbfa34ec006a64d60882a722cfc`:
+
+```sh
+python3 tools/profile_native.py \
+  --core /tmp/rcr-snes9x/libretro/snes9x_libretro.so \
+  --rom build/empty-chr-menu4-01/native-cpu.sfc \
+  --frames 12000 --warmup 1800 \
+  --out build/empty-chr-menu4-01/stall-profile.json
+```
+
+The five runs longer than two stalled frames begin after display frames 1821,
+1863, 5281, 5304, and 5328, with respectively 40, 28, 21, 23, and 22 stalled
+samples. Of these 134 samples, 129 have PPUCTRL's NMI-enable bit clear; all have
+NMI depth and bank depth zero. 84 PCs are in the replicated `$2000..$24FF`
+runtime, including PPUDATA dispatch, shadow-pointer/CHR mapping, dirty marking,
+and address increment. Other samples include generated I/O stubs and original
+game code. The final samples can already have NMI enabled while awaiting the
+next edge. Gameplay sound-service counters do not advance across these runs.
+
+This supports investigating bulk PPU adapter overhead during NMI-disabled game
+work, rather than treating these gaps as a stuck bank critical section. It does
+not establish instruction cost percentages, original NES equivalence, or that
+every audible sputter is caused by these particular gaps. Next work should
+measure original transfer behavior and reduce this overhead without moving
+game/audio state forward at an invented cadence. No hardware deployment or
+new speed/audio fidelity pass is claimed by this diagnostic.
