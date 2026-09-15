@@ -20,10 +20,12 @@ def build(out, controllers=False, jump=False):
     symbols = {line.split()[2].lstrip("."): int(line.split()[1], 16)
                for line in (out / "runtime.lbl").read_text().splitlines()}
     io_stub = stub(0x8D, 0x2007, symbols['dispatch_ppudata'], fast_ppudata=True)
+    read_address = 24576 + len(io_stub)
+    io_stub += stub(0xAD, 0x2007, symbols['dispatch_ppudata_read'], fast_ppudata=True)
     subprocess.run([ca65, *(["-D", "CONTROLLER_TEST=1"] if controllers or jump else []), *(["-D", "JUMP_TEST=1"] if jump else []), "-D", f'dispatch_read={symbols["dispatch_read"]}',
                     "-D", f'dispatch_write={symbols["dispatch_write"]}',
                     "-D", f'bank_switch_enter={symbols["bank_switch_enter"]}',
-                    "-D", 'io_write_stub=24576', "-o", str(out / "test.o"),
+                    "-D", 'io_write_stub=24576', '-D', f'io_read_stub={read_address}', "-o", str(out / "test.o"),
                     str(ROOT / "snes/runtime_test.asm")], check=True)
     subprocess.run([ld65, "-C", str(ROOT / "snes/native_boot.cfg"), "-o", str(out / "test.bin"),
                     str(out / "test.o")], check=True)

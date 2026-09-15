@@ -60,8 +60,8 @@ def check(core):
         raise RuntimeError('Incorrect direct R7 did not fail pair assertion 9')
     print('All eight direct bank pairs preserve registers/state; wrong R7 fails case 9.')
     guard = bytes.fromhex('ad0a1c0d831cd00a')
-    if original.count(guard) != 8:
-        raise RuntimeError('Expected one generated I/O guard per runtime bank')
+    if original.count(guard) != 16:
+        raise RuntimeError('Expected two generated I/O guards per runtime bank')
     for label, replacement in (
             ('nmi-depth', bytes.fromhex('a900ea0d831cd00a')),
             ('bank-depth', bytes.fromhex('ad0a1ceaeaead00a'))):
@@ -89,6 +89,15 @@ def check(core):
     if not result.returncode or 'WRAM status=ee, adapter case=11' not in result.stderr:
         raise RuntimeError('Duplicate PPUMASK preparation did not fail scheduling assertion 11')
     print('PPUMASK prepares initial/offline loads and coalesces active pipelines; duplicate call fails case 11.')
+    fast_read = b'\x4c' + symbols['ppu_read_data'].to_bytes(2, 'little')
+    if original.count(fast_read) != 8:
+        raise RuntimeError('Expected one fast PPUDATA read jump per runtime bank')
+    skipped_read = out/'missing-fast-read.sfc'
+    skipped_read.write_bytes(original.replace(fast_read, plain))
+    result = subprocess.run(command + ['--rom', str(skipped_read)], capture_output=True, text=True, timeout=30)
+    if not result.returncode or 'WRAM status=ee, adapter case=12' not in result.stderr:
+        raise RuntimeError('Skipped fast read did not fail read-buffer assertion 12')
+    print('Fast PPU read buffer/palette/increment/flags pass; skipped read fails case 12.')
     controls = ROOT / "build/controller-test"
     build(controls, controllers=True)
     control_cmd = command + ["--rom", str(controls / "adapter-test.sfc")]

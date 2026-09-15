@@ -323,6 +323,21 @@ mark_ppu_dirty:
 @end:
     rts
 
+dispatch_ppudata_read:
+.ifdef TRACE_CALLERS
+    jsr trace_caller
+.endif
+    php
+    pha
+    phx
+    phy
+    phd
+    stz $4200
+    lda #$1B
+    xba
+    lda #0
+    tcd
+    jmp ppu_read_data
 dispatch_read:
 .ifdef TRACE_CALLERS
     jsr trace_caller
@@ -396,6 +411,7 @@ dispatch_read:
     sta $24
     jmp done
 @data:
+ppu_read_data:
     jsr ppu_pointer
     lda a:$1C2A
     sta $24

@@ -370,6 +370,54 @@ tests:
     jne failed
     stz $1C0A
     stz $1C79
+    lda #12
+    sta $1C61
+    lda #$FF
+    sta $1B20
+    sta $1B21
+    lda #$20
+    sta $1C27
+    lda #$10
+    sta $1C26
+    lda #$A5
+    sta f:$7F2010
+    lda #$5A
+    sta $1C2A
+    ldx #$34
+    ldy #$56
+    sec
+    jsr io_read_stub
+    jcc failed
+    cmp #$5A                ; first read returns the old buffer
+    jne failed
+    cpx #$34
+    jne failed
+    cpy #$56
+    jne failed
+    lda $1C2A
+    cmp #$A5
+    jne failed
+    lda $1C26
+    cmp #$11
+    jne failed
+    jsr io_read_stub
+    jpl failed              ; LDA result must set N from the returned $A5
+    cmp #$A5
+    jne failed
+    lda #$3F
+    sta $1C27
+    stz $1C26
+    lda #$37
+    sta f:$7F3F00
+    lda #4                  ; 32-byte address increment
+    sta $1C20
+    jsr io_read_stub
+    cmp #$37                ; palette reads bypass the old read buffer
+    jne failed
+    lda $1C26
+    cmp #$20
+    jne failed
+    stz $1C20
     lda #1
     sta $1C60
     stz $2121

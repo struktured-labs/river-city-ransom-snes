@@ -319,3 +319,31 @@ A mutant restoring the duplicate pipeline call fails assertion 11. The bridge
 is a counter stub in this ABI test; exact renderer pixels remain covered by
 the separate graphics harness and game settings audit. All adapter controls
 and 52 unit tests pass. No Rivalmage deployment or full-speed claim is made.
+
+### Specialized PPUDATA reads
+
+`build/fast-read-01/native-cpu.sfc`, SHA
+`f45f4d5a0cf11965ecc680ac8c3bbb180adf69f6175c3b895214c68d8fcd11b2`,
+extends the known-address path to plain LDA $2007. It shares the production
+buffered-read/CHR-pointer/palette-bypass/increment body, but omits address
+mailbox setup and general I/O dispatch. Indexed and X/Y-register reads remain
+on the general path. The generated LDA stub still loads the result after
+restoring the caller, setting N/Z from that result while preserving carry.
+
+The baseline capture is only two frames shorter (2487 versus 2489; NES 1936).
+Thus dispatch overhead on these reads is not a major measured loading
+bottleneck. All four timing gates still fail, while settings/basic audio gates
+pass. Bundle integrity verifies at `build/fast-read-quality-01/site/index.html`.
+The 12,000-frame workload reports no overrun/adapter/SPC fault, 58.53 NMIs/sec,
+25.19 sampled game-counter changes/sec, and maximum observed NMI gap 41 frames.
+Whole-run phase differences preclude interpreting these as an overall gain.
+
+Executed assertion 12 poisons the unused address mailbox and checks the old
+buffer result, buffer refill, result flags, register preservation, immediate
+palette reads, and 1/32-byte increments. A mutant bypassing the fast read fails
+that assertion. Depth-guard mutations now change both read/write stub copies;
+the executed guarded-access assertion still exercises the write path. All
+adapter controls and 52 unit tests pass. Next profiling should
+separate actual scene-load CPU work from producer scheduling/backlog rather
+than assuming another dispatcher shortcut will remove the remaining stalls.
+Rivalmage is unchanged.
