@@ -396,6 +396,19 @@ prepare_chr:
     rep #$20
     .a16
     tya
+    ; MMC3 CHR inversion changes which registers feed a physical PPU slot,
+    ; not the destination slot. The CPU-side CHR reader already honors it.
+    pha
+    lda $1C19
+    and #$0080
+    beq :+
+    pla
+    eor #4
+    bra @mapped_slot
+:
+    pla
+@mapped_slot:
+    sta $10
     cmp #4
     bcs @single
     lsr
@@ -403,7 +416,7 @@ prepare_chr:
     lda $1C10,x
     and #$00FE
     sta $12
-    tya
+    lda $10
     and #1
     ora $12
     bra @bank

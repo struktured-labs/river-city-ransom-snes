@@ -174,6 +174,21 @@ def check_left_controls(core):
     print('Independent BG/OBJ clipping passes all four masks; off-by-one boundary fails.')
 
 
+def check_chr_inversion_control(core):
+    with tempfile.TemporaryDirectory(prefix='rcr-chr-inversion-negative-') as temporary:
+        out = Path(temporary)
+        for name in ('video_test.asm', 'native_prepare.asm', 'native_video.asm'):
+            (out/name).write_text((ROOT/'snes'/name).read_text())
+        source = out/'native_prepare.asm'
+        original = source.read_text()
+        pattern = '    eor #4\n    bra @mapped_slot'
+        if original.count(pattern) != 1:
+            raise RuntimeError('Cannot identify CHR inversion correction')
+        source.write_text(original.replace(pattern, '    eor #0\n    bra @mapped_slot'))
+        check(core, out, out/'video_test.asm', negative=True, expected_case=9)
+    print('CHR inversion maps both bank groups and live toggles; ignored inversion fails case 9.')
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--core", type=Path, required=True)
@@ -185,3 +200,4 @@ if __name__ == "__main__":
     check_cache_controls(core)
     check_last_chr_control(core)
     check_left_controls(core)
+    check_chr_inversion_control(core)

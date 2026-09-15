@@ -87,6 +87,7 @@ reset:
     .a16
     lda #$1E00
     tcd
+    jsr check_chr_inversion
     jsr native_prepare
     sep #$20
     .a8
@@ -333,6 +334,82 @@ nmi:
     rti
 interrupt:
     rti
+check_chr_inversion:
+    sep #$20
+    .a8
+    lda #9
+    sta $1C61
+    ldx #0
+@registers:
+    lda chr_test_registers,x
+    sta $1C10,x
+    inx
+    cpx #6
+    bne @registers
+    lda #$80
+    sta $1C19
+    jsr prepare_chr
+    ldx #0
+@inverted:
+    lda $1DA0,x          ; BG physical slots 0..3 use R2..R5
+    cmp chr_test_single,x
+    jne failed
+    rep #$20
+    .a16
+    txa
+    asl
+    tay
+    sep #$20
+    .a8
+    lda $1DB0,y          ; OBJ physical slots 4..7 use R0/R1 pairs
+    cmp chr_test_pairs,x
+    jne failed
+    inx
+    cpx #4
+    bne @inverted
+    stz $1C19            ; same registers, live inversion change only
+    jsr prepare_chr
+    ldx #0
+@normal:
+    lda $1DA0,x
+    cmp chr_test_pairs,x
+    jne failed
+    rep #$20
+    .a16
+    txa
+    asl
+    tay
+    sep #$20
+    .a8
+    lda $1DB0,y
+    cmp chr_test_single,x
+    jne failed
+    inx
+    cpx #4
+    bne @normal
+    ldx #0
+@restore_registers:
+    stz $1C10,x
+    inx
+    cpx #6
+    bne @restore_registers
+    ldx #0
+@restore_jobs:
+    lda #$FF
+    sta $1DA0,x
+    stz $1D80,x
+    inx
+    cpx #24
+    bne @restore_jobs
+    rep #$20
+    .a16
+    rts
+chr_test_registers:
+    .byte 3,7,11,13,17,19
+chr_test_pairs:
+    .byte 2,3,6,7
+chr_test_single:
+    .byte 11,13,17,19
 .include "native_video.asm"
 .include "native_prepare.asm"
 .segment "HEADER"

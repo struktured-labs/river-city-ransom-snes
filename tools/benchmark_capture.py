@@ -122,7 +122,7 @@ def audio_stats(raw):
             "peak": int(np.max(np.abs(pcm)))}
 
 
-def capture(core_path, rom_path, system, references, out, scenario_name='baseline'):
+def capture(core_path, rom_path, system, references, out, scenario_name='baseline', frame_images=False):
     scenario = scenario_for(scenario_name)
     out.mkdir(parents=True, exist_ok=False)
     # Bind classifiers to previously authenticated original-ROM captures.
@@ -287,6 +287,7 @@ def capture(core_path, rom_path, system, references, out, scenario_name='baselin
                     rows[-1]['native'] = {'pc':getter(0), 'p':getter(5), 'db':getter(6),
                         'task':ram[0x100], 'guard':ram[0x107], 'nmi_depth':ram[0x1C0A],
                         'ppu_ctrl':ram[0x1C20], 'ppu_mask':ram[0x1C21],
+                        'mapper_select':ram[0x1C19], 'chr_registers':list(ram[0x1C10:0x1C16]),
                         'gameplay_sound_services':ram[0x1C84],
                         'row_states': [ram[0x1D00:0x1D80].count(state) for state in range(4)],
                         'row_flags_hex': ram[0x1D00:0x1D80].hex(),
@@ -297,6 +298,13 @@ def capture(core_path, rom_path, system, references, out, scenario_name='baselin
                         'game_nmi_ticks_010b': ram[0x10B],
                         'scroll_x':ram[0x1C28], 'scroll_y':ram[0x1C29],
                         'publish_count':ram[0x1C7A], 'apu_packet':ram[0xA00:0xA17].hex()}
+                if frame_images:
+                    directory = out/'frames'
+                    directory.mkdir(exist_ok=True)
+                    filename = f'frame-{len(rows):05d}.png'
+                    Image.fromarray(latest).save(directory/filename)
+                    rows[-1]['frame_image'] = 'frames/'+filename
+                    rows[-1]['frame_image_sha256'] = sha(directory/filename)
                 pcm.extend(frame_audio)
                 if "until" in phase:
                     hit = matches(latest, templates[phase["until"]], RECTS[phase["until"]])
@@ -334,6 +342,7 @@ def capture(core_path, rom_path, system, references, out, scenario_name='baselin
                   "palette_sha256": palette_hash,
                   "capture_tool_sha256": sha(Path(__file__)), "templates": template_hashes,
                   "scenario_name":scenario_name,
+                  "frame_images": frame_images,
                   "scenario": scenario, "scenario_sha256": hashlib.sha256(json.dumps(scenario, sort_keys=True).encode()).hexdigest(),
                   "input_mapping": MAPPING[system], "core_options": {k.decode(): v.decode() for k,v in options.items()},
                   "fps": av.timing.fps, "sample_rate": av.timing.sample_rate,
@@ -354,8 +363,9 @@ if __name__ == "__main__":
     for name in ("core", "rom", "title", "walk", "out"):
         parser.add_argument("--"+name, type=Path, required=True)
     parser.add_argument("--system", choices=("nes", "snes"), required=True)
+    parser.add_argument('--frame-images', action='store_true', help='Retain every rendered frame with PNG and raw-pixel hashes')
     parser.add_argument('--scenario',choices=('baseline','menu-audio','start','select','start-select','start-confirm','traversal','traversal-recovery'),default='baseline')
     args = parser.parse_args()
     refs = {"menu": (args.title, 600), "settings": (args.walk, 600),
             "story": (args.walk, 900), "street": (args.walk, 1800)}
-    capture(args.core, args.rom, args.system, refs, args.out, args.scenario)
+    capture(args.core, args.rom, args.system, refs, args.out, args.scenario, args.frame_images)
