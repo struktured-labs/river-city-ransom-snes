@@ -1,0 +1,169 @@
+diff --git a/snes/native_runtime.asm b/snes/native_runtime.asm
+index b8feb07..38452e0 100644
+--- a/snes/native_runtime.asm
++++ b/snes/native_runtime.asm
+@@ -776,6 +776,22 @@ bulk_ring_bytes:
+     ldy #0
+     rts
+ 
++; Original C3B9 performs five signed right shifts of $26/$27. CMP supplies
++; the sign carry for ROR without rebuilding the high byte using AND/ORA.
++map_shift_loop:
++    jsr map_shift_five
++    jmp $C3CA
++map_shift_five:
++    .repeat 5
++        lda $27
++        cmp #$80
++        ror $27
++        ror $26
++    .endrepeat
++    lda $27
++    ldx #0               ; original final DEX sets Z and clears N
++    rts
++
+ bank_switch_enter:
+     ; Direct translation of FED1's paired-bank operation. The original routine
+     ; uses four generic mapper writes, but their effect is fully determined by
+diff --git a/snes/runtime_test.asm b/snes/runtime_test.asm
+index d893ea2..8394084 100644
+--- a/snes/runtime_test.asm
++++ b/snes/runtime_test.asm
+@@ -506,6 +506,7 @@ bulk_writer_tests_done:
+     jsr page_fill_tests
+     jsr ring_loop_tests
+     jsr pulse_reload_tests
++    jsr map_shift_tests
+     lda #1
+     sta $1C60
+     stz $2121
+@@ -573,6 +574,54 @@ guarded_io_test:
+     lda $1C8D
+     jne failed
+     rts
++map_shift_tests:
++    lda #19
++    sta $1C61
++    stz $1C8F
++    ldy #0
++@vector:
++    lda $B000,y
++    sta $26
++    iny
++    lda $B000,y
++    sta $27
++    iny
++    sty $1C8A
++    bit $1C8F            ; test V clear and set: original loop preserves it
++    ldx #$34
++    jsr map_shift_five
++    php
++    cmp $B001,y          ; original A is the final high byte
++    jne failed
++    pla
++    and #$C3
++    eor $1C8F
++    eor #$40             ; normalize saved V to the table's set-V oracle
++    cmp $B002,y
++    jne failed
++    cpx #0
++    jne failed
++    cpy $1C8A
++    jne failed
++    lda $26
++    cmp $B000,y
++    jne failed
++    lda $27
++    cmp $B001,y
++    jne failed
++    iny
++    iny
++    iny
++    cpy #125
++    bne @vector
++    lda $1C8F
++    bne @done
++    lda #$40
++    sta $1C8F
++    ldy #0
++    bra @vector
++@done:
++    rts
+ pulse_reload_tests:
+     lda #18
+     sta $1C61
+diff --git a/tools/build_native.py b/tools/build_native.py
+index a26a28c..d485594 100644
+--- a/tools/build_native.py
++++ b/tools/build_native.py
+@@ -171,6 +171,10 @@ def build(rom_path, traces, out, experimental_fastrom=False):
+     if rom.prg[0x1C575:0x1C575 + len(ring_preimage)] != ring_preimage:
+         raise ValueError('Graphics ring loop preimage mismatch')
+     prg[0x1C575:0x1C578] = b'\x4c' + word(symbols['bulk_ring_loop'])
++    shift_preimage = bytes.fromhex('a205a98025274627052785276626cad0f1')
++    if rom.prg[0x1C3B9:0x1C3B9 + len(shift_preimage)] != shift_preimage:
++        raise ValueError('Map signed-shift loop preimage mismatch')
++    prg[0x1C3B9:0x1C3BC] = b'\x4c' + word(symbols['map_shift_loop'])
+     for pc, expected, name in ((0xFF61, b"\xa5\xf8\x29", "nmi_task_return"),
+                                (0xF1D3, b"\x68\xa8\x68", "nmi_rti_return"),
+                                (0xFED1, b"\x48\x8a\x48", "bank_switch_enter"),
+@@ -220,7 +224,11 @@ def build(rom_path, traces, out, experimental_fastrom=False):
+                                      {"pc": 0xC575, "offset": 0x1C575,
+                                       "entry": symbols['bulk_ring_loop'],
+                                       "preimage_sha256": hashlib.sha256(ring_preimage).hexdigest(),
+-                                      "kind": "graphics command ring byte loop"}],
++                                      "kind": "graphics command ring byte loop"},
++                                     {"pc": 0xC3B9, "offset": 0x1C3B9,
++                                      "entry": symbols['map_shift_loop'],
++                                      "preimage_sha256": hashlib.sha256(shift_preimage).hexdigest(),
++                                      "kind": "map signed right shift by five"}],
+               "graphics_pipeline": "prepared dirty rows, whole CHR banks and bounded per-NMI DMA",
+               "limits": {"vram_bytes_per_nmi": 2048, "chr_jobs_per_nmi": 1, "row_scan_per_nmi": 32,
+                          "oam_bytes_per_nmi": 544, "cgram_bytes_per_nmi": 64,
+diff --git a/tools/build_runtime_test.py b/tools/build_runtime_test.py
+index 0e44db5..beea871 100644
+--- a/tools/build_runtime_test.py
++++ b/tools/build_runtime_test.py
+@@ -29,6 +29,7 @@ def build(out, controllers=False, jump=False):
+                     '-D', f'bulk_source_byte={symbols["bulk_source_byte"]}',
+                     '-D', f'bulk_fill_pages={symbols["bulk_fill_pages"]}',
+                     '-D', f'bulk_ring_bytes={symbols["bulk_ring_bytes"]}',
++                    '-D', f'map_shift_five={symbols["map_shift_five"]}',
+                     "-D", 'io_write_stub=24576', '-D', f'io_read_stub={read_address}', "-o", str(out / "test.o"),
+                     str(ROOT / "snes/runtime_test.asm")], check=True)
+     subprocess.run([ld65, "-C", str(ROOT / "snes/native_boot.cfg"), "-o", str(out / "test.bin"),
+@@ -43,6 +44,14 @@ def build(out, controllers=False, jump=False):
+         image[bank * 0x10000 + 0x2000:bank * 0x10000 + 0x6000] = (out / "runtime.bin").read_bytes()
+         image[bank * 0x10000 + 0xBFFF] = bank - 1
+         image[bank * 0x10000 + 0x6000:bank * 0x10000 + 0x6000 + len(io_stub)] = io_stub
++        vectors = bytearray()
++        for high in (0, 1, 0x7F, 0x80, 0xFF):
++            for low in (0, 0x10, 0x1F, 0x20, 0xFF):
++                value = high * 256 + low
++                signed = value - 65536 if value & 32768 else value
++                shifted = (signed >> 5) & 65535
++                vectors += bytes((low, high, shifted & 255, shifted >> 8, 0x42 | ((low >> 4) & 1)))
++        image[bank * 0x10000 + 0xB000:bank * 0x10000 + 0xB000 + len(vectors)] = vectors
+     for bank in range(128):
+         image[0xF0000 + bank * 1024 + 0x15] = bank ^ 0x91
+     image[0xFFDC:0xFFE0] = b"\xff\xff\0\0"
+diff --git a/tools/check_adapter.py b/tools/check_adapter.py
+index cb4cc7e..fec54fb 100644
+--- a/tools/check_adapter.py
++++ b/tools/check_adapter.py
+@@ -60,6 +60,15 @@ def check(core):
+     banked = b'\x4c' + symbols['done_banked'].to_bytes(2, 'little')
+     plain = b'\x4c' + symbols['done'].to_bytes(2, 'little')
+     original = (out/'adapter-test.sfc').read_bytes()
++    signed_shift = bytes.fromhex('a527c98066276626')
++    if original.count(signed_shift) != 40:
++        raise RuntimeError('Expected five signed shifts in each runtime bank')
++    bad_shift = out/'wrong-map-shift-sign.sfc'
++    bad_shift.write_bytes(original.replace(signed_shift, bytes.fromhex('a527c90066276626')))
++    result = subprocess.run(command + ['--rom', str(bad_shift)], capture_output=True, text=True, timeout=30)
++    if not result.returncode or 'WRAM status=ee, adapter case=19' not in result.stderr:
++        raise RuntimeError('Wrong map shift sign did not fail assertion 19')
++    print('Map signed-shift result/register/flag oracle passes; wrong sign fails case 19.')
+     reload_flag = bytes.fromhex('a9400d160a8d160a')
+     if original.count(reload_flag) != 8:
+         raise RuntimeError('Expected one pulse-0 period reload flag per runtime bank')
