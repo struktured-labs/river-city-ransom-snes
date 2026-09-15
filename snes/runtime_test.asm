@@ -1,5 +1,5 @@
 ; Asset-free tests of the ACTUAL bank-replicated native adapter.
-; This program is copied into C0 and C1; the helper is the production runtime.
+; Program copies in C0/C1/C2 exercise real cross-bank returns.
 .setcpu "65816"
 .macpack longbranch
 .a8
@@ -222,6 +222,55 @@ tests:
     jne failed
     inx
     bne @dma_check
+    ; A completed R6/R7 pair must retarget both program and data banks.
+    lda #8
+    sta $1C61
+    lda #$80
+    sta $1B21
+    lda #1
+    sta $1B20
+    lda #6
+    sta $1C19
+    lda #2
+    sta $1B22
+    jsl $C10000+dispatch_write
+    lda #7
+    sta $1C19
+    lda #3
+    sta $1B22
+    lda #$78
+    ldx #$34
+    ldy #$56
+    jsl $C10000+dispatch_write
+    cmp #$78
+    jne failed
+    cpx #$34
+    jne failed
+    cpy #$56
+    jne failed
+    phk
+    pla
+    cmp #$C2
+    jne failed
+    phb
+    pla
+    cmp #$82
+    jne failed
+    ; An ordinary call into the C1 helper must return to its C2 caller,
+    ; preserving DB and registers without a return-bank rewrite.
+    lda #$20
+    ldx #6
+    jsr ppu_write_test
+    cmp #$20
+    jne failed
+    phk
+    pla
+    cmp #$C2
+    jne failed
+    phb
+    pla
+    cmp #$82
+    jne failed
     lda #1
     sta $1C60
     stz $2121

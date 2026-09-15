@@ -71,7 +71,7 @@ mapper_write:
     adc #$C1
     sta a:$1C03
     sta a:$1C02
-    jmp done
+    jmp done_banked
 @chr:
     inc a:$1C08
     jmp done
@@ -481,6 +481,15 @@ ppu_increment:
 :
     rts
 done:
+    ; Ordinary PPU/APU/controller accesses do not change the program bank.
+    ; Their original JSL return bank and DB are already correct.
+    pld
+    ply
+    plx
+    pla
+    plp
+    rtl
+done_banked:
     pld
     ply
     plx

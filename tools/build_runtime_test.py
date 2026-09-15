@@ -22,8 +22,9 @@ def build(out, controllers=False, jump=False):
     image = bytearray(b"\xff" * 2097152)
     program = (out / "test.bin").read_bytes()
     image[0x8000:0x10000] = program
-    image[0x18000:0x20000] = program
-    image[0x12000:0x16000] = (out / "runtime.bin").read_bytes()
+    for bank in (1, 2):
+        image[bank * 0x10000 + 0x8000:(bank + 1) * 0x10000] = program
+        image[bank * 0x10000 + 0x2000:bank * 0x10000 + 0x6000] = (out / "runtime.bin").read_bytes()
     image[0xF0000 + 0x42 * 1024 + 0x15] = 0xD3
     image[0xFFDC:0xFFE0] = b"\xff\xff\0\0"
     checksum = sum(image) & 65535

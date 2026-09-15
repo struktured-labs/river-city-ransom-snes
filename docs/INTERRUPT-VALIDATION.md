@@ -158,3 +158,32 @@ while OAM is unchanged, checking staging contents before restoring the final
 pixel oracle. Mutants that ignore either change must fail executed assertion
 7. Normal, scrolling, late-entry, lost-row, disabled-HDMA, and cache-invalidation
 checks pass; 46 unit tests pass. No Rivalmage deployment was performed.
+
+### Ordinary adapter return overhead
+
+`build/lean-return-01/native-cpu.sfc`, SHA
+`8e58e706bab2cd0d29cdc264df83d711e862e78cf1fbaa918c845b00cf93e01a`,
+splits the ordinary adapter return from the bank-changing return. Previously
+every PPU/APU/controller access rewrote its JSL return bank and DB. Only the
+R7 pair-completion path changes the active PRG bank; ordinary calls now restore
+the existing saved registers and RTL to the bank already on the stack. The
+atomic bank-switch guard and bank-changing stack rewrite are unchanged.
+
+The same 12,000-frame workload measures 56.98 NMIs/second and 22.93 sampled
+game-counter changes/second, versus 55.16 and 15.93 before this change. Picture
+changes measure 18.80/second. No adapter/SPC fault or publisher overrun was
+detected. The camera/HDMA scroll samples span 0–511; that is not a verified
+scene-exit or right-edge traversal test. Workload phase differences still
+prevent interpreting these counters as a matched original-speed verdict.
+
+`build/lean-return-quality-01/site/index.html` has verified bundle integrity.
+Settings pixels and basic audio-activity gates pass; all four transition timing
+gates still fail. SNES capture takes 2588 frames versus the NES reference's
+1936. No claim of full sound fidelity, original speed, or hardware readiness.
+
+The asset-free adapter fixture now replicates its code/runtime in C1 and C2,
+executes an actual R6/R7 pair change, and checks PB=C2, DB=82 and preserved
+A/X/Y. An ordinary PPU call from C2 into the C1 helper must return to C2 with
+DB unchanged. A mutant that bypasses the bank retarget fails assertion 8.
+The existing truncated-OAM mutant now changes both runtime copies. Adapter
+positive/negative controls and all 46 unit tests pass. Rivalmage is unchanged.
