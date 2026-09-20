@@ -66,8 +66,8 @@
   },
   {
     "key": "medium_difficulty",
-    "title": "QoL: medium difficulty between Novice and Advanced",
-    "body": "User request after hardware 4108: add a difficulty between original Novice and Advanced. Keep original Novice and Advanced behavior. New option must be selectable from the original skill-level UI (or an obvious SNES extension of it), apply to enemy toughness/aggression in a documented way, and not silently change economy, shops, or player starting stats.\n\nAcceptance: labeled third setting; NES-comparable Novice/Advanced still match original; medium is measurably between them on enemy stamina/damage/aggression; P1/P2, passwords/saves, and in-game Level menu covered. Related original-bug investigation for Simon on Advanced. Parent #1."
+    "title": "QoL: Intermediate difficulty between Novice and Advanced",
+    "body": "User request after hardware 4108: add Intermediate between original Novice and Advanced (not named Medium). Keep original Novice and Advanced behavior. New option must be selectable from the original skill-level UI (or an obvious SNES extension of it). If the NES-style menu cannot fit INTERMEDIATE, use INTERMED. Apply to enemy toughness/aggression in a documented way; do not silently change economy, shops, or player starting stats.\n\nAcceptance: labeled Intermediate; NES-comparable Novice/Advanced still match original; Intermediate is measurably between them on enemy stamina/damage/aggression; P1/P2, passwords/saves, and in-game Level menu covered. Related original-bug investigation for Simon on Advanced. Parent #1."
   },
   {
     "key": "gamer_mode",

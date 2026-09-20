@@ -20,7 +20,7 @@ two-purchase; DMA envelopes. Notes:
 [issues](https://github.com/struktured-labs/river-city-ransom-snes/issues).
 
 Next requested work: 2P AI (#2), splash sound (#13), controller presets (#12),
-a medium difficulty between Novice and Advanced, ultra-hard Gamer Mode, and
+Intermediate difficulty between Novice and Advanced, ultra-hard Gamer Mode, and
 an original-game check of whether Simon is easier on Advanced than intended.
 
 ROMs, extracted assets and generated cartridges stay local. Start with
