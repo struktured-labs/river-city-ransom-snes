@@ -10,7 +10,7 @@ a pushed build or new hardware verification.
 | Issue | Scope |
 | --- | --- |
 | [#1](https://github.com/struktured-labs/river-city-ransom-snes/issues/1) | Original native-port objective |
-| [#2](https://github.com/struktured-labs/river-city-ransom-snes/issues/2) | AI-assisted P2 companion |
+| [#2](https://github.com/struktured-labs/river-city-ransom-snes/issues/2) | AI-assisted P2 companion (emulator audit on 4146 parent; not on EverDrive) |
 | [#3](https://github.com/struktured-labs/river-city-ransom-snes/issues/3) | SNES/Struktured Labs branding and attribution |
 | [#4](https://github.com/struktured-labs/river-city-ransom-snes/issues/4) | Blank Present Status statistics |
 | [#5](https://github.com/struktured-labs/river-city-ransom-snes/issues/5) | Original-speed gameplay, rare slowdown, sprite latency |
@@ -21,7 +21,7 @@ a pushed build or new hardware verification.
 | [#10](https://github.com/struktured-labs/river-city-ransom-snes/issues/10) | Lingering cursors and their regression coverage |
 | [#11](https://github.com/struktured-labs/river-city-ransom-snes/issues/11) | SNAC/Select/Start-Select coverage |
 | [#12](https://github.com/struktured-labs/river-city-ransom-snes/issues/12) | Selectable controller modes/dedicated jump |
-| [#13](https://github.com/struktured-labs/river-city-ransom-snes/issues/13) | Logo duration and descending slow-WUB splash sound |
+| [#13](https://github.com/struktured-labs/river-city-ransom-snes/issues/13) | Logo duration and descending slow-WUB splash sound (4146 on EverDrive for listen) |
 | [#14](https://github.com/struktured-labs/river-city-ransom-snes/issues/14) | Hardened focused test cycle and reusable skill |
 | [#15](https://github.com/struktured-labs/river-city-ransom-snes/issues/15) | Controller-one management of P2 equipment |
 | [#16](https://github.com/struktured-labs/river-city-ransom-snes/issues/16) | Immediate shop stat-gain display |

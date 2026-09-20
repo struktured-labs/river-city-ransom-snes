@@ -5,10 +5,11 @@ and not deployed to any MiSTer. The companion runs on the SNES CPU, not in an
 emulator input bot. Original graphics, combat, money, shops, item bonuses and
 equipment routines remain unchanged. There is no new XP or leveling system.
 
-Candidate: `build/ai-p2-prototype-05/native-cpu.sfc`, SHA-256
-`549a0ee2be4f2406dcb297e9e3c27935f01d674d35b2bb834a8539b021745409`.
-Parent: `build/sprite-copy-game-3252`, unchanged outside verified controller
-hooks, unused ROM helper slots and the cartridge checksum.
+Current candidate: `build/ai-p2-4146/native-cpu.sfc`, SHA-256
+`2dbca7a3212e14f956404eb4b8dbf6687bdd0d317dcdedd70cb48cd2fe8b2fb7`.
+Parent: splash trial **4146** (4108 gameplay + chromatic WUB). Not on EverDrive
+yet. Earlier isolated cart `build/ai-p2-prototype-05` (parent 3252, SHA
+`549a0ee2be4f2406dcb297e9e3c27935f01d674d35b2bb834a8539b021745409`) is retained.
 
 Review: <http://127.0.0.1:8766/ai-p2-review-02/>.
 
