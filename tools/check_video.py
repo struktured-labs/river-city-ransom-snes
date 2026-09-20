@@ -10,13 +10,13 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def check(core, out=None, source=None, negative=False, scrolling=False, late=False, expected_case=None, last_chr=False, left_mask=None):
+def check(core, out=None, source=None, negative=False, scrolling=False, late=False, expected_case=None, last_chr=False, left_mask=None, blank_load=False, oam_compare_unroll=False, oam_compare_test=False, sprite_unroll=False, dirty_final_dma=False, sprite_delta=False):
     out = out or ROOT / "build/video-test"
     source = source or ROOT / "snes/video_test.asm"
     out.mkdir(parents=True, exist_ok=True)
     palette = [0, 0x001F, 0x7C00] + [0] * 61
     (out / "native_palette.inc").write_text(".word " + ",".join(map(str, palette)) + "\n")
-    subprocess.run([str(ROOT / ".deps/cc65/bin/ca65"), *(['-D', f'LEFT_MASK={left_mask}'] if left_mask is not None else []), *(['-D','SCROLL_TEST=1'] if scrolling else []), *(['-D', 'LATE_TEST=1'] if late else []), *(['-D', 'LAST_CHR_TEST=1'] if last_chr else []), "-I", str(out), "-o", str(out / "test.o"),
+    subprocess.run([str(ROOT / ".deps/cc65/bin/ca65"), *(['-D', 'EXPERIMENTAL_SPRITE_DELTA=1'] if sprite_delta else []), *(['-D','BLANK_LOAD_TEST=1'] if blank_load else []), *(['-D', f'LEFT_MASK={left_mask}'] if left_mask is not None else []), *(['-D','SCROLL_TEST=1'] if scrolling else []), *(['-D', 'LATE_TEST=1'] if late else []), *(['-D', 'LAST_CHR_TEST=1'] if last_chr else []), *(['-D', 'EXPERIMENTAL_OAM_COMPARE_UNROLL=1'] if oam_compare_unroll else []), *(['-D', 'OAM_COMPARE_TEST=1'] if oam_compare_test else []), *(['-D', 'EXPERIMENTAL_SPRITE_UNROLL=1'] if sprite_unroll else []), *(['-D', 'EXPERIMENTAL_DIRTY_FINAL_DMA=1'] if dirty_final_dma else []), "-I", str(out), "-o", str(out / "test.o"),
                     str(source)], check=True)
     subprocess.run([str(ROOT / ".deps/cc65/bin/ld65"), "-C", str(ROOT / "snes/native_boot.cfg"),
                     "-o", str(out / "test.bin"), str(out / "test.o")], check=True)
@@ -109,7 +109,7 @@ def check_late_control(core):
         final_guard = '    jsr final_room\n    bcs :+\n    rts\n:\n'
         if original.count(final_guard) != 1:
             raise RuntimeError('Late-entry negative control cannot identify final guard')
-        source.write_text(original.replace(guard, '').replace(final_guard, ''))
+        source.write_text(original.replace(guard, '@on_time:').replace(final_guard, ''))
         check(core, out, out/'video_test.asm', late=True, negative=True)
     print('Late VBlank preserves queued graphics; removed-budget-guards control fails.')
 
@@ -132,7 +132,21 @@ def check_cache_controls(core):
                 raise RuntimeError('Cache negative control cannot identify invalidation')
             source.write_text(original.replace(good, bad))
             check(core, out, out/'video_test.asm', negative=True, expected_case=7)
-    print('Missing palette and sprite-pattern invalidation each fail cache assertion 7.')
+        source.write_text(original)
+        video = out/'native_video.asm'
+        original_video = video.read_text()
+        good = '    lda #$22\n    sta $4301\n    ldx #$5400'
+        if original_video.count(good) != 1:
+            raise RuntimeError('Cannot identify palette DMA destination')
+        video.write_text(original_video.replace(good, '    lda #$21\n    sta $4301\n    ldx #$5400'))
+        try:
+            check(core, out, out/'video_test.asm')
+        except RuntimeError as error:
+            if 'differs from synthetic pixel oracle' not in str(error):
+                raise
+        else:
+            raise RuntimeError('Wrong palette DMA destination passed the actual pixel oracle')
+    print('Missing palette/sprite invalidation fails case 7; wrong palette DMA destination fails actual pixels.')
 
 
 def check_last_chr_control(core):
@@ -189,6 +203,101 @@ def check_chr_inversion_control(core):
     print('CHR inversion maps both bank groups and live toggles; ignored inversion fails case 9.')
 
 
+def check_alias_snapshot_controls(core):
+    with tempfile.TemporaryDirectory(prefix='rcr-alias-snapshot-negative-') as temporary:
+        out = Path(temporary)
+        for name in ('video_test.asm', 'native_prepare.asm', 'native_video.asm'):
+            (out/name).write_text((ROOT/'snes'/name).read_text())
+        source = out/'native_prepare.asm'
+        original = source.read_text()
+        mutations = (
+            ('    cmp #1\n    bne @done\n    rep #$20',
+             '    cmp #1\n    nop\n    nop\n    rep #$20'),
+            ('    lda #63\n    mvn $7E0000,$7E0000',
+             '    lda #61\n    mvn $7E0000,$7E0000'),
+        )
+        for good, bad in mutations:
+            if original.count(good) != 1:
+                raise RuntimeError('Cannot identify alias snapshot mutation')
+            source.write_text(original.replace(good, bad))
+            check(core, out, out/'video_test.asm', negative=True, expected_case=11)
+    print('Overwriting queued aliases and truncating the shared row each fail case 11.')
+
+
+def check_blank_load_control(core):
+    check(core, ROOT/'build/blank-load-test', late=True, blank_load=True)
+    with tempfile.TemporaryDirectory(prefix='rcr-blank-load-negative-') as temporary:
+        out=Path(temporary)
+        for name in ('video_test.asm','native_prepare.asm','native_video.asm'):
+            (out/name).write_text((ROOT/'snes'/name).read_text())
+        source=out/'native_video.asm'
+        original=source.read_text()
+        good='    lda #$80\n    sta $2100\n    jmp @on_time'
+        if original.count(good)!=1:
+            raise RuntimeError('Cannot identify forced-blank load entry')
+        source.write_text(original.replace(good,'    lda #$0F\n    sta $2100\n    jmp @on_time'))
+        check(core,out,out/'video_test.asm',negative=True,expected_case=13,late=True,blank_load=True)
+    print('Late loading DMA reaches VRAM; disabling force blank fails executed case 13.')
+
+
+def check_row_pair_controls(core):
+    with tempfile.TemporaryDirectory(prefix='rcr-row-pair-negative-') as temporary:
+        out = Path(temporary)
+        for name in ('video_test.asm', 'native_prepare.asm', 'native_video.asm'):
+            (out/name).write_text((ROOT/'snes'/name).read_text())
+        source = out/'native_video.asm'
+        original = source.read_text()
+        for good, bad in (
+            ('    cpx #127\n    beq @done', '    cpx #128\n    beq @done'),
+            ('    cmp #128\n    sep #$20\n    .a8\n    bcc @done',
+             '    cmp #64\n    sep #$20\n    .a8\n    bcc @done'),
+            ('    lda $1D01,x\n    and #1', '    lda $1D01,x\n    and #0'),
+        ):
+            if original.count(good) != 1:
+                raise RuntimeError('Cannot identify paired-row guard')
+            source.write_text(original.replace(good, bad))
+            check(core, out, out/'video_test.asm', negative=True, expected_case=12)
+    print('Paired-row wrap, insufficient-budget and lost-newer-write mutations fail case 12.')
+
+
+def check_transition_controls(core):
+    # Both terminal bitmap words must participate: otherwise a nearly-finished
+    # transition can expose missing rows or stale CHR for an entire frame.
+    with tempfile.TemporaryDirectory(prefix='rcr-transition-negative-') as temporary:
+        out = Path(temporary)
+        for name in ('video_test.asm', 'native_prepare.asm', 'native_video.asm'):
+            (out/name).write_text((ROOT/'snes'/name).read_text())
+        source = out/'native_video.asm'
+        original = source.read_text()
+        mutations = (
+            ('    .repeat 63, pair\n        ora $1E82+pair*2',
+             '    .repeat 62, pair\n        ora $1E82+pair*2'),
+            ('    .repeat 12, pair\n        ora $1D80+pair*2',
+             '    .repeat 11, pair\n        ora $1D80+pair*2'),
+        )
+        for good, bad in mutations:
+            if original.count(good) != 1:
+                raise RuntimeError('Cannot identify transition readiness reduction')
+            source.write_text(original.replace(good, bad))
+            check(core, out, out/'video_test.asm', negative=True, expected_case=10)
+    print('Omitting either final transition bitmap word fails executed case 10.')
+
+
+def check_grouped_scan_control(core):
+    with tempfile.TemporaryDirectory(prefix='rcr-publisher-scan-') as temporary:
+        out = Path(temporary)
+        for name in ('video_test.asm', 'native_video.asm', 'native_prepare.asm'):
+            (out/name).write_text((ROOT/'snes'/name).read_text())
+        source = out/'native_video.asm'
+        original = source.read_text()
+        good = '    and #$0202'
+        if original.count(good) != 1:
+            raise RuntimeError('Cannot identify grouped ready-row mask')
+        source.write_text(original.replace(good, '    and #$0000'))
+        check(core, out, out/'video_test.asm', negative=True, expected_case=5)
+    print('Skipping staged-ready rows fails executed case 5.')
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--core", type=Path, required=True)
@@ -201,3 +310,8 @@ if __name__ == "__main__":
     check_last_chr_control(core)
     check_left_controls(core)
     check_chr_inversion_control(core)
+    check_transition_controls(core)
+    check_alias_snapshot_controls(core)
+    check_row_pair_controls(core)
+    check_blank_load_control(core)
+    check_grouped_scan_control(core)

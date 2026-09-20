@@ -114,6 +114,11 @@ class NativeControls(unittest.TestCase):
         read = stub(0xAD, 0x2007, 0x2100, fast_ppudata=True)
         self.assertIn(bytes.fromhex('ad241b'), read)
         self.assertNotIn(bytes.fromhex('8d201b'), read)
+        for opcode, transfer in ((0x8E, '8a'), (0x8C, '98')):
+            register_store = stub(opcode, 0x2007, 0x2100, fast_ppudata=True)
+            self.assertIn(bytes.fromhex(transfer + '8d221b'), register_store)
+            self.assertNotIn(bytes.fromhex('8d201b'), register_store)
+            self.assertNotIn(bytes.fromhex('8d211b'), register_store)
         for opcode, address in ((0xAE, 0x2007), (0x9D, 0x2007), (0x8D, 0x2006)):
             with self.assertRaises(ValueError):
                 stub(opcode, address, 0x2100, fast_ppudata=True)

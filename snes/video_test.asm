@@ -88,12 +88,37 @@ reset:
     lda #$1E00
     tcd
     jsr check_chr_inversion
+    jsr check_transition_guard
+    jsr check_alias_snapshot
+    jsr check_row_pair
     jsr native_prepare
+.ifdef OAM_COMPARE_TEST
+    ; Keep the OBJ pattern half stable so this second preparation can notice
+    ; the moved sprite only through the production OAM equality scan.
+    sep #$20
+    .a8
+    lda #7
+    sta $1C61
+    lda #40
+    sta $1003
+    rep #$20
+    .a16
+    jsr native_prepare
+    sep #$20
+    .a8
+    lda f:$7E5000
+    cmp #40
+    jne failed
+    rep #$20
+    .a16
+.endif
     sep #$20
     .a8
     ; A newer shadow write must not revoke an already prepared row's DMA.
     lda #3
     sta $1D00
+    lda #2
+    sta $1E80
     lda #5
     sta $1C61
     lda #$80
@@ -107,9 +132,48 @@ reset:
     lda $1D00
     cmp #1
     jne failed
+    lda $1E80
+    cmp #1
+    jne failed
     lda $1C85
     cmp #1
     jne failed
+.ifdef EXPERIMENTAL_DIRTY_FINAL_DMA
+    ; Exercise a palette-only generation. Poison the DMA channel so this can
+    ; pass only if the palette branch initializes mode and source bank itself,
+    ; rather than inheriting them from the skipped OAM branch.
+    stz $4200
+    lda #2
+    sta f:$7F3F01
+    rep #$20
+    .a16
+    jsr native_prepare
+    sep #$20
+    .a8
+    lda $1CED
+    cmp #1
+    jne failed
+    lda $1CEE
+    jne failed
+    lda #1
+    sta $4300
+    stz $4304
+    lda #1
+    sta $1CA0
+@palette_only_vblank:
+    lda $4212
+    bpl @palette_only_vblank
+    jsr native_video
+    stz $1CA0
+    lda $1CED
+    ora $1CEE
+    jne failed
+    lda $4300
+    jne failed
+    lda $4304
+    cmp #$7E
+    jne failed
+.endif
     ; Second generation: nonadjacent dirty rows and moved OAM must drain too.
     stz $4200
     ; Cache invalidation must depend on palette bytes and the sprite pattern
@@ -309,10 +373,38 @@ nmi:
     lda $1C7C
     cmp #4
     bcc @late_wait
+.ifdef BLANK_LOAD_TEST
+    lda #13
+    sta $1C61
+    lda #1
+    sta $1CA0
+.endif
     jsr native_video
     lda $1D00
+.ifdef BLANK_LOAD_TEST
+    cmp #1
+.else
     cmp #3
+.endif
     jne failed
+.ifdef BLANK_LOAD_TEST
+    ; Read under forced blank even if the publisher mutant omitted it.
+    ; The actual write happened after the delayed entry, not during this read.
+    lda #$80
+    sta $2100
+    sta $2115
+    ldx #$2000
+    stx $2116
+    rep #$20
+    .a16
+    lda $2139
+    lda $2139
+    cmp #1
+    jne failed
+    sep #$20
+    .a8
+    stz $1CA0
+.endif
     lda $1C7B
     jne failed
     bra @consumed
@@ -334,6 +426,110 @@ nmi:
     rti
 interrupt:
     rti
+check_alias_snapshot:
+    .a16
+    stz $14
+    lda #$1234
+    sta f:$7E3000
+    lda #$5678
+    sta f:$7E303E
+    lda #$BEEF
+    sta f:$7E4000
+    sep #$20
+    .a8
+    stz $1C18
+    lda #11
+    sta $1C61
+    lda #2
+    sta $1D40
+    jsr prepare_row_alias
+    rep #$20
+    .a16
+    lda f:$7E4000
+    cmp #$BEEF
+    jne failed
+    sep #$20
+    .a8
+    lda #3
+    sta $1D40
+    jsr prepare_row_alias
+    rep #$20
+    .a16
+    lda f:$7E4000
+    cmp #$BEEF
+    jne failed
+    sep #$20
+    .a8
+    lda #1
+    sta $1D40
+    jsr prepare_row_alias
+    lda $1D40
+    cmp #2
+    jne failed
+    rep #$20
+    .a16
+    lda f:$7E4000
+    cmp #$1234
+    jne failed
+    lda f:$7E403E
+    cmp #$5678
+    jne failed
+    ; Restore fixture staging and flags before normal production conversion.
+    lda #0
+    sta f:$7E4000
+    sta f:$7E403E
+    sep #$20
+    .a8
+    stz $1D40
+    rep #$20
+    .a16
+    rts
+
+check_transition_guard:
+    sep #$20
+    .a8
+    lda $1C21
+    pha
+    lda #10
+    sta $1C61
+    lda #1
+    sta $1CA0
+    stz $1C21
+    jsr transition_ready
+    lda $1CA0
+    cmp #1
+    jne failed
+    lda #$18
+    sta $1C21
+    lda #2
+    sta $1CA0
+    ; Initial fixture row zero is dirty; test the last row independently.
+    stz $1D00
+    lda #1
+    sta $1EFF
+    jsr transition_ready
+    lda $1CA0
+    cmp #2
+    jne failed
+    stz $1EFF
+    lda #1
+    sta $1D97
+    jsr transition_ready
+    lda $1CA0
+    cmp #2
+    jne failed
+    stz $1D97
+    jsr transition_ready
+    lda $1CA0
+    jne failed
+    lda #1
+    sta $1D00
+    pla
+    sta $1C21
+    rep #$20
+    .a16
+    rts
+
 check_chr_inversion:
     sep #$20
     .a8
@@ -411,6 +607,88 @@ chr_test_pairs:
 chr_test_single:
     .byte 11,13,17,19
 .include "native_video.asm"
+check_row_pair:
+    sep #$20
+    .a8
+    lda #12
+    sta $1C61
+    ldx #8
+    ldy #0
+@state:
+    tya
+    sta $1D09
+    lda #1
+    sta $1E89
+    stz $1C85
+    rep #$20
+    .a16
+    lda #128
+    sta $1A
+    sep #$20
+    .a8
+    jsr pair_ready_row
+    tya
+    and #2
+    beq @unready
+    lda $1E
+    cmp #128
+    jne failed
+    lda $1E89
+    jne failed
+    tya
+    and #1
+    cmp $1D09
+    jne failed
+    cmp $1C85
+    jne failed
+    bra @next
+@unready:
+    lda $1E
+    cmp #64
+    jne failed
+    tya
+    cmp $1D09
+    jne failed
+    lda $1E89
+    cmp #1
+    jne failed
+@next:
+    iny
+    cpy #4
+    bne @state
+    ; Only 64 bytes left: leave the second prepared row untouched.
+    lda #2
+    sta $1D09
+    lda #64
+    sta $1A
+    jsr pair_ready_row
+    lda $1E
+    cmp #64
+    jne failed
+    lda $1D09
+    cmp #2
+    jne failed
+    ; Last row must not treat the following CHR bitmap as another row.
+    ldx #127
+    lda #128
+    sta $1A
+    lda #2
+    sta $1D80
+    jsr pair_ready_row
+    lda $1E
+    cmp #64
+    jne failed
+    lda $1D80
+    cmp #2
+    jne failed
+    stz $1D80
+    stz $1D09
+    stz $1E89
+    stz $1C85
+    rep #$20
+    .a16
+    rts
+
 .include "native_prepare.asm"
 .segment "HEADER"
     .byte "RCR NMI VIDEO TEST  "

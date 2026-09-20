@@ -1,0 +1,82 @@
+[
+  {
+    "key": "speed",
+    "title": "Regression: original-speed gameplay, rare park combat slowdown, and stale sprite updates",
+    "body": "User reports slow/choppy gameplay and rare music/graphics slowdown while running from enemies near the park entrance. Original NES speed is the acceptance benchmark before another hardware presentation.\n\nAcceptance: reproduce ordinary-input traversal and combat; measure original game-loop cadence separately from display refresh; follow produced sprite updates through preparation, actual DMA and rendering; retain busy/outlier intervals. Compare to NES and include inspectable video/audio evidence.\n\nLocal progress: experimental3252 displays all20 known sprite generations next frame in the fixed window (3219 had four three-frame delays and five unrendered generations), with unchanged prefix game-counter/camera/input trajectories. Full route has3,750 two-frame cadence intervals. This is scoped offline evidence, not full-game/hardware closure. See local docs/SPRITE-COPY-PREPARATION.md. Parent #1."
+  },
+  {
+    "key": "audio",
+    "title": "Regression: gameplay audio popping, sputtering, slowdown and intermittent silence",
+    "body": "Consolidated user reports: choppy music/SFX, sputtering even while paused and at player selection, intermittent dead SFX/no sound, and occasional audio slowdown during combat. Audio must be self-tested; user has OBS live/recording/replay evidence.\n\nAcceptance: capture actual native audio, verify source/core/ROM and physical capture routing, test active game/menus/pause/transitions/combat, detect dropouts and discontinuities, compare original NES behavior without hiding differences through retiming or normalization. Do not call silence or command-byte equality a pop-free pass.\n\nLocal3252 passes1,607 measured DSP restart windows with zero wrong-first-pitch/stale nonzero onset;8,802 CPU packet records equal the older3065 comparison. Original-NES waveform fidelity and physical pop-free acceptance remain open. No new hardware deployment claimed. Parent #1."
+  },
+    {
+    "key": "scrolling",
+    "title": "Regression: broken scrolling and player blocked near rightmost quarter of screen",
+    "body": "User reported scrolling broken and inability to move beyond roughly75% of the screen to the right.\n\nAcceptance: traverse complete streets/room boundaries in both directions, including park/mall; compare logical camera to actual scanline rendering, HUD split and visible tiles; no screen-edge movement trap, stale camera frame or torn split. Preserve original gameplay boundaries.\n\nLocal3252: full9,248-frame route completed;7,639 eligible renderer frames have zero missing coverage, splits or stale camera failures. This is an offline route check, not whole-game/physical closure. Parent #1."
+  },
+  {
+    "key": "sprites",
+    "title": "Regression: transient garbage sprites, truncated setup characters and corrupted mall NPCs",
+    "body": "Backfill of distinct sprite reports: characters on message-speed/play-skill setup screen show only heads; scene loads show garbage sprites for1–2seconds before clearing; wandering mall NPC sprites are corrupted. User paused hardware for inspection.\n\nAcceptance: capture setup plus every transition frame, mall NPC animation and sprite/CHR/palette state; compare original NES graphics; no hiding early corrupted frames via delayed capture. Actual OAM and CHR upload timing must be checked independently of game speed. New sprite latency fix3252 is not automatically proof that all these visual failures are fixed. Parent #1."
+  },
+  {
+    "key": "shop_render",
+    "title": "Regression: shop interior missing text, wrong colors and missing YES/NO menu",
+    "body": "User reports shop interiors with missing menu text and incorrect colors on Alex/NPC/background; initial shop YES/NO prompt absent. Later reports confirm restaurant menus look good, so retain as a regression case rather than assume all shops are equivalent.\n\nAcceptance: verify multiple shop/interior types, palette and text against NES, initial entry and repeated purchases, including the YES/NO prompt. Keep original artwork. Current menu oracles cover selected shop flows; broader interior/NPC palette coverage still needs explicit evidence. Parent #1."
+  },
+  {
+    "key": "cursor",
+    "title": "Regression coverage: lingering and duplicate cursors in shop and pause menus",
+    "body": "Historical user reports: after purchasing, > YES NO cursor sticks; selecting NO changes game state but the cursor does not move; BELONGINGS/PASSWORD/LEVEL/STATUS/HELP leave artifacts after highlight/exit/reentry. User subsequently confirmed duplicate cursor fixed.\n\nKeep an automated regression for repeated purchases, YES→NO→YES movement, menu cancel/reopen and each affected pause menu. Check rendered pixels and underlying selection state.\n\nLocal3252 passes repeated-purchase, YES/NO and pause-cursor NES pixel/VRAM/state oracles; known-broken builds still fail. This issue records the resolved report and retained coverage; do not confuse it with blank Present Status values tracked in #4. Parent #1."
+  },
+  {
+    "key": "snac",
+    "title": "Controller regression coverage: SNAC buttons, Select and Start/Select menu behavior",
+    "body": "User initially reported SNES SNAC controller failing while USB worked, then only D-pad/Start worked, later confirmed SNAC controls working. Select remained suspect; Start then Select health/money/status behavior was also reported broken.\n\nAcceptance: record physical and delivered inputs for every SNES button, confirm edge/hold handling, verify SNAC and USB independently, and exercise original Start/Select menu behavior without stealing inputs for QoL chords. Latest machine availability must be respected; this issue does not authorize taking over occupied hardware. Parent #1."
+  },
+  {
+    "key": "presets",
+    "title": "QoL: selectable punch/kick/jump controller presets and dedicated jump button",
+    "body": "User requests a dedicated SNES jump button (A or X) in addition to original Y+B, and3–4 selectable control modes because preferred punch/kick/jump layout varies. Modes must be accessible through an obvious menu, not merely hidden configuration.\n\nAcceptance: preserve original combo jump; offer clearly labeled presets with correct punch/kick/jump mapping and an in-game selection affordance; test both players/SNAC/USB and Start/Select; retain preference according to documented save/password policy. Inspect existing implementation before adding another mapping layer. AI P2 manual equipment mode must not corrupt P1 preferences. Parent #1."
+  },
+  {
+    "key": "splash_sound",
+    "title": "Branding QoL: longer Struktured Labs hold and descending bass drop with slow WUB tail",
+    "body": "User feedback on branding splash: logo too quick; bass effect absent or played on the following original-maker logo; later sound too flat. Desired effect is a smooth descending chromatic pitch slide, muddy bass with slight reverb, ending on a sustained low note pulsing slowly WUB WUB WUB before stopping. Preserve original-maker branding separately.\n\nAcceptance: logo visible long enough to read, sound aligned to Struktured Labs splash, captured native PCM with measurable pitch descent/slow pulse tail plus user listening approval; clean transition to original intro/game sound. No graphics redesign outside approved branding. Related #3."
+  },
+  {
+    "key": "test_loop",
+    "title": "Testing: harden fast symptom-driven ROM iteration and auditable audio/video evidence",
+    "body": "User requests first-class automated tests, web collages like Penta Dragon DX, real audio self-testing, and shorter fix/test cycles; specifically requested hardening this workflow as a skill.\n\nImplemented locally: romhack-test-loop skill, focused prefix runner with validated baseline reuse, same-core observer controls, real broken-build rejection, exact source/counter/camera/input guards, web collage and timing receipts. Fresh sprite cycle3267 takes15.54seconds; the old build fails the symptom gate.1,313 unit tests passed at the root checkpoint.\n\nAcceptance: use the short failing replay before broad campaigns; retain all exclusions and native PCM; do not substitute proxy timing for displayed output; record stage wall times and evidence bindings; broader qualification only after measured improvement. Skill installed locally, not claimed pushed/published. Parent #1."
+  },
+  {
+    "key": "p2_equipment",
+    "title": "AI P2 QoL: controller one must manage Player 2 equipment and belongings",
+    "body": "Explicit user requirement for #2: P1 must edit P2 setup, specifically equip items normally requiring a second controller.\n\nAcceptance: controller one can intentionally enter P2's original Belongings/equipment flow, equip and unequip P2 items, inspect the correct P2 state, and exit cleanly. Suspend AI while manually managing P2; do not simultaneously move/attack with P1. Restore P1 and AI safely, including releasing the takeover chord inside a menu. Preserve original inventory/stat rules and P1 equipment.\n\nAn isolated in-ROM prototype is under development. Empty-menu access alone is not equip completion; tests must prove actual P2 inventory/worn flags and unchanged P1 state. No hardware integration yet. Parent #2."
+  },
+  {
+    "key": "shop_stat_delta",
+    "title": "Shop QoL: display stat gains immediately when consuming purchases",
+    "body": "User requests modern-Kunio-style explicit stat bonuses when consuming an item inside a shop, rather than requiring leaving the shop and opening status.\n\nPreserve the user's progression requirement: fighting yields currency, not XP; character improvement comes from purchases and equipment. Do not add combat XP or change the economy/equipment rules.\n\nVerified correction to the initial first-use-only assumption: ordinary-input original-NES and SNES3252 replays consumed Waffles twice; Agility and Strength each went 15 to 16 to 17. Both games already show their gains inside the shop. Stamina/willpower, Max Power and permanent combat-stat changes must be represented separately. This is a tested item/flow, not universal shop coverage.\n\nAcceptance: accurate named actual per-stat deltas for the consuming player, repeat gains up to original caps, zero/capped results, P1/P2 ownership, consumption versus takeout, repeated purchases and YES/NO/cancel. Minimal original-style text; no unrelated art redesign. Existing dialogue is authoritative until a tested enhancement replaces it. See docs/SHOP-QOL-MECHANICS.md; no new ROM UI installed yet. Related #17; parent #1."
+  },
+  {
+    "key": "shop_consumed_marker",
+    "title": "Shop QoL: per-player item history or benefit markers (preserve repeat stat gains)",
+    "body": "CLOSED at user request after hardware 4108. Food combat-stat bonuses stack on every purchase, unlike River City Girls; do not colorize items as if a one-time bonus is spent. Original in-shop 1 UP dialogue remains the result display. Related #16; parent #1."
+  },
+  {
+    "key": "medium_difficulty",
+    "title": "QoL: medium difficulty between Novice and Advanced",
+    "body": "User request after hardware 4108: add a difficulty between original Novice and Advanced. Keep original Novice and Advanced behavior. New option must be selectable from the original skill-level UI (or an obvious SNES extension of it), apply to enemy toughness/aggression in a documented way, and not silently change economy, shops, or player starting stats.\n\nAcceptance: labeled third setting; NES-comparable Novice/Advanced still match original; medium is measurably between them on enemy stamina/damage/aggression; P1/P2, passwords/saves, and in-game Level menu covered. Related original-bug investigation for Simon on Advanced. Parent #1."
+  },
+  {
+    "key": "gamer_mode",
+    "title": "QoL: ultra-hard Gamer Mode difficulty",
+    "body": "User request after hardware 4108: an ultra-hard \"Gamer Mode\" above Advanced. Harder enemies than Advanced without breaking original Novice/Advanced. Must not rely on 8-bit overflow (see Simon-on-Advanced investigation). Selectable from the skill-level UI.\n\nAcceptance: labeled Gamer Mode; Advanced remains the original hard setting; Gamer Mode is strictly tougher on documented enemy stats/AI; no accidental weaker bosses; passwords/saves/Level menu; tests vs Novice/Advanced/medium. Parent #1."
+  },
+  {
+    "key": "simon_advanced",
+    "title": "Investigation: Simon easier on Advanced than intended (original NES)",
+    "body": "User asked separately whether Simon is actually easier on Advanced than he should be. This is an original-game question, not a SNES-port regression, until NES and 4108 are measured.\n\nCommunity/speedrun reports: Advanced doubles enemy stamina/speed/strength; Simon's Novice stamina is about 118, and 118×2 = 236, which can wrap or get masked toward 108 if stored in a 7-bit/127 field — easier than Novice. TASVideos notes that on Novice only Simon has WP>54, while Advanced gives other gangs WP>31. Speedrunners joke that Advanced Simon has almost no stamina.\n\nAcceptance: dump Simon stamina/will/punch on NES Novice vs Advanced at roof spawn (no RAM pokes of the fight itself); compare 4108; if Advanced HP < Novice HP, document the original overflow and decide whether Gamer Mode / optional Advanced correction is in scope. Do not \"fix\" original Advanced until the dump exists. Parent #1."
+  }
+]

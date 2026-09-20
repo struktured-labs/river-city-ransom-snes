@@ -43,7 +43,12 @@ spc_upload:
     bcs @return
     ldy #0
 @send:
+.ifdef EXPERIMENTAL_SWEEP_EVENTS
+    tyx
+    lda f:audio_engine,x      ; expanded engine resides in its own HiROM bank
+.else
     lda audio_engine,y
+.endif
     sta $2141
     tya
     sta $2140
@@ -66,33 +71,37 @@ spc_upload:
 
 ; Memblers/upernes legacy protocol. The newer Rumbleminze engine uses a
 ; DIFFERENT acknowledgement protocol; do not swap binaries without adapting it.
-spc_frame:
-    lda #$7D
-    jsr wait_port0
-    bcs @return
-    lda #$D7
-    sta $2140
-    jsr wait_port0
-    bcs @return
-    ldy #0
-    sty $2140                 ; APU ports 0,1=0 (X/Y are 16-bit)
-@byte:
-    lda APU_PACKET,y
-    sta $2141
-    tya
-    jsr wait_port0
-    bcs @return
-    iny
-    cpy #$17
-    beq @done
-    tya
-    sta $2140
-    bra @byte
-@done:
-    clc
-@return:
-    rts
+.include "native_spc_frame.inc"
+.ifdef EXPERIMENTAL_SWEEP_EVENTS
+audio_engine = $D20000
+audio_engine_end = audio_engine + SWEEP_DRIVER_BYTES
+.else
 audio_engine:
     .incbin "Memblers_2a03.bin"
 audio_engine_end:
+.endif
+.ifdef EXPERIMENTAL_SWEEP_EVENTS
+    .assert audio_engine_end-audio_engine = SWEEP_DRIVER_BYTES, error, "Wrong live sweep driver SPC engine size"
+.elseif .defined(EXPERIMENTAL_TRIANGLE_RELEASE)
+    .assert audio_engine_end-audio_engine = $2C7F, error, "Wrong in-place triangle attack/release SPC engine size"
+.elseif .defined(AUDIO_TRIPLE)
+.ifdef AUDIO_FAST_RESET
+    .assert audio_engine_end-audio_engine = $2C7F, error, "Wrong triple fast-reset SPC engine size"
+.else
+    .assert audio_engine_end-audio_engine = $2C1F, error, "Wrong triple-port SPC engine size"
+.endif
+.elseif .defined(AUDIO_PAIR)
+.ifdef AUDIO_FAST_RESET
+    .assert audio_engine_end-audio_engine = $2C7F, error, "Wrong fast-reset SPC engine size"
+.elseif .defined(AUDIO_DEFERRED_RESET)
+    .assert audio_engine_end-audio_engine = $2C38, error, "Wrong deferred-reset SPC engine size"
+.else
+.ifdef AUDIO_REUSE
+    .assert audio_engine_end-audio_engine = $2C37, error, "Wrong packet-reuse SPC engine size"
+.else
+    .assert audio_engine_end-audio_engine = $2C1F, error, "Wrong paired SPC engine size"
+.endif
+.endif
+.else
     .assert audio_engine_end-audio_engine = $2C00, error, "Wrong SPC engine size"
+.endif

@@ -1,0 +1,48 @@
+// Fixed-size reads preserve complete packets during HDMI reacquisition.
+// At most8192 frames per callback; each read is <=8192 bytes.
+config = { max_strlen = 8192; }
+BEGIN { printf("B,%llu\n",nsecs); }
+uprobe:/usr/local/lib/obs-plugins/decklink.so:_ZN22DeckLinkDeviceInstance17HandleAudioPacketEP25IDeckLinkAudioInputPacketm
+/pid == $1/ { @deck[tid]=1; }
+uretprobe:/usr/local/lib/obs-plugins/decklink.so:_ZN22DeckLinkDeviceInstance17HandleAudioPacketEP25IDeckLinkAudioInputPacketm
+/pid == $1/ { delete(@deck[tid]); }
+uprobe:/usr/local/lib/libobs.so.30:obs_source_output_audio
+/pid == $1 && @deck[tid]/
+{
+    $frames=*(uint32 *)(arg1+64); $speakers=*(uint32 *)(arg1+68);
+    $format=*(uint32 *)(arg1+72); $rate=*(uint32 *)(arg1+76);
+    @source[arg0]=1; @seq[arg0]++;
+    if ($frames>0 && $frames<=8192 && $speakers==2 && $rate==48000 && ($format==2 || $format==3)) {
+        $width=(uint32)($format==2 ? 4 : 8);
+        printf("I,%llu,%llu,%llu,%u,%llu,%u\n",nsecs,arg0,@seq[arg0],$frames,*(uint64 *)(arg1+80),$format);
+        $offset=(uint32)0;
+        unroll(8) {
+            if ($offset<$frames) {
+                $count=(uint32)($frames-$offset>1024 ? 1024 : $frames-$offset);
+                printf("D,I,%llu,%llu,%u,%u,%rh\n",arg0,@seq[arg0],$offset,$count,
+                       buf(uptr(*(uint64 *)arg1+$offset*$width),$count*$width));
+            }
+            $offset=(uint32)($offset+1024);
+        }
+    } else { printf("X,%llu,%u,%u,%u,%u\n",nsecs,$frames,$speakers,$format,$rate); }
+}
+uprobe:/usr/local/lib/libobs.so.30:on_audio_playback
+/pid == $1 && @source[arg1]/
+{
+    $frames=*(uint32 *)(arg2+64);
+    if ($frames>0 && $frames<=8192) {
+        printf("M,%llu,%llu,%llu,%u,%llu\n",nsecs,arg1,@seq[arg1],$frames,*(uint64 *)(arg2+72));
+        $offset=(uint32)0;
+        unroll(8) {
+            if ($offset<$frames) {
+                $count=(uint32)($frames-$offset>1024 ? 1024 : $frames-$offset);
+                printf("D,M,%llu,%llu,%u,%u,%rh,%rh\n",arg1,@seq[arg1],$offset,$count,
+                       buf(uptr(*(uint64 *)arg2+$offset*4),$count*4),
+                       buf(uptr(*(uint64 *)(arg2+8)+$offset*4),$count*4));
+            }
+            $offset=(uint32)($offset+1024);
+        }
+    } else { printf("X,%llu,%u\n",nsecs,$frames); }
+}
+interval:s:1 { @elapsed++; if (@elapsed >= (int64)$2) { exit(); } }
+END { printf("Z,%llu\n",nsecs); clear(@deck); clear(@seq); clear(@source); clear(@elapsed); }

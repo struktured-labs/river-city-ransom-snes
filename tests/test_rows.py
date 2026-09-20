@@ -4,6 +4,15 @@ from tools.check_rows import expected_rows
 
 
 class RowOracleTests(unittest.TestCase):
+    def test_two_physical_tables_map_both_modes(self):
+        shadow = bytearray(4096)
+        for table in range(4):
+            shadow[table*1024:table*1024+960] = bytes([table+1])*960
+        for mirror, expected in ((0, [1, 2, 1, 2]), (1, [1, 1, 2, 2])):
+            rows = expected_rows(shadow, 0, mirror)
+            self.assertEqual([struct.unpack_from('<H', rows, table*2048)[0]
+                              for table in range(4)], expected)
+
     def test_four_quadrants_and_pattern_half(self):
         shadow = bytearray(4096)
         shadow[:960] = bytes([5])*960

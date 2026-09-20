@@ -1,0 +1,47 @@
+diff --git a/src/ppu.c b/src/ppu.c
+--- a/src/ppu.c
++++ b/src/ppu.c
+@@ -61,6 +61,8 @@
+ static void RefreshSprites(void);
+ static void CopySprites(uint8_t *target);
+ 
++#include "../../../tools/fceumm_background.inc"
++
+ static void Fixit1(void);
+ static uint32_t ppulut1[256];
+ static uint32_t ppulut2[256];
+@@ -729,6 +731,7 @@
+ 		HDNes_RecordLine(scanline, target, rendis);
+ #endif
+ 
++	rcr_observe_background(scanline, target, PPU[1], rendis);
+ 	if (SpriteON)
+ 		CopySprites(target);
+ 
+diff --git a/src/drivers/libretro/libretro.c b/src/drivers/libretro/libretro.c
+--- a/src/drivers/libretro/libretro.c
++++ b/src/drivers/libretro/libretro.c
+@@ -3360,3 +3360,23 @@
+ unsigned rcr_trace_frame = 0;
++extern uint8_t rcr_background_indices[240 * 256];
++extern uint8_t rcr_background_valid[240];
++extern int rcr_background_enabled;
++RETRO_API void retro_rcr_background_reset(void) {
++   rcr_background_enabled = 1;
++   memset(rcr_background_valid, 0, 240);
++   memset(rcr_background_indices, 0, 240 * 256);
++}
++RETRO_API const void *retro_rcr_background_valid(void) { return rcr_background_valid; }
++RETRO_API unsigned retro_rcr_background_format(void) { return active_pixformat; }
++RETRO_API const void *retro_rcr_background_pixels(void) {
++   static uint32_t pixels[240 * 256];
++   unsigned i;
++   for (i = 0; i < 240 * 256; ++i) {
++      uint32_t color = rcr_background_valid[i / 256] ? retro_palette[(rcr_background_indices[i] & 0x3f) | 0x80] : 0;
++      if (active_pixformat == RETRO_PIXEL_FORMAT_XRGB8888) pixels[i] = color;
++      else ((uint16_t *)pixels)[i] = color;
++   }
++   return pixels;
++}
+ void retro_run(void)
+ {

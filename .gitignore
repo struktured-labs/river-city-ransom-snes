@@ -4,6 +4,8 @@
 build/
 .deps/
 roms/
+tmp/
+setenv.sh
 __pycache__/
 *.pyc
 *.nes
@@ -15,3 +17,4 @@ __pycache__/
 *.wav
 *.sav
 
+setenv.sh

@@ -22,6 +22,8 @@ def camera_key(ram):
 
 def require_same_camera(reference, candidate):
     a, b = camera_key(reference), camera_key(candidate)
+    if reference[0x42] != candidate[0x42]:
+        raise ValueError('Original room identifiers differ')
     if a != b:
         raise ValueError(f'Camera position mismatch: {a} versus {b}')
     return a
@@ -31,10 +33,12 @@ def build(reference, candidate, pairs, out):
     evidence = [verify_capture(p) for p in (reference, candidate)]
     for system, (receipt, rows) in zip(('nes', 'snes'), evidence):
         if (receipt['system'] != system or not receipt['capture_complete']
-                or receipt['scenario_name'] != 'traversal-recovery'
+                or not receipt['scenario_name'].startswith('traversal')
                 or any(r['fault'] for r in rows)
                 or any(r['input_requested'] != r['input_delivered'] for r in rows)):
-            raise ValueError('Need complete fault-free traversal-recovery captures')
+            raise ValueError('Need complete fault-free traversal captures')
+    if evidence[0][0]['scenario_name'] != evidence[1][0]['scenario_name']:
+        raise ValueError('Traversal input scenarios differ')
     if evidence[0][0]['rom_sha256'] != evidence[0][0]['templates']['menu']['source_rom']:
         raise ValueError('Wrong original reference ROM')
     if not pairs:
@@ -53,7 +57,7 @@ def build(reference, candidate, pairs, out):
             if raw[:2048].hex() != last['game_ram_hex']:
                 raise ValueError('Checkpoint RAM differs from verified frame evidence')
             ram.append(raw)
-        selected.append((names, require_same_camera(*ram)))
+        selected.append((names, require_same_camera(*ram), ram[0][0x42]))
     out.mkdir(parents=True, exist_ok=False)
     report = dict(schema='rcr-camera-checkpoint-audit-v1', release_ready=False,
                   scope='Explicit equal-camera samples, not equal game time or independently verified room identity; actors are not masked',
@@ -64,12 +68,12 @@ def build(reference, candidate, pairs, out):
             '<h1>Camera-matched diagnostic checkpoints</h1>',
             '<p>Not a release or full scrolling verdict. Checkpoints are explicit, not image-search matches. ',
             'Equal camera registers do not prove equal rooms. Actors entering the fixed strip remain differences.</p>']
-    for index, (names, key) in enumerate(selected):
+    for index, (names, key, room) in enumerate(selected):
         _, heat = compare(reference/f'{names[0]}.png', candidate/f'{names[1]}.png')
         strip = heat.crop(tuple(report['region']))
         mismatches = int(np.any(np.asarray(strip) != 0, axis=2).sum())
         report['pairs'].append(dict(reference=names[0], candidate=names[1],
-                                    camera_x=key[0], scroll_x=key[1], pixels_compared=20480,
+                                    camera_x=key[0], scroll_x=key[1], room_id=room, pixels_compared=20480,
                                     mismatch_pixels=mismatches))
         html.append(f'<h2>{names[0]} / {names[1]}: camera {key[0]}, scroll {key[1]}</h2>'
                     f'<p>{mismatches} differing pixels in fixed strip.</p><section>')
@@ -79,6 +83,7 @@ def build(reference, candidate, pairs, out):
             html.append(f'<div><h3>{system}</h3><img src="{filename}" alt="{system} checkpoint"></div>')
         strip.save(out/f'{index}-difference.png')
         html.append(f'<div><h3>Strip differences</h3><img src="{index}-difference.png" alt="Unmasked pixel differences"></div></section>')
+    report['exact_match'] = all(p['mismatch_pixels'] == 0 for p in report['pairs'])
     (out/'index.html').write_text('\n'.join(html))
     (out/'report.json').write_text(json.dumps(report, indent=2)+'\n')
     (out/'bundle.json').write_text(json.dumps({'files': {p.name: sha(p) for p in sorted(out.iterdir())}}, indent=2)+'\n')
@@ -90,5 +95,8 @@ if __name__ == '__main__':
     for arg in ('reference', 'candidate', 'out'):
         parser.add_argument('--'+arg, type=Path, required=True)
     parser.add_argument('--pair', action='append', required=True)
+    parser.add_argument('--require-match', action='store_true', help='Fail after preserving the audit if any requested strip differs')
     args = parser.parse_args()
-    print(json.dumps(build(args.reference, args.candidate, args.pair, args.out), indent=2))
+    report = build(args.reference, args.candidate, args.pair, args.out)
+    print(json.dumps(report, indent=2))
+    raise SystemExit(1 if args.require_match and not report['exact_match'] else 0)

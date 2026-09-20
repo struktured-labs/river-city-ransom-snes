@@ -1,0 +1,48 @@
+// Exact hash-bound libobs x86-64 offsets; metadata only, no PCM.
+BEGIN { printf("B,%llu\n", nsecs); }
+uprobe:/usr/local/lib/obs-plugins/decklink.so:_ZN22DeckLinkDeviceInstance17HandleAudioPacketEP25IDeckLinkAudioInputPacketm
+/pid == $1/ { @deck[tid] = 1; }
+uretprobe:/usr/local/lib/obs-plugins/decklink.so:_ZN22DeckLinkDeviceInstance17HandleAudioPacketEP25IDeckLinkAudioInputPacketm
+/pid == $1/ { delete(@deck[tid]); }
+uprobe:/usr/local/lib/libobs.so.30:obs_source_output_audio
+/pid == $1 && @deck[tid]/
+{
+    @source[arg0] = 1;
+    printf("I,%llu,%d,%llu,%u,%llu\n", nsecs, tid, arg0,
+           *(uint32 *)(arg1+64), *(uint64 *)(arg1+80));
+}
+// Producer: immediately after audio_buf_mutex lock, before timestamp placement.
+uprobe:/usr/local/lib/libobs.so.30:obs_source_output_audio+0x479
+/pid == $1 && @source[reg("bx")]/
+{
+    $s=reg("bx");
+    printf("P,%llu,%d,%llu,%llu,%llu,%u\n",nsecs,tid,$s,
+           *(uint64 *)($s+0x378),*(uint64 *)($s+0x368),
+           *(uint32 *)(reg("sp")+0xc0));
+}
+// Producer completed both channels, immediately before mutex unlock.
+uprobe:/usr/local/lib/libobs.so.30:obs_source_output_audio+0x725
+/pid == $1 && @source[reg("bx")]/
+{
+    $s=reg("bx");
+    printf("p,%llu,%d,%llu,%llu,%llu\n",nsecs,tid,$s,
+           *(uint64 *)($s+0x378),*(uint64 *)($s+0x368));
+}
+// Ordinary mixer discard: under the same buffer mutex, before any branch.
+uprobe:/usr/local/lib/libobs.so.30:audio_callback+0xa32
+/pid == $1 && @source[reg("bx")]/
+{
+    $s=reg("bx");
+    printf("D,%llu,%d,%llu,%llu,%llu,%llu,%llu\n",nsecs,tid,$s,
+           *(uint64 *)($s+0x378),*(uint64 *)($s+0x368),
+           *(uint64 *)(reg("sp")+0x50),*(uint64 *)(reg("sp")+0x58));
+}
+uprobe:/usr/local/lib/libobs.so.30:audio_callback+0xa0b
+/pid == $1 && @source[reg("bx")]/
+{
+    $s=reg("bx");
+    printf("d,%llu,%d,%llu,%llu,%llu\n",nsecs,tid,$s,
+           *(uint64 *)($s+0x378),*(uint64 *)($s+0x368));
+}
+interval:s:1 { @elapsed++; if (@elapsed >= (int64)$2) { exit(); } }
+END { printf("Z,%llu\n",nsecs); clear(@deck); clear(@source); clear(@elapsed); }

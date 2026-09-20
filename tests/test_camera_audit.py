@@ -9,7 +9,7 @@ class CameraAuditTests(unittest.TestCase):
         reference[0xF6] = 255
         reference[0x3D] = 1
         self.assertEqual(require_same_camera(reference, reference), (511, 511))
-        for address in (0xDC, 0xDD, 0xF6, 0x3D):
+        for address in (0x42, 0xDC, 0xDD, 0xF6, 0x3D):
             altered = reference.copy()
             altered[address] ^= 1
             with self.assertRaises(ValueError):

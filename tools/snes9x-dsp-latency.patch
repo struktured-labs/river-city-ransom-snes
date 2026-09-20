@@ -1,0 +1,83 @@
+diff --git a/apu/apu.cpp b/apu/apu.cpp
+--- a/apu/apu.cpp
++++ b/apu/apu.cpp
+@@ -84,6 +84,7 @@
+         return false;
+     }
+ 
+     spc::resampler.read((short *)out, sample_count);
++    SNES::rcr_dsp_latency_callback(sample_count / 2);
+ 
+     if (Settings.MSU1)
+diff --git a/apu/bapu/dsp/SPC_DSP.h b/apu/bapu/dsp/SPC_DSP.h
+--- a/apu/bapu/dsp/SPC_DSP.h
++++ b/apu/bapu/dsp/SPC_DSP.h
+@@ -8,6 +8,12 @@
+ 
+ extern "C" { typedef void (*dsp_copy_func_t)( unsigned char** io, void* state, size_t ); }
+ 
++void rcr_dsp_latency_context(unsigned long long, unsigned long long);
++void rcr_dsp_latency_mark(char, unsigned long long, unsigned long long, int);
++void rcr_dsp_latency_write(int, int, int);
++void rcr_dsp_latency_sample(int, int);
++void rcr_dsp_latency_callback(unsigned);
++
+ class SPC_DSP {
+ public:
+ 	typedef BOOST::uint8_t uint8_t;
+@@ -268,6 +274,7 @@
+ inline void SPC_DSP::write( int addr, int data )
+ {
+ 	assert( (unsigned) addr < register_count );
++	rcr_dsp_latency_write(addr, data, m.phase);
+ 
+ 	m.regs [addr] = (uint8_t) data;
+ 	m.external_regs [addr] = (uint8_t) data;
+diff --git a/apu/bapu/dsp/SPC_DSP.cpp b/apu/bapu/dsp/SPC_DSP.cpp
+--- a/apu/bapu/dsp/SPC_DSP.cpp
++++ b/apu/bapu/dsp/SPC_DSP.cpp
+@@ -21,6 +21,8 @@
+ 
+ #include "blargg_source.h"
+ 
++#include "../../../../../tools/snes9x_dsp_latency.inc"
++
+ #ifdef BLARGG_ENABLE_OPTIMIZER
+ 	#include BLARGG_ENABLE_OPTIMIZER
+ #endif
+@@ -1073,6 +1075,7 @@
+ 	}
+ 
+ 	// Output sample to DAC
++	rcr_dsp_latency_sample(l, r);
+ 	#ifdef SPC_DSP_OUT_HOOK
+ 		SPC_DSP_OUT_HOOK( l, r );
+ 	#else
+diff --git a/apu/bapu/smp/core.cpp b/apu/bapu/smp/core.cpp
+--- a/apu/bapu/smp/core.cpp
++++ b/apu/bapu/smp/core.cpp
+@@ -47,6 +47,7 @@
+       apuram[regs.pc-2] == 0xd4 &&
+       (apuram[regs.pc-1] == 0x40 || apuram[regs.pc-1] == 0x41)) {
+     ++rcr_packet;
++    rcr_dsp_latency_mark('P', rcr_packet, rcr_spc_ticks, dsp.clock);
+     if (rcr_keyon) fprintf(rcr_keyon, "P,%llu,%u,%04x\n", rcr_packet, data, regs.pc);
+     if (rcr_game_keyon) fprintf(rcr_game_keyon, "P,%llu,%u,%u,%u,%u,%04x\n",
+       rcr_packet, data, apuram[0x55], apuram[0x40], apuram[0x44], regs.pc);
+@@ -56,6 +57,8 @@
+     fprintf(rcr_synth, "R,%llu,%llu,%04x\n", rcr_packet, rcr_spc_ticks, regs.pc);
+     fflush(rcr_synth);
+   }
++  if (addr == 0xf4 && data == 0x7d)
++    rcr_dsp_latency_mark('R', rcr_packet, rcr_spc_ticks, dsp.clock);
+   if ((rcr_keyon || rcr_game_keyon) && addr == 0xf3 && status.dsp_addr == 0x4c) {
+     if (rcr_keyon) fprintf(rcr_keyon, "K,%llu,%u,%04x\n", rcr_packet, data, regs.pc);
+     if (rcr_game_keyon) fprintf(rcr_game_keyon, "K,%llu,%u,%04x\n", rcr_packet, data, regs.pc);
+@@ -64,6 +67,7 @@
+     if (rcr_game_keyon) fflush(rcr_game_keyon);
+   }
+   #include "../../../../../tools/snes9x_spc_receive.inc"
++  if (addr == 0xf3) rcr_dsp_latency_context(rcr_packet, rcr_spc_ticks + 1);
+   tick();
+   if((addr & 0xfff0) == 0x00f0) mmio_write(addr, data);
+   apuram[addr] = data;  //all writes go to RAM, even MMIO writes

@@ -36,6 +36,26 @@ and outside-region changes have negative unit controls. HTML includes paired
 screenshots and playable audio. This is scoped menu evidence, not a full
 gameplay or speed certification.
 
+## Separate splash direction (2026-09-15)
+
+The user supplied a screenshot of direct guidance from Infidelity, describing
+his own splash implementation: an 8bpp BG1 image revealed left-to-right using
+window masking. Initialize `$2126` and `$2127` to zero, advance `$2127` by four
+per frame, and stop at `$FC`. His accompanying setup uses zero BG1 scroll
+(`$210D`/`$210E`), `$2123 = $03`, and `$212C` through `$212F = $01`.
+
+This is a contextual implementation reference, not a complete standalone PPU
+initialization recipe. The optional splash must establish its own display
+mode, tiles, map, palette, and window configuration and restore the game's
+display state on handoff. Automated coverage should check the reveal pixels,
+frame progression, and the unchanged game presentation and audio afterward.
+Use a separate boot splash so the original mode-selection instruction can
+remain intact. This was the initial September 15 research direction; the
+owner subsequently supplied artwork and the actual
+[audited, hardware-tested boot splash](BRANDING-SPLASH.md) keeps the original
+mode-selection instruction. The footer text substitution above is a distinct
+historical prototype and is not included in the live ROM.
+
 Initial candidate parent SHA-256:
 `af7883ec4103688b637b55e43a07837cbe006adf7ee1f979d1e9381d7809cc95`.
 Branded SHA-256:

@@ -1,0 +1,61 @@
+--- a/apu/bapu/dsp/SPC_DSP.cpp
++++ b/apu/bapu/dsp/SPC_DSP.cpp
+@@ -23,6 +23,7 @@
+ #include "../../../../../tools/snes9x_dsp_latency.inc"
+ #include "../../../../../tools/snes9x_pulse_onset.inc"
+ #include "../../../../../tools/snes9x_pulse_pitch.inc"
++#include "../../../../../tools/snes9x_voice_edge.inc"
+ 
+ #ifdef BLARGG_ENABLE_OPTIMIZER
+ 	#include BLARGG_ENABLE_OPTIMIZER
+@@ -744,11 +745,13 @@
+ 	run_counters();
+ 
+ 	// Noise
++	int const rcr_previous_noise = m.noise;
+ 	if ( !read_counter( REG(flg) & 0x1F ) )
+ 	{
+ 		int feedback = (m.noise << 13) ^ (m.noise << 14);
+ 		m.noise = (feedback & 0x4000) ^ (m.noise >> 1);
+ 	}
++	rcr_edge_noise(rcr_previous_noise, m.noise, REG(flg));
+ }
+ 
+ 
+@@ -787,6 +790,7 @@
+ 
+ inline VOICE_CLOCK( V3c )
+ {
++	int const rcr_previous_delay = v->kon_delay;
+ 	// Pitch modulation using previous voice's output
+ 	if ( m.t_pmon & v->vbit )
+ 		m.t_pitch += ((m.t_output >> 5) * m.t_pitch) >> 10;
+@@ -833,6 +837,10 @@
+ 
+ 		// Apply envelope
+ 		m.t_output = (output * v->env) >> 11 & ~1;
++		rcr_edge_source(v->voice_number, output, v->env, m.t_output, m.noise,
++			m.t_non, m.t_pitch, VREG(v->regs,pitchl) | ((VREG(v->regs,pitchh) & 0x3f) << 8),
++			v->kon_delay, REG(flg), VREG(v->regs,srcn), v->brr_addr, v->interp_pos,
++			VREG(v->regs,adsr0), VREG(v->regs,gain), rcr_previous_delay);
+ 		v->t_envx_out = (uint8_t) (v->env >> 4);
+ 	}
+ 
+@@ -868,6 +876,8 @@
+ 	// Apply left/right volume
+ 	int amp = (m.t_output * (int8_t) VREG(v->regs,voll + ch)) >> 7;
+ 	amp *= ((stereo_switch & (1 << (v->voice_number + ch * voice_count))) ? 1 : 0);
++	rcr_edge_voice(v->voice_number, ch, m.t_output, (int8_t)VREG(v->regs,voll + ch),
++		amp, m.t_main_out[ch], (stereo_switch >> (v->voice_number + ch * voice_count)) & 1);
+ 
+ 	// Add to output total
+ 	m.t_main_out [ch] += amp;
+@@ -1051,6 +1061,8 @@
+ 	int out = (int16_t) ((m.t_main_out [ch] * (int8_t) REG(mvoll + ch * 0x10)) >> 7) +
+ 			(int16_t) ((m.t_echo_in [ch] * (int8_t) REG(evoll + ch * 0x10)) >> 7);
+ 	CLAMP16( out );
++	rcr_edge_mix(ch, m.t_main_out[ch], (int8_t)REG(mvoll + ch * 0x10),
++		m.t_echo_in[ch], (int8_t)REG(evoll + ch * 0x10), out, REG(flg));
+ 	return out;
+ }
+ ECHO_CLOCK( 26 )

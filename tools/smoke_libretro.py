@@ -47,8 +47,15 @@ def check_native(ram, previous=None):
     return counter
 
 
-def run(core_path, rom_path, frames, wav_path=None, kind="audio", screenshot=None, ram_path=None, profile="title"):
+def run(core_path, rom_path, frames, wav_path=None, kind="audio", screenshot=None, ram_path=None, profile="title", background_path=None):
     core = C.CDLL(str(core_path.resolve()))
+    background=None
+    if background_path:
+        try:
+            from .background_observer import Observer
+        except ImportError:
+            from background_observer import Observer
+        background=Observer(core)
     samples = bytearray()
     video_frames = 0
     pixel_format = 0
@@ -141,6 +148,7 @@ def run(core_path, rom_path, frames, wav_path=None, kind="audio", screenshot=Non
         core.retro_get_system_av_info(C.byref(av))
         frame_counts = []
         for frame in range(frames):
+            if background:background.reset()
             core.retro_run()
             if kind == "native" and (frame + 1) % 300 == 0:
                 ptr = core.retro_get_memory_data(2)
@@ -158,22 +166,41 @@ def run(core_path, rom_path, frames, wav_path=None, kind="audio", screenshot=Non
                 status_address = 0xA22 if kind == "audio" else 0x1C60
                 counter_address = 0xA20 if kind == "audio" else 0x1C62
                 if ram[status_address] != 1:
-                    raise RuntimeError(f"Diagnostic failed: WRAM status={ram[status_address]:02x}, adapter case={ram[0x1C61]}")
+                    if ram_path:
+                        ram_path.write_bytes(ram)
+                    location = ''
+                    if hasattr(core, 'retro_rcr_cpu_register'):
+                        debug_getter = core.retro_rcr_cpu_register
+                        debug_getter.argtypes = [C.c_uint]
+                        debug_getter.restype = C.c_uint
+                        location = (f', pc={debug_getter(0):06x}, p={debug_getter(5):04x}, '
+                                    f'db={debug_getter(6):02x}, d={debug_getter(7):04x}')
+                    raise RuntimeError(f"Diagnostic failed: WRAM status={ram[status_address]:02x}, adapter case={ram[0x1C61]}{location}")
                 frame_counts.append(int.from_bytes(ram[counter_address:counter_address + 2], "little"))
+        if background:
+            try:
+                from .benchmark_capture import decode_frame
+            except ImportError:
+                from benchmark_capture import decode_frame
+            from PIL import Image
+            raw,pitch,fmt,flags=background.read()
+            Image.fromarray(decode_frame(raw,256,240,pitch,fmt)).save(background_path)
+            background_path.with_suffix('.valid').write_bytes(flags)
         # Exclude IPL/startup transients: inspect only the second half of audio.
         values = struct.unpack(f"<{len(samples) // 2}h", samples)
         steady = values[len(values) // 2:]
         peak = max(map(abs, steady), default=0)
         if video_frames < frames // 2 or (kind in ("audio", "adapter") and frame_counts[1] <= frame_counts[0]):
             raise RuntimeError("CPU/video stopped advancing")
-        if kind == "audio" and (peak < 128 or len(set(steady)) < 16):
-            raise RuntimeError("No sustained audio waveform")
         if wav_path:
             with wave.open(str(wav_path), "wb") as output:
                 output.setnchannels(2)
                 output.setsampwidth(2)
                 output.setframerate(round(av.timing.sample_rate))
                 output.writeframes(samples)
+        # Preserve failed-signal PCM too, for auditable negative controls.
+        if kind == "audio" and (peak < 128 or len(set(steady)) < 16):
+            raise RuntimeError("No sustained audio waveform")
         if screenshot:
             if last_image is None:
                 raise RuntimeError("No rendered image captured")
@@ -231,6 +258,7 @@ if __name__ == "__main__":
     parser.add_argument("--kind", choices=("audio", "render", "native", "adapter"), default="audio")
     parser.add_argument("--screenshot", type=Path)
     parser.add_argument("--ram", type=Path)
+    parser.add_argument('--background',type=Path)
     parser.add_argument("--profile", choices=("title", "walk", "select-control", "jump-control", "jump-swapped"), default="title")
     parser.add_argument("--receipt", type=Path)
     args = parser.parse_args()
@@ -238,7 +266,7 @@ if __name__ == "__main__":
         parser.error("Use 120..30000 frames to allow SPC startup and avoid counter wrap")
     if args.kind == "native" and args.frames < 600:
         parser.error("Native checks require at least 600 frames")
-    result = run(args.core, args.rom, args.frames, args.wav, args.kind, args.screenshot, args.ram, args.profile)
+    result = run(args.core, args.rom, args.frames, args.wav, args.kind, args.screenshot, args.ram, args.profile,args.background)
     if args.receipt:
         args.receipt.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result, indent=2))

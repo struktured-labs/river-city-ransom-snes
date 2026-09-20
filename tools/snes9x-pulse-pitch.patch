@@ -1,0 +1,22 @@
+diff --git a/apu/bapu/dsp/SPC_DSP.cpp b/apu/bapu/dsp/SPC_DSP.cpp
+--- a/apu/bapu/dsp/SPC_DSP.cpp
++++ b/apu/bapu/dsp/SPC_DSP.cpp
+@@ -22,6 +22,7 @@
+ 
+ #include "../../../../../tools/snes9x_dsp_latency.inc"
+ #include "../../../../../tools/snes9x_pulse_onset.inc"
++#include "../../../../../tools/snes9x_pulse_pitch.inc"
+ 
+ #ifdef BLARGG_ENABLE_OPTIMIZER
+ 	#include BLARGG_ENABLE_OPTIMIZER
+@@ -907,6 +908,10 @@
+ 		VREG(v->regs,pitchl) | ((VREG(v->regs,pitchh) & 0x3f) << 8),
+ 		VREG(v->regs,srcn), v->brr_addr, v->env, m.t_output,
+ 		VREG(v->regs,voll), VREG(v->regs,volr), m.t_non);
++	rcr_pitch_voice(v->voice_number, v->kon_delay, m.t_pitch,
++		VREG(v->regs,pitchl) | ((VREG(v->regs,pitchh) & 0x3f) << 8),
++		VREG(v->regs,srcn), v->brr_addr, v->env, m.t_output,
++		VREG(v->regs,voll), VREG(v->regs,volr), m.t_non);
+ 	v->interp_pos = (v->interp_pos & 0x3FFF) + m.t_pitch;
+ 
+ 	// Keep from getting too far ahead (when using pitch modulation)

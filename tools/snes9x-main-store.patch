@@ -1,0 +1,11 @@
+diff --git a/cpuexec.cpp b/cpuexec.cpp
+--- a/cpuexec.cpp
++++ b/cpuexec.cpp
+@@ -224,6 +224,7 @@
+ 		#include "../../tools/snes9x_cpu_profile.inc" // local read-only timing/state/stack/write harness
+ 		#include "../../tools/snes9x_span_trace.inc" // exact-bank or replicated-PC timing
+ 		#include "../../tools/snes9x_instruction_trace.inc" // flushed instruction-entry elapsed clocks
++		#include "../../tools/snes9x_main_store.inc" // sparse exact camera-commit timing
+ 		uint8				Op;
+ 		struct	SOpcodes	*Opcodes;
+ 

@@ -90,6 +90,36 @@ class EvidenceControls(unittest.TestCase):
         self.assertEqual(len(recovery[len(scenario):]), 12)
         self.assertTrue(all(p['frames'] == 120 and p['buttons'] == ['Left']
                             for p in recovery[len(scenario):]))
+        upper = scenario_for('traversal-upper')
+        self.assertEqual(upper[:walk], scenario[:walk])
+        self.assertEqual(upper[walk], dict(name='move_upper_lane', frames=90, buttons=['Up']))
+        self.assertEqual(upper[walk+1:], scenario[walk:])
+        jumping = scenario_for('traversal-jump')
+        self.assertEqual(jumping[:walk], scenario[:walk])
+        self.assertTrue(all(p['buttons'] == ['Right', 'A', 'B']
+                            and p['pulse'] == [30, 4] and p['hold_buttons'] == ['Right']
+                            for p in jumping[walk:]))
+        lower = scenario_for('traversal-jump-lower')
+        self.assertEqual(lower[:len(jumping)], jumping)
+        self.assertEqual(lower[len(jumping)], dict(name='move_lower_lane', frames=90, buttons=['Down']))
+        self.assertEqual(len(lower[len(jumping)+1:]), 18)
+        mall = scenario_for('traversal-mall')
+        self.assertEqual(mall[:len(jumping)], jumping)
+        shop = scenario_for('traversal-shop')
+        self.assertEqual(shop[:len(mall)], mall)
+        self.assertEqual(shop[len(mall):], [
+            dict(name='approach_shop', frames=88, buttons=['Right']),
+            dict(name='enter_shop', frames=180, buttons=['Up']),
+            dict(name='observe_shop', frames=180),
+        ])
+        exit_route = scenario_for('traversal-shop-exit')
+        self.assertEqual(exit_route[:len(shop)], shop)
+        self.assertEqual(exit_route[len(shop):len(shop)+3], [
+            dict(name='leave_shop', frames=12, buttons=['B']),
+            dict(name='observe_shop_exit', frames=180),
+            dict(name='mall_lower_lane', frames=60, buttons=['Down']),
+        ])
+        self.assertEqual(len(exit_route[len(shop)+3:]), 8)
 
     def test_video_ram_snapshot_integrity(self):
         for mutation in (None, 'changed', 'short', 'path'):

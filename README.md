@@ -1,22 +1,31 @@
 # River City Ransom — NES to SNES
 
-Work in progress toward a native SNES port of the US NES game. Preserve the
-original graphics, gameplay, music and effects. Run the game logic on the 65C816,
-translate NES hardware operations, and synthesize NES sound on the SPC700.
+Native SNES port of the US NES game. Original game logic on the 65C816, NES
+PPU/APU/MMC3 translated to SNES hardware, NES sound synthesized on the SPC700
+(Memblers 2A03 engine).
 
-**Experimental port, not release-ready.** Original game code now boots on the
-SNES CPU, reaches the menus and street, accepts input, and sends game APU writes
-to Memblers' SPC700 NES sound emulator. Scrolling, raster interrupts, timing,
-audio fidelity and full-game compatibility remain incomplete.
+**Playable experimental trial, not a release.** Candidate **4108**
+(`build/timed-token-grace-game-4108/native-cpu.sfc`, SHA256
+`57c62e5e9f5e6a112e6a72889beba87d85510bff40e5c3182533ef38f6653da7`) is on
+EverDrive / SNES Junior. 1-player street → mall → café → park runs; the owner
+called hardware gameplay fantastic. 2-player combat still hitches. Splash WUB
+is still too quiet versus in-game mix. Popping and NES-matched speed are not
+certified.
 
-Start with the [visual audit and collages](docs/audit/README.md). Renderer fixtures
-and live execution have separate evidence: a static pixel match is never called
-a gameplay pass. ROMs, extracted assets and generated cartridges stay local.
+Offline 4108 gates (not a hardware certificate): full 9,092-frame route all
+two-frame cadence; 1P combat including-busy; Present Status vs NES; shop
+two-purchase; DMA envelopes. Notes:
+[timed-token-grace](docs/TIMED-TOKEN-GRACE.md),
+[roadmap](docs/ROADMAP.md),
+[issues](https://github.com/struktured-labs/river-city-ransom-snes/issues).
 
-The [quality benchmark](docs/BENCHMARK.md) compares original and port transitions,
-input delivery and per-frame audio, with phase-seekable local listening evidence.
-The current port fails its speed/audio/graphics gates; no new build is offered
-until original-speed gameplay and clean sound are established.
+Next requested work: 2P AI (#2), splash sound (#13), controller presets (#12),
+a medium difficulty between Novice and Advanced, ultra-hard Gamer Mode, and
+an original-game check of whether Simon is easier on Advanced than intended.
+
+ROMs, extracted assets and generated cartridges stay local. Start with
+[visual audits](docs/audit/README.md) and the [development runbook](docs/DEVELOPMENT.md).
+A static pixel match is never a gameplay pass.
 
 Implemented:
 

@@ -1,0 +1,45 @@
+// Metadata-only observer for the hash-bound local x86-64 OBS build.
+// Arguments: OBS pid, duration seconds. No audio samples or settings writes.
+BEGIN { printf("B,%llu\n", nsecs); }
+
+uprobe:/usr/local/lib/obs-plugins/decklink.so:_ZN22DeckLinkDeviceInstance17HandleAudioPacketEP25IDeckLinkAudioInputPacketm
+/pid == $1/ { @deck[tid] = 1; }
+
+uretprobe:/usr/local/lib/obs-plugins/decklink.so:_ZN22DeckLinkDeviceInstance17HandleAudioPacketEP25IDeckLinkAudioInputPacketm
+/pid == $1/ { delete(@deck[tid]); }
+
+uprobe:/usr/local/lib/libobs.so.30:obs_source_output_audio
+/pid == $1 && @deck[tid]/
+{
+    @source[arg0] = 1;
+    printf("I,%llu,%d,%llu,%u,%llu,%u\n", nsecs, tid, arg0,
+           *(uint32 *)(arg1+64), *(uint64 *)(arg1+80), *(uint32 *)(arg1+76));
+}
+
+uprobe:/usr/local/lib/libobs.so.30:on_audio_playback
+/pid == $1 && @source[arg1]/
+{
+    @active[tid] = 1;
+    printf("M,%llu,%d,%llu,%u,%llu,%llu,%u\n", nsecs, tid, arg1,
+           *(uint32 *)(arg2+64), *(uint64 *)(arg2+72), arg0, (uint32)arg3);
+}
+
+// Immediately after pthread_mutex_trylock, before test eax,eax.
+uprobe:/usr/local/lib/libobs.so.30:on_audio_playback+0x42
+/pid == $1 && @active[tid]/
+{ printf("L,%llu,%d,%u\n", nsecs, tid, (uint32)reg("ax")); }
+
+// Successful resampler branch, before loading its output-frame count.
+uprobe:/usr/local/lib/libobs.so.30:on_audio_playback+0xae
+/pid == $1 && @active[tid]/
+{ printf("Q,%llu,%d,%u\n", nsecs, tid, *(uint32 *)(reg("sp")+20)); }
+
+uretprobe:/usr/local/lib/libobs.so.30:on_audio_playback
+/pid == $1 && @active[tid]/
+{
+    printf("E,%llu,%d\n", nsecs, tid);
+    delete(@active[tid]);
+}
+
+interval:s:1 { @elapsed++; if (@elapsed >= $2) { exit(); } }
+END { printf("Z,%llu\n", nsecs); clear(@deck); clear(@source); clear(@active); clear(@elapsed); }

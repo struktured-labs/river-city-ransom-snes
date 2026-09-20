@@ -1,0 +1,40 @@
+diff --git a/src/drivers/libretro/libretro.c b/src/drivers/libretro/libretro.c
+--- a/src/drivers/libretro/libretro.c
++++ b/src/drivers/libretro/libretro.c
+@@ -4359,6 +4359,15 @@ unsigned retro_get_region(void)
+    return FSettings.PAL ? RETRO_REGION_PAL : RETRO_REGION_NTSC;
+ }
+ 
++RETRO_API unsigned retro_rcr_mmc3_register(unsigned index)
++{
++   extern uint8_t DRegBuf[8], MMC3_cmd, A000B;
++   if (index < 8) return DRegBuf[index];
++   if (index == 8) return MMC3_cmd;
++   if (index == 9) return A000B;
++   return 0;
++}
++
+ void *retro_get_memory_data(unsigned type)
+ {
+    uint8_t* data;
+@@ -4383,6 +4392,10 @@ void *retro_get_memory_data(unsigned type)
+       case RETRO_MEMORY_SYSTEM_RAM:
+          data = RAM;
+          break;
++      case RETRO_MEMORY_VIDEO_RAM:
++         /* Read-only CIRAM for original-game rendering comparisons. */
++         data = NTARAM;
++         break;
+       default:
+          data = NULL;
+          break;
+@@ -4413,6 +4426,9 @@ size_t retro_get_memory_size(unsigned type)
+       case RETRO_MEMORY_SYSTEM_RAM:
+          size = 0x800;
+          break;
++      case RETRO_MEMORY_VIDEO_RAM:
++         size = 0x800;
++         break;
+       default:
+          size = 0;
+          break;

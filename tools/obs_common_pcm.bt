@@ -1,0 +1,35 @@
+// Read only DeckLink's submitted PCM and its source-capture callback PCM.
+// No settings or process-memory writes. Exact hash-bound OBS binaries required.
+config = { max_strlen = 8192; }
+BEGIN { printf("B,%llu\n",nsecs); }
+uprobe:/usr/local/lib/obs-plugins/decklink.so:_ZN22DeckLinkDeviceInstance17HandleAudioPacketEP25IDeckLinkAudioInputPacketm
+/pid == $1/ { @deck[tid]=1; }
+uretprobe:/usr/local/lib/obs-plugins/decklink.so:_ZN22DeckLinkDeviceInstance17HandleAudioPacketEP25IDeckLinkAudioInputPacketm
+/pid == $1/ { delete(@deck[tid]); }
+uprobe:/usr/local/lib/libobs.so.30:obs_source_output_audio
+/pid == $1 && @deck[tid]/
+{
+    $frames=*(uint32 *)(arg1+64);
+    $speakers=*(uint32 *)(arg1+68);
+    $format=*(uint32 *)(arg1+72);
+    $rate=*(uint32 *)(arg1+76);
+    @source[arg0]=1; @seq[arg0]++;
+    if ($frames>0 && $frames<=1024 && $speakers==2 && $rate==48000 && ($format==2 || $format==3)) {
+        $width=(uint32)($format==2 ? 4 : 8);
+        printf("I,%llu,%llu,%llu,%u,%llu,%u,%rh\n",nsecs,arg0,@seq[arg0],
+               $frames,*(uint64 *)(arg1+80),$format,
+               buf(uptr(*(uint64 *)arg1),$frames*$width));
+    } else { printf("X,%llu,%u,%u,%u,%u\n",nsecs,$frames,$speakers,$format,$rate); }
+}
+uprobe:/usr/local/lib/libobs.so.30:on_audio_playback
+/pid == $1 && @source[arg1]/
+{
+    $frames=*(uint32 *)(arg2+64);
+    if ($frames>0 && $frames<=1024) {
+        printf("M,%llu,%llu,%llu,%u,%llu,%rh,%rh\n",nsecs,arg1,@seq[arg1],
+               $frames,*(uint64 *)(arg2+72),buf(uptr(*(uint64 *)arg2),$frames*4),
+               buf(uptr(*(uint64 *)(arg2+8)),$frames*4));
+    } else { printf("X,%llu,%u\n",nsecs,$frames); }
+}
+interval:s:1 { @elapsed++; if (@elapsed >= (int64)$2) { exit(); } }
+END { printf("Z,%llu\n",nsecs); clear(@deck); clear(@seq); clear(@source); clear(@elapsed); }

@@ -48,17 +48,47 @@ reset:
     bne @shadow
     sep #$20
     .a8
+.ifdef ATTRIBUTE_GROUP
+    ldx #0
+@sprite_fixture:
+    txa
+    sta $1000,x           ; also cover off-screen Y values
+    sta $1001,x
+    sta $1003,x
+    lsr
+    lsr
+    ora #(ATTRIBUTE_GROUP * 64)
+    sta $1002,x
+    inx
+    inx
+    inx
+    inx
+    cpx #256
+    bne @sprite_fixture
+.endif
     ldx #0
     lda #1
+.if PATTERN_HALF = 16
+    lda #0                 ; force table-change invalidation to create dirtiness
+.endif
 @dirty:
     sta $1D00,x
     inx
     cpx #128
     bne @dirty
     lda #PATTERN_HALF
+.ifdef SPRITE_HALF
+    ora #SPRITE_HALF
+.endif
     sta $1C20
+    lda #MIRROR_MODE
+    sta $1C18
     lda #GAME_TASK
     sta $0100
+.ifdef TRANSITION_STATE
+    lda #TRANSITION_STATE
+    sta $1CA0
+.endif
     lda #1
     sta $1C85
     lda #64
@@ -73,6 +103,7 @@ reset:
     ldx #0
 @first_batch:
     lda $1D00,x
+    sta f:$7E5800,x         ; immutable first-batch flag oracle
     cmp #2
     bne :+
     inc $1C8E

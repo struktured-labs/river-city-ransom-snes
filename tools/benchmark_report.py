@@ -73,15 +73,22 @@ def evaluate(reference, candidate):
 
 def verify_capture(directory):
     try:
-        from .benchmark_capture import scenario_for
+        from .benchmark_capture import scenario_for, waypoint_policy
     except ImportError:
-        from benchmark_capture import scenario_for
+        from benchmark_capture import scenario_for, waypoint_policy
     report = json.loads((directory / "capture.json").read_text())
     if report["schema"] != "rcr-benchmark-capture-v1" or report["release_ready"] is not False:
         raise ValueError("Invalid capture status")
     scenario = scenario_for(report.get('scenario_name', 'baseline'))
     if report["scenario"] != scenario or report["scenario_sha256"] != hashlib.sha256(json.dumps(scenario, sort_keys=True).encode()).hexdigest():
         raise ValueError("Scenario mismatch")
+    if any('waypoint' in p for p in scenario):
+        policy=waypoint_policy(report.get('scenario_name','baseline'))
+        if report.get('waypoint_policy_sha256')!=sha(Path(policy.__file__)):
+            raise ValueError('Waypoint navigation policy changed')
+        if getattr(policy, 'SOURCE_FILES', ()) and report.get('waypoint_dependency_sha256') != {
+                p.name:sha(p) for p in policy.SOURCE_FILES}:
+            raise ValueError('Waypoint dependency changed or missing')
     system = report["system"]
     if system not in MAPPING or report["input_mapping"] != MAPPING[system]:
         raise ValueError("Wrong logical input mapping")
@@ -98,6 +105,72 @@ def verify_capture(directory):
     rows = json.loads((directory / "timeline.json").read_text())
     if not rows or len(rows) != report["frames"]:
         raise ValueError("Missing frame telemetry")
+    background=report.get('background_observer')
+    if background is not None:
+        try:
+            from .background_observer import sources as background_sources
+        except ImportError:
+            from background_observer import sources as background_sources
+        root=Path(__file__).resolve().parents[1]
+        if (background.get('schema')!='rcr-background-v1' or background.get('sources')!=
+            {str(p.relative_to(root)):sha(p) for p in background_sources(root,system)}):
+            raise ValueError('Background observer source changed or missing')
+        for row in rows:
+            observation=row.get('background',{})
+            expected=f'background/frame-{row["frame"]:05d}.png'
+            if observation.get('image')!=expected or sha(directory/expected)!=observation.get('sha256'):
+                raise ValueError('Background image changed or unsafe path')
+            rgb=np.asarray(Image.open(directory/expected).convert('RGB'))
+            flags=bytes.fromhex(observation.get('valid_lines',''))
+            if (rgb.shape!=(240,256,3) or hashlib.sha256(rgb.tobytes()).hexdigest()!=observation.get('rgb_sha256')
+                or len(flags)!=240 or any(x not in (0,1) for x in flags)):
+                raise ValueError('Invalid background pixels or row validity')
+    elif any('background' in row for row in rows):
+        raise ValueError('Unbound background observations')
+    try:
+        from .boot_faults import verify_rows
+    except ImportError:
+        from boot_faults import verify_rows
+    if report.get('boot_fault_policy'):
+        path = directory / 'boot-manifest.json'
+        manifest = json.loads(path.read_text())
+        if (sha(path) != report['candidate_manifest_sha256'] or not manifest.get('splash')
+                or manifest['rom_sha256'] != report['rom_sha256']):
+            raise ValueError('Unbound splash fault-monitor manifest')
+    verify_rows(report, rows)
+    ppu = report.get('nes_ppu_observer')
+    if ppu is not None:
+        if (system != 'nes' or ppu != dict(method='libretro-PPUREG-read-only',
+                source_sha256=sha(Path(__file__).with_name('libretro_memory.py')))):
+            raise ValueError('Unknown NES PPU observer')
+        for row in rows:
+            regs = row.get('nes_ppu', {})
+            if (set(regs) != {'ctrl','mask','status','oam_address'}
+                    or any(type(v) is not int or not 0 <= v <= 255 for v in regs.values())):
+                raise ValueError('Missing or invalid NES PPU observation')
+    elif any('nes_ppu' in row for row in rows):
+        raise ValueError('Unbound NES PPU observations')
+    palette=report.get('snes_palette_observer')
+    if palette is not None:
+        if (system!='snes' or palette!=dict(method='libretro-WRAM-palette-read-only',
+                source_sha256=sha(Path(__file__).with_name('palette_telemetry.py')))):
+            raise ValueError('Unknown SNES palette observer')
+        try:
+            from .palette_telemetry import validate as validate_palette
+        except ImportError:
+            from palette_telemetry import validate as validate_palette
+        for row in rows:validate_palette(row.get('snes_palette'))
+    elif any('snes_palette' in row for row in rows):
+        raise ValueError('Unbound SNES palette observations')
+    if any('waypoint' in p for p in scenario):
+        for row in rows:
+            expected=f'frames/frame-{row["frame"]:05d}.png'
+            if row.get('frame_image')!=expected or sha(directory/expected)!=row.get('frame_image_sha256'):
+                raise ValueError('Waypoint image changed or unsafe path')
+            rgb=np.asarray(Image.open(directory/expected).convert('RGB'))
+            if (hashlib.sha256(rgb.tobytes()).hexdigest()!=row['video_sha256']
+                    or list(policy.cursor_mask(rgb))!=row.get('waypoint_cursor')):
+                raise ValueError('Waypoint cursor differs from rendered frame')
     with wave.open(str(directory / "audio.wav"), "rb") as source:
         if source.getnchannels() != 2 or source.getsampwidth() != 2 or source.getframerate() != round(report["sample_rate"]):
             raise ValueError("Wrong PCM geometry/rate")
@@ -113,9 +186,9 @@ def verify_capture(directory):
                 or segment["frames"] != segment["end_frame"]-next_frame+1
                 or not 0 < segment["frames"] <= phase["frames"]):
             raise ValueError("Phase coverage mismatch")
-        if "until" not in phase and segment["frames"] != phase["frames"]:
+        if "until" not in phase and 'waypoint' not in phase and segment["frames"] != phase["frames"]:
             raise ValueError("Truncated measured phase")
-        if "until" in phase and segment["transition_matched"] is not True:
+        if ("until" in phase or 'waypoint' in phase) and segment["transition_matched"] is not True:
             complete = False
             if index != len(report["segments"])-1:
                 raise ValueError("Continued after an unrecognized phase")
@@ -132,16 +205,27 @@ def verify_capture(directory):
                     or sha(directory/(name+'.vram')) != segment.get('vram_snapshot_sha256')
                     or (directory/(name+'.vram')).stat().st_size != 65536):
                 raise ValueError('Video RAM snapshot changed or unsafe path')
+        if 'nametable_snapshot' in segment or 'nametable_snapshot_sha256' in segment:
+            if (segment.get('nametable_snapshot') != name+'.nametable'
+                    or sha(directory/(name+'.nametable')) != segment.get('nametable_snapshot_sha256')
+                    or (directory/(name+'.nametable')).stat().st_size != 2048):
+                raise ValueError('NES nametable/CIRAM shadow changed or unsafe path')
         for offset, row in enumerate(rows[next_frame-1:segment["end_frame"]]):
             if row["frame"] != next_frame+offset or row["phase"] != name:
                 raise ValueError("Non-contiguous telemetry")
-            if report.get('scenario_name', '').startswith('traversal'):
+            if report.get('scenario_name', '').startswith('traversal') or report.get('scenario_name') == 'movement-probe':
                 raw = bytes.fromhex(row.get('game_ram_hex', ''))
                 if len(raw) != 2048 or hashlib.sha256(raw).hexdigest() != row['ram_sha256']:
                     raise ValueError('Traversal game RAM does not match frame telemetry')
             buttons = phase.get("buttons", [])
+            if 'waypoint' in phase:
+                if row['frame']<=1:
+                    raise ValueError('Waypoint has no preceding observation')
+                preceding=rows[row['frame']-2]
+                buttons=policy.buttons(phase['waypoint'],bytes.fromhex(preceding['game_ram_hex']),offset,
+                                 preceding['waypoint_cursor'])
             if "pulse" in phase and offset % phase["pulse"][0] >= phase["pulse"][1]:
-                buttons = []
+                buttons = phase.get('hold_buttons', [])
             requested = sorted(MAPPING[system].get(b, BUTTONS[b]) for b in buttons)
             if row["input_requested"] != requested:
                 raise ValueError("Input schedule changed")
@@ -163,6 +247,11 @@ def verify_capture(directory):
             template = np.array(Image.open(directory / ('reference-'+phase['until']+'.png')).convert('RGB'))
             if segment['frames'] < 3 or not matches(last, template, RECTS[phase['until']]):
                 raise ValueError("Falsely recognized phase")
+        if 'waypoint' in phase:
+            policy.validate_completion(phase['waypoint'],
+                [bytes.fromhex(r['game_ram_hex']) for r in rows[next_frame-1:segment['end_frame']]],
+                phase['frames'],segment['transition_matched'] is True,
+                [r['waypoint_cursor'] for r in rows[next_frame-1:segment['end_frame']]])
         next_frame = segment["end_frame"]+1
     if next_frame != len(rows)+1 or next_sample*4 != len(pcm):
         raise ValueError("Unaccounted video/audio evidence")

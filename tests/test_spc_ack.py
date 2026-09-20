@@ -24,6 +24,22 @@ class SpcAckTests(unittest.TestCase):
     def test_complete_packet(self):
         self.assertEqual(analyze(self.fixture())['acknowledged_packets'], 1)
 
+    def test_triple_ack_tracks_advanced_sender_index(self):
+        rows = [event(0x7d, 0x2c81), event(0x7d), event(0xd7)]
+        rows += [event(i, min(i+3,23)) for i in range(0,23,3)]
+        self.assertEqual(analyze(rows, triple=True, engine_size=0x2c7f)['acknowledged_packets'], 1)
+        for bad in (rows[:-1], rows[:5]+rows[6:]):
+            with self.assertRaises(ValueError):
+                analyze(bad, triple=True, engine_size=0x2c7f)
+        rows[-1][6] = 24
+        with self.assertRaises(ValueError):
+            analyze(rows, triple=True, engine_size=0x2c7f)
+
+    def test_paired_custom_engine_size(self):
+        rows = [event(0x7d, 0x2c3a), event(0x7d), event(0xd7)]
+        rows += [event(i, i) for i in range(0, 23, 2)]
+        self.assertEqual(analyze(rows, paired=True, engine_size=0x2c38)['acknowledged_packets'], 1)
+
     def test_bad_missing_timeout_and_truncated(self):
         good = self.fixture()
         timeout = [r[:] for r in good]

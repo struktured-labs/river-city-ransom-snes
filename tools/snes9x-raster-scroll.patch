@@ -1,0 +1,17 @@
+diff --git a/gfx.cpp b/gfx.cpp
+--- a/gfx.cpp
++++ b/gfx.cpp
+@@ -21,1 +21,2 @@
+ #include "../../tools/snes9x_background.inc"
++#include "../../tools/snes9x_raster_scroll.inc"
+@@ -947,1 +948,2 @@
+ 		rcr_observe_background();
++		rcr_observe_raster_scroll();
+diff --git a/libretro/libretro.cpp b/libretro/libretro.cpp
+--- a/libretro/libretro.cpp
++++ b/libretro/libretro.cpp
+@@ -1820,2 +1820,4 @@
+ void retro_run()
+ {
++   extern unsigned rcr_raster_frame;
++   ++rcr_raster_frame;

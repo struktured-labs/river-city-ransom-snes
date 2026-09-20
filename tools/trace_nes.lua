@@ -2,9 +2,16 @@
 local out = assert(os.getenv("RCR_CAPTURE_DIR"), "RCR_CAPTURE_DIR missing")
 local total = tonumber(os.getenv("RCR_CAPTURE_FRAMES") or "1800")
 local profile = os.getenv("RCR_CAPTURE_PROFILE") or "title"
+local replay = {}
+if profile == "replay" then
+    for line in io.lines(assert(os.getenv("RCR_REPLAY_INPUT"))) do
+        replay[#replay+1] = assert(tonumber(line))
+    end
+end
 local writes = assert(io.open(out .. "/hardware.jsonl", "w"))
 local code = assert(io.open(out .. "/executed.jsonl", "w"))
 local ram_code = assert(io.open(out .. "/executed-ram.jsonl", "w"))
+local decompression = assert(io.open(out .. "/decompression.jsonl", "w"))
 local ram_seen = {}
 local seen = {}
 local bank_select = 0
@@ -31,9 +38,19 @@ local function physical(pc)
 end
 
 memory.registerexec(0x8000, 0x8000, function(pc)
+    local previouspc = lastpc
     lastpc = pc
     local bank = physical(pc)
     local offset = bank * 8192 + pc % 8192
+    if offset == 0x1C8DB or offset == 0x1C90C then
+        -- Immediate predecessor is the actual JSR site, including nested
+        -- decompression. Do not infer the caller from a last-command latch.
+        decompression:write(string.format('{"frame":%d,"kind":"%s","caller":%d,"source_base":%d,"source_index":%d,"destination":%d,"value":%d,"ppu_ctrl":%d}\n',
+            frame, offset == 0x1C8DB and "read" or "write", previouspc,
+            memory.readbyte(0x2A) + 256 * memory.readbyte(0x2B),
+            memory.readbyte(0x1A), memory.readbyte(0x2C) + 256 * memory.readbyte(0x2D),
+            memory.readbyte(0x1B), ppu_regs[0]))
+    end
     if not seen[offset] then
         local opcode = memory.readbyte(pc)
         -- A mapping bug must not silently associate code with the wrong PRG bank.
@@ -82,6 +99,12 @@ emu.poweron()
 for n=1,total do
     frame = n
     local buttons = {up=false,down=false,left=false,right=false,A=false,B=false,start=false,select=false}
+    if profile == "replay" then
+        local mask = replay[n] or 0
+        for key, bit in pairs({B=0,select=2,start=3,up=4,down=5,left=6,right=7,A=8}) do
+            buttons[key] = math.floor(mask / 2^bit) % 2 == 1
+        end
+    end
     if profile == "walk" or profile == "inventory" then
         if n == 360 or n == 720 then buttons.start = true end
         if profile == "walk" then
@@ -119,5 +142,6 @@ end
 writes:close()
 code:close()
 ram_code:close()
+decompression:close()
 file("complete.json", string.format('{"frames":%d,"profile":"%s"}\n', total, profile))
 emu.exit()

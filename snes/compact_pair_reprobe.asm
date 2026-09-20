@@ -1,0 +1,9 @@
+.setcpu "65816"
+.a16
+.i16
+EXPERIMENTAL_HIDDEN_HIGH_CACHE = 1
+EXPERIMENTAL_HIDDEN_COMPACT_INDEX = 1
+EXPERIMENTAL_HIDDEN_DIRECT_PAIR = 1
+.segment "HELPER"
+.include "hidden_direct_rows.inc"
+helper_end:
