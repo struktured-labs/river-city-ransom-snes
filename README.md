@@ -20,8 +20,10 @@ two-purchase; DMA envelopes. Notes:
 [issues](https://github.com/struktured-labs/river-city-ransom-snes/issues).
 
 Next requested work: 2P AI (#2), splash sound (#13), controller presets (#12),
-Intermediate difficulty between Novice and Advanced, ultra-hard Gamer Mode, and
-an original-game check of whether Simon is easier on Advanced than intended.
+Intermediate difficulty (#20), ultra-hard Gamer Mode (#21). Original NES
+Advanced Simon is not an overflow-easier fight (#22): skill is +16 with 63/127
+caps (stamina 118→127, will stays 63). Splash trial 4146 is louder chromatic
+WUB, not flashed.
 
 ROMs, extracted assets and generated cartridges stay local. Start with
 [visual audits](docs/audit/README.md) and the [development runbook](docs/DEVELOPMENT.md).
