@@ -72,7 +72,7 @@
   {
     "key": "gamer_mode",
     "title": "QoL: ultra-hard Gamer Mode difficulty",
-    "body": "User request after hardware 4108: an ultra-hard \"Gamer Mode\" above Advanced. Harder enemies than Advanced without breaking original Novice/Advanced. Must not rely on 8-bit overflow (see Simon-on-Advanced investigation). Selectable from the skill-level UI.\n\nAcceptance: labeled Gamer Mode; Advanced remains the original hard setting; Gamer Mode is strictly tougher on documented enemy stats/AI; no accidental weaker bosses; passwords/saves/Level menu; tests vs Novice/Advanced/medium. Parent #1."
+    "body": "User request after hardware 4108: an ultra-hard \"Gamer Mode\" above Advanced. Harder enemies than Advanced without breaking original Novice/Advanced. Must not rely on 8-bit overflow (see Simon-on-Advanced investigation). Selectable from the skill-level UI.\n\nLocked 2026-09-20 (docs/GAMER-MODE.md): one mode, two legal paths — win at original 63/127 on execution, or shop past those caps. Enemies use $064C=3 (+32) with Gamer clamps combat/will 127 and stamina 255 (Simon 93/95/150). Player Gamer caps 127/255; food still stacks; start still 15/63. Gamer-only: skip agility AND #$3F so speed can exceed 63. SNES SRAM save (QoL, required for stats past NES password width); original passwords must not silently truncate. Novice/Advanced unchanged.\n\nAcceptance: labeled Gamer Mode; Advanced remains the original hard setting; Gamer Mode is strictly tougher on documented enemy stats/AI; no accidental weaker bosses; SRAM round-trip; passwords/Level menu; tests vs Novice/Advanced/Intermediate; Gamer agility 80 is faster than 63, other skill levels are not. Parent #1."
   },
   {
     "key": "simon_advanced",

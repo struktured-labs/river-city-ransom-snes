@@ -27,7 +27,7 @@ a pushed build or new hardware verification.
 | [#16](https://github.com/struktured-labs/river-city-ransom-snes/issues/16) | Immediate shop stat-gain display |
 | [#17](https://github.com/struktured-labs/river-city-ransom-snes/issues/17) | Closed: no RCG-style consumed-item marker (food stats stack) |
 | [#20](https://github.com/struktured-labs/river-city-ransom-snes/issues/20) | Intermediate difficulty between Novice and Advanced |
-| [#21](https://github.com/struktured-labs/river-city-ransom-snes/issues/21) | Ultra-hard Gamer Mode |
+| [#21](https://github.com/struktured-labs/river-city-ransom-snes/issues/21) | Ultra-hard Gamer Mode ([locked spec](GAMER-MODE.md): optional grind, speed>63, SRAM) |
 | [#22](https://github.com/struktured-labs/river-city-ransom-snes/issues/22) | Simon easier on Advanced? original NES overflow check (ROM: no wrap; Advanced is +16 with 63/127 caps) |
 
 The user's progression clarification is part of16/17: defeating gangsters yields

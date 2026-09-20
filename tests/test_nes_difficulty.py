@@ -2,8 +2,9 @@ import unittest
 from pathlib import Path
 
 from tools.nes_difficulty import (
-    SIMON_CLASS, SKILL_ADVANCED, SKILL_NOVICE, apply_boss, class_stats,
-    prg_from, simon_spawn, skill_add_table, wrap_hypothesis,
+    SIMON_CLASS, SKILL_ADVANCED, SKILL_NOVICE, agility_speed_masks,
+    apply_boss, class_stats, prg_from, simon_gamer, simon_spawn,
+    skill_add_table, wrap_hypothesis,
 )
 
 ROM = Path('roms/river-city-ransom-us.nes')
@@ -51,6 +52,18 @@ class NesDifficultyTests(unittest.TestCase):
         self.assertEqual(gamer['will'], advanced['will'])
         self.assertEqual(gamer['punch'], 63)
 
+    def test_gamer_mode_simon_is_thicker_than_advanced(self):
+        advanced, _ = simon_spawn(self.prg, SKILL_ADVANCED)
+        gamer, _ = simon_gamer(self.prg)
+        self.assertEqual(gamer['punch'], 93)
+        self.assertEqual(gamer['will'], 95)
+        self.assertEqual(gamer['stamina'], 150)
+        self.assertGreater(gamer['stamina'], advanced['stamina'])
+        self.assertLess(gamer['stamina'], 256)
+
+    def test_agility_speed_and_63_sites_are_where_we_think(self):
+        self.assertEqual(len(agility_speed_masks(self.prg)), 2)
+
     def test_original_skill_ram_stays_one_and_two(self):
         from tools.nes_difficulty import planned_skill_levels
         by_name = {row['name']: row for row in planned_skill_levels()}
@@ -58,3 +71,6 @@ class NesDifficultyTests(unittest.TestCase):
         self.assertEqual(by_name['Advanced']['ram'], 2)
         self.assertIsNone(by_name['Intermediate']['ram'])
         self.assertEqual(by_name['Intermediate']['add'], 8)
+        self.assertEqual(by_name['Gamer Mode']['ram'], 3)
+        self.assertTrue(by_name['Gamer Mode']['unmask_agility_speed'])
+        self.assertEqual(by_name['Gamer Mode']['stamina_cap'], 255)

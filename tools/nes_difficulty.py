@@ -16,13 +16,30 @@ STAMINA_CLAMP = 0x7F
 SIMON_CLASS = 22
 SKILL_NOVICE = 1
 SKILL_ADVANCED = 2
+SKILL_GAMER = 3
 SKILL_ADD = {0: -16, 1: 0, 2: 16, 3: 32}
+GAMER_COMBAT_CLAMP = 127
+GAMER_STAMINA_CLAMP = 255
+# NES run/jump: LDA $04AF,X / AND #$3F (Gamer skips the AND). PRG offsets of the LDA.
+AGILITY_SPEED_MASK_OFFSETS = (0x1A316, 0x1A389)
 
 
 def prg_from(rom_bytes):
     rom = Rom.parse(rom_bytes)
     rom.require_rcr_us()
     return rom.prg
+
+
+def agility_speed_masks(prg):
+    """Return (offset, bytes) for each LDA $04AF,X / AND #$3F speed site."""
+    expected = b'\xbd\xaf\x04\x29\x3f'
+    rows = []
+    for offset in AGILITY_SPEED_MASK_OFFSETS:
+        got = bytes(prg[offset:offset + 5])
+        if got != expected:
+            raise ValueError(f'Agility speed mask missing at ${offset:05X}')
+        rows.append((offset, got))
+    return tuple(rows)
 
 
 def skill_add_table(prg):
@@ -49,9 +66,26 @@ def apply_boss(base, skill, stamina=False):
     return added
 
 
+def apply_gamer(base, stamina=False):
+    """Locked #21 apply: +32 with 127/255 caps. Original $B900/$B923 stay 63/127."""
+    added = base + SKILL_ADD[SKILL_GAMER]
+    cap = GAMER_STAMINA_CLAMP if stamina else GAMER_COMBAT_CLAMP
+    if added <= 0:
+        return 1
+    if added >= cap + 1:
+        return cap
+    return added
+
+
 def simon_spawn(prg, skill):
     base = class_stats(prg, SIMON_CLASS)
     return {name: apply_boss(base[name], skill, stamina=(name == 'stamina'))
+            for name in STATS}, base
+
+
+def simon_gamer(prg):
+    base = class_stats(prg, SIMON_CLASS)
+    return {name: apply_gamer(base[name], stamina=(name == 'stamina'))
             for name in STATS}, base
 
 
@@ -74,5 +108,7 @@ def planned_skill_levels():
              note='Needs a new $064C value and table byte; between +0 and +16.'),
         dict(name='Advanced', ram=2, add=16, original=True),
         dict(name='Gamer Mode', ram=3, add=32, original=False,
-             note='Existing table slot, but Simon stam/will already cap at 127/63 on Advanced.'),
+             combat_cap=127, stamina_cap=255, player_cap_combat=127,
+             player_cap_stamina=255, unmask_agility_speed=True,
+             note='docs/GAMER-MODE.md: optional grind, SRAM, Gamer-only speed>63.'),
     )
