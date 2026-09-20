@@ -21,7 +21,7 @@ two-purchase; DMA envelopes. Notes:
 
 Next requested work: 2P AI (#2), splash sound (#13), controller presets (#12),
 Intermediate difficulty (#20), Gamer Mode (#21, [locked](docs/GAMER-MODE.md):
-optional grind, Gamer-only speed>63, SNES SRAM). Original NES Advanced Simon
+optional grind, Gamer-only speed>63, SRAM, NES+SNES passwords). Original NES Advanced Simon
 is not an overflow-easier fight (#22): +16 with 63/127 caps. Splash trial 4146
 is louder chromatic WUB, not flashed.
 

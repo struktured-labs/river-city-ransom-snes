@@ -30,13 +30,28 @@ Grinding is optional. It is not the intended-only path.
 
 ## SRAM (SNES QoL)
 
-Original NES has no battery; passwords are 6/7-bit and cannot store Gamer stats past 63/127.
+Original NES has no battery. SRAM is the convenient save; passwords still exist for sharing and NES carts.
 
 - Battery-backed SRAM on the SNES image (EverDrive / cart save).
 - Saves skill, full 8-bit stats, inventory, money, story flags.
-- Works for every skill level; required for Gamer once anything exceeds the NES password width.
-- Original password screen stays. A password that would drop bits is rejected or not offered for that file, not silently clamped.
+- Works for every skill level.
 - Diagnostic SRAM loggers stay a separate map; do not collide with the game save.
+
+## Passwords (NES and SNES)
+
+The pause Password screen accepts **both** encodings. Discriminator is length after stripping spaces. Never silently clamp.
+
+| Kind | Length | Layout | When generated |
+| --- | --- | --- | --- |
+| NES | **33** | original 3×11 | Skill is Novice/Advanced **and** every field fits the original 6/7-bit widths |
+| SNES | **44** | NES 3×11 plus a **4th row of 11** (same glyph set) | Gamer/Intermediate, or any stat that would not fit NES |
+
+- A 33-character string is decoded with the **original NES algorithm**, unchanged. Published NES passwords (Nintendo Player’s Guide, etc.) load on this port.
+- A 44-character string is the SNES extension: 8-bit combat/stam, skill `$064C` including Gamer (3) and Intermediate, version nibble, checksum. Same 0–63 glyph alphabet as NES.
+- Generate NES when it is lossless so a SNES file that still fits can be typed on a real NES. Generate SNES when NES would drop bits; do not offer a truncated 33-char string for that file.
+- A SNES password is not valid on original NES hardware (wrong length). That is expected.
+- Checksum fail → reject. Two players still have independent strings, same as NES.
+- `tools/rcr_password.py` pins the lengths (`classify`). Encoder/decoder comes with the feature.
 
 ## UI / not this spec
 
@@ -49,4 +64,7 @@ Original NES has no battery; passwords are 6/7-bit and cannot store Gamer stats 
 - Novice/Advanced spawn and `AND #$3F` speed unchanged.
 - Gamer Simon stam/will/punch > Advanced; no 8-bit wrap.
 - Gamer agility 80 runs faster than 63; Novice/Advanced 80 (if poked) still AND to 63.
-- SRAM round-trip of a 80/180 file; password path does not silently truncate.
+- SRAM round-trip of a 80/180 file.
+- 33-char NES password still loads (original algorithm).
+- Gamer 80/180 file generates 44-char SNES password, not a clamped 33-char NES one.
+- `classify` on length: 33→nes, 44→snes, else invalid.
