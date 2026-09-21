@@ -90,6 +90,15 @@ def build(parent, out):
     for at in snes_fixed(0x1f97c):
         patch_bytes(image, at, bytes.fromhex('a9018d70068d4c0660'), jmp('load_sram'))
 
+    # Original LEVEL script draws NOVICE then ADVANCED. Blank the second
+    # name so the first paint is already a single skill.
+    packed = bytes.fromhex('46cdced5c8c2c4080048c0c3d5c0cdc2c4c3')
+    blanked = bytes.fromhex('46cdced5c8c2c40800480000000000000000')
+    if image.count(packed) != 1:
+        raise ValueError('LEVEL NOVICE/ADVANCED script not unique')
+    at = image.index(packed)
+    patch_bytes(image, at, packed, blanked)
+
     image[0xFFD6] = 2
     image[0xFFD8] = 3
     checksum(image)
