@@ -25,7 +25,8 @@ optional grind, Gamer-only speed>63, SRAM, NES+SNES passwords). Original NES Adv
 is not an overflow-easier fight (#22): +16 with 63/127 caps. Splash 4146 is on
 EverDrive for a listen. Combined **4163** (`build/ai-p2-4163`) is 4162 difficulty
 plus AI: R toggles on settings or in-game, HUD **AI** label, lane-first pathfinding.
-Emulator audit pass; **not** on the card. Player food still original 63/127;
+Emulator audit pass; on EverDrive as `River City Ransom SNES 4163 AI Gamer.sfc`.
+Player food still original 63/127;
 44-char passwords not in ROM yet.
 
 ROMs, extracted assets and generated cartridges stay local. Start with
