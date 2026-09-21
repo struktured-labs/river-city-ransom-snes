@@ -23,10 +23,10 @@ Next requested work: 2P AI (#2), splash sound (#13), controller presets (#12),
 Intermediate difficulty (#20), Gamer Mode (#21, [locked](docs/GAMER-MODE.md):
 optional grind, Gamer-only speed>63, SRAM, NES+SNES passwords). Original NES Advanced Simon
 is not an overflow-easier fight (#22): +16 with 63/127 caps. Splash 4146 is on
-EverDrive for a listen. AI P2 (`build/ai-p2-4149`) has HUD **AI** label plus
-lane-first/stuck pathfinding; emulator audit pass; **not** on the card yet.
-Difficulty 4162: LEVEL cycles Novice / INTERMED / Advanced / GAMER (parent 4146,
-not on the card). Player food still original 63/127; 44-char passwords not in ROM yet.
+EverDrive for a listen. Combined **4163** (`build/ai-p2-4163`) is 4162 difficulty
+plus AI: R toggles on settings or in-game, HUD **AI** label, lane-first pathfinding.
+Emulator audit pass; **not** on the card. Player food still original 63/127;
+44-char passwords not in ROM yet.
 
 ROMs, extracted assets and generated cartridges stay local. Start with
 [visual audits](docs/audit/README.md) and the [development runbook](docs/DEVELOPMENT.md).

@@ -10,7 +10,7 @@ a pushed build or new hardware verification.
 | Issue | Scope |
 | --- | --- |
 | [#1](https://github.com/struktured-labs/river-city-ransom-snes/issues/1) | Original native-port objective |
-| [#2](https://github.com/struktured-labs/river-city-ransom-snes/issues/2) | AI-assisted P2 companion (HUD AI label + lane-first pathing on 4149; not on EverDrive) |
+| [#2](https://github.com/struktured-labs/river-city-ransom-snes/issues/2) | AI-assisted P2 companion (4163: pathfinding + R toggle in-game; not on EverDrive) |
 | [#3](https://github.com/struktured-labs/river-city-ransom-snes/issues/3) | SNES/Struktured Labs branding and attribution |
 | [#4](https://github.com/struktured-labs/river-city-ransom-snes/issues/4) | Blank Present Status statistics |
 | [#5](https://github.com/struktured-labs/river-city-ransom-snes/issues/5) | Original-speed gameplay, rare slowdown, sprite latency |

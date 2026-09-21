@@ -59,11 +59,11 @@ def build(parent, out):
         parent=str(parent), enabled_by_default=False, helper=SLOT, size=SIZE,
         state_address='7ff000', state_size=32,
         sources={str(p):sha(p) for p in files},release_ready=False,
-        controls='Select original 2P. Tap R on pregame settings to toggle AI. '
+        controls='Select original 2P. Tap R on pregame settings or in-game to toggle AI. '
                  'Hold P1 L to drive P2 belongings/equipment; Start remains original global P1 pause. '
                  'Release L for one neutral poll, then P1+AI resume. Physical P2 input overrides AI.',
-        limits='Experimental bounded follower/nearby actor attacker; no pathfinding, '
-               'friendly-fire guarantee, shopping decisions, menu indicator or persistence. '
+        limits='Lane-first follow and stuck detours. HUD AI label while enabled. '
+               'No friendly-fire guarantee, shopping AI or persistence. '
                'Not compatible yet with experimental control presets.'))
     (out/'manifest.json').write_text(json.dumps(meta,indent=2)+'\n')
     print(json.dumps(dict(out=str(out),rom_sha256=meta['rom_sha256'])))

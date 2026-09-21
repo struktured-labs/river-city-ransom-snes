@@ -43,9 +43,23 @@ ai_p2:
     lda $4016              ; L: temporarily lend controller 1 to P2
     and #1
     sta f:SHOULDER
-    lda $4016              ; R: opt-in toggle on original settings screen
+    lda $4016              ; R: toggle AI (settings or in-game 2P)
     and #1
     tay
+    tya
+    beq settings_done
+    lda f:PREV_R
+    bne settings_done
+    lda f:SHOULDER
+    bne settings_done
+    lda a:$003F
+    bne settings_done
+    lda a:$0035
+    cmp #2
+    bne try_settings
+    lda f:IN_GAME
+    bne do_toggle
+try_settings:
     lda a:$0006
     cmp #5
     bne settings_done
@@ -60,12 +74,7 @@ ai_p2:
     lda a:$003F
     and #$20
     bne settings_done
-    lda f:IN_GAME
-    bne settings_done
-    tya
-    beq settings_done
-    lda f:PREV_R
-    bne settings_done
+do_toggle:
     lda f:ENABLED
     eor #1
     sta f:ENABLED
