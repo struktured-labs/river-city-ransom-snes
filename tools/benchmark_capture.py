@@ -73,6 +73,17 @@ def validate_render_options(environment):
 
 
 def scenario_for(name):
+    if name == 'title-skill':
+        prefix = SCENARIO[:next(i for i, p in enumerate(SCENARIO) if p['name'] == 'menu')]
+        return list(prefix) + [
+            dict(name='title', frames=60),
+            dict(name='title_l1', frames=12, buttons=['L']),
+            dict(name='title_intermed', frames=60),
+            dict(name='title_l2', frames=12, buttons=['L']),
+            dict(name='title_advanced', frames=60),
+            dict(name='title_r_ai', frames=12, buttons=['R']),
+            dict(name='title_ai', frames=60),
+        ]
     if name == 'difficulty-level':
         prefix = SCENARIO[:next(i for i, p in enumerate(SCENARIO) if p['name'] == 'idle')]
         return list(prefix) + [
@@ -851,7 +862,7 @@ if __name__ == "__main__":
     parser.add_argument('--ppu-telemetry',action='store_true',help='Read actual NES PPU registers through the core-provided memory map')
     parser.add_argument('--palette-telemetry',action='store_true',help='Read native palette shadow and prepared snapshots from core-advertised SNES WRAM')
     parser.add_argument('--background-telemetry',action='store_true',help='Retain a diagnostic background plane from an observer core')
-    parser.add_argument('--scenario',choices=('baseline','difficulty-level','combat-knockdown-audio','movement-probe','menu-audio','start','select','start-select','start-confirm','traversal','traversal-recovery','traversal-upper','traversal-jump','traversal-jump-lower','traversal-mall','traversal-shop','traversal-shop-exit','traversal-park-stress','traversal-park-coverage','traversal-park-single-sweep','traversal-expanded-sweep','traversal-shop-confirm','traversal-shop-repeat','traversal-shop-no','traversal-waypoint-shop','traversal-waypoint-shop-repeat','traversal-waypoint-shop-no','controls-presets','pause-cursor-return','pause-status','pause-status-after-combat'),default='baseline')
+    parser.add_argument('--scenario',choices=('baseline','title-skill','difficulty-level','combat-knockdown-audio','movement-probe','menu-audio','start','select','start-select','start-confirm','traversal','traversal-recovery','traversal-upper','traversal-jump','traversal-jump-lower','traversal-mall','traversal-shop','traversal-shop-exit','traversal-park-stress','traversal-park-coverage','traversal-park-single-sweep','traversal-expanded-sweep','traversal-shop-confirm','traversal-shop-repeat','traversal-shop-no','traversal-waypoint-shop','traversal-waypoint-shop-repeat','traversal-waypoint-shop-no','controls-presets','pause-cursor-return','pause-status','pause-status-after-combat'),default='baseline')
     args = parser.parse_args()
     refs = {"menu": (args.title, 600), "settings": (args.walk, 600),
             "story": (args.walk, 900), "street": (args.walk, 1800)}

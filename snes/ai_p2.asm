@@ -28,6 +28,7 @@ NAME1 = $7FF013
 NAME2 = $7FF014
 NAME3 = $7FF015
 LABEL_ON = $7FF016
+TITLE_PREV_L = $7FF017
 
 ai_p2:
     stz $4200
@@ -348,6 +349,7 @@ down:
 ; RYAN HUD is original name RAM $0677 and CIRAM row 2 col 17 ($7F:2051).
 apply_label:
     jsr title_mark
+    jsr title_skill
     lda f:ENABLED
     beq restore_name
     lda f:IN_GAME
@@ -408,13 +410,97 @@ title_mark:
     lda #$BB
     sta f:$7F212B
     lda #$C0
-    sta f:$7F2134
+    sta f:$7F212F
     lda #$C8
-    sta f:$7F2135
+    sta f:$7F2130
+    lda #0
+    sta f:$7F2131
+    sta f:$7F2132
+    lda #2
+    sta a:$0035
     rts
 title_off:
-    lda #0
-    sta f:$7F2134
-    sta f:$7F2135
+    lda #$CF
+    sta f:$7F212F
+    lda #$CB
+    sta f:$7F2130
+    lda #$C0
+    sta f:$7F2131
+    lda #$D8
+    sta f:$7F2132
 title_done:
     rts
+
+; Title ($0006=$3D): L cycles skill. Same order as LEVEL. Row 11.
+title_skill:
+    lda a:$0006
+    cmp #$3D
+    bne skill_done
+    lda f:SHOULDER
+    beq draw_skill
+    lda f:TITLE_PREV_L
+    bne draw_skill
+    php
+    sep #$30
+    ldx a:$064C
+    phb
+    phk
+    plb
+    lda skill_next,x
+    plb
+    sta a:$064C
+    sta f:$206004
+    lda #'R'
+    sta f:$206000
+    lda #'C'
+    sta f:$206001
+    lda #'R'
+    sta f:$206002
+    lda #'1'
+    sta f:$206003
+    plp
+draw_skill:
+    lda f:SHOULDER
+    sta f:TITLE_PREV_L
+    php
+    sep #$30
+    lda a:$064C
+    dec a
+    asl a
+    asl a
+    asl a
+    sta f:$7FF020
+    phb
+    phk
+    plb
+    ldx #0
+copy_sk:
+    txa
+    clc
+    adc f:$7FF020
+    tay
+    lda skill_names,y
+    sta f:$7FF030,x
+    inx
+    cpx #8
+    bne copy_sk
+    plb
+    lda #$BB
+    sta f:$7F20AB
+    ldx #0
+wr_sk:
+    lda f:$7FF030,x
+    sta f:$7F20AC,x
+    inx
+    cpx #8
+    bne wr_sk
+    plp
+skill_done:
+    rts
+
+skill_next: .byte 1,4,3,1,2
+skill_names:
+    .byte $CD,$CE,$D5,$C8,$C2,$C4,0,0
+    .byte $C0,$C3,$D5,$C0,$CD,$C2,$C4,$C3
+    .byte $C6,$C0,$CC,$C4,$D1,0,0,0
+    .byte $C8,$CD,$D3,$C4,$D1,$CC,$C4,$C3
