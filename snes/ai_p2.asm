@@ -350,6 +350,7 @@ down:
 apply_label:
     jsr title_mark
     jsr title_skill
+    jsr level_overlay
     lda f:ENABLED
     beq restore_name
     lda f:IN_GAME
@@ -496,6 +497,61 @@ wr_sk:
     bne wr_sk
     plp
 skill_done:
+    rts
+
+; Skill/settings screen ($0006=5): keep a single name. The original draw
+; shows NOVICE+ADVANCED for a beat; rewrite every poll so it does not linger.
+level_overlay:
+    lda a:$0006
+    cmp #5
+    bne ov_done
+    php
+    sep #$30
+    lda a:$064C
+    dec a
+    asl a
+    asl a
+    asl a
+    sta f:$7FF020
+    phb
+    phk
+    plb
+    ldx #0
+ov_copy:
+    txa
+    clc
+    adc f:$7FF020
+    tay
+    lda skill_names,y
+    sta f:$7FF030,x
+    inx
+    cpx #8
+    bne ov_copy
+    plb
+    lda #0
+    ldx #8
+ov_blank:
+    sta f:$7F22B2,x
+    dex
+    bpl ov_blank
+    lda #$BB
+    sta f:$7F22A3
+    ldx #0
+ov_wr:
+    lda f:$7FF030,x
+    sta f:$7F22A4,x
+    inx
+    cpx #8
+    bne ov_wr
+    lda f:ENABLED
+    beq ov_plp
+    lda #$C0
+    sta f:$7F22B2
+    lda #$C8
+    sta f:$7F22B3
+ov_plp:
+    plp
+ov_done:
     rts
 
 skill_next: .byte 1,4,3,1,2
