@@ -142,26 +142,26 @@ copy_n:
     bne copy_n
     plb
     lda #0
-    ldx #8
+    ldx #27
 blank_r:
-    sta f:$7F22B2,x
+    sta f:$7F22A2,x
     dex
     bpl blank_r
     lda #$BB
-    sta f:$7F22A3
+    sta f:$7F22AB
     ldx #0
 wr:
     lda f:$7FF030,x
-    sta f:$7F22A4,x
+    sta f:$7F22AC,x
     inx
     cpx #8
     bne wr
     lda f:$7FF000
     beq no_ai
     lda #$C0
-    sta f:$7F22B2
+    sta f:$7F22B6
     lda #$C8
-    sta f:$7F22B3
+    sta f:$7F22B7
 no_ai:
     plp
     rts
@@ -220,9 +220,9 @@ save_sram:
 
 ; 8-char rows: skill 1,2,3,4 -> 0,1,2,3 after DEC
 names:
-    .byte $CD,$CE,$D5,$C8,$C2,$C4,0,0          ; NOVICE
+    .byte 0,$CD,$CE,$D5,$C8,$C2,$C4,0          ; NOVICE
     .byte $C0,$C3,$D5,$C0,$CD,$C2,$C4,$C3      ; ADVANCED
-    .byte $C6,$C0,$CC,$C4,$D1,0,0,0            ; GAMER
+    .byte 0,$C6,$C0,$CC,$C4,$D1,0,0            ; GAMER
     .byte $C8,$CD,$D3,$C4,$D1,$CC,$C4,$C3      ; INTERMED
 next_t: .byte 1,4,3,1,2
 prev_t: .byte 1,3,4,2,1

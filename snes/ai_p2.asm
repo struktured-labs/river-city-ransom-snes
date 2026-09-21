@@ -529,26 +529,26 @@ ov_copy:
     bne ov_copy
     plb
     lda #0
-    ldx #8
+    ldx #27
 ov_blank:
-    sta f:$7F22B2,x
+    sta f:$7F22A2,x
     dex
     bpl ov_blank
     lda #$BB
-    sta f:$7F22A3
+    sta f:$7F22AB
     ldx #0
 ov_wr:
     lda f:$7FF030,x
-    sta f:$7F22A4,x
+    sta f:$7F22AC,x
     inx
     cpx #8
     bne ov_wr
     lda f:ENABLED
     beq ov_plp
     lda #$C0
-    sta f:$7F22B2
+    sta f:$7F22B6
     lda #$C8
-    sta f:$7F22B3
+    sta f:$7F22B7
 ov_plp:
     plp
 ov_done:
@@ -556,7 +556,7 @@ ov_done:
 
 skill_next: .byte 1,4,3,1,2
 skill_names:
-    .byte $CD,$CE,$D5,$C8,$C2,$C4,0,0
+    .byte 0,$CD,$CE,$D5,$C8,$C2,$C4,0
     .byte $C0,$C3,$D5,$C0,$CD,$C2,$C4,$C3
-    .byte $C6,$C0,$CC,$C4,$D1,0,0,0
+    .byte 0,$C6,$C0,$CC,$C4,$D1,0,0
     .byte $C8,$CD,$D3,$C4,$D1,$CC,$C4,$C3

@@ -93,7 +93,7 @@ def build(parent, out):
     # Original LEVEL script draws NOVICE then ADVANCED. Blank the second
     # name so the first paint is already a single skill.
     packed = bytes.fromhex('46cdced5c8c2c4080048c0c3d5c0cdc2c4c3')
-    blanked = bytes.fromhex('46cdced5c8c2c40800480000000000000000')
+    blanked = bytes.fromhex('460000000000000800480000000000000000')
     if image.count(packed) != 1:
         raise ValueError('LEVEL NOVICE/ADVANCED script not unique')
     at = image.index(packed)
