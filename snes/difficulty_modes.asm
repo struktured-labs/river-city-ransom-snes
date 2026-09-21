@@ -118,65 +118,45 @@ menu_prev:
 extra_level:
     jsr save_sram
     jsr $E2C0
+    php
+    sep #$30
+    lda a:$064C
+    dec a
+    asl a
+    asl a
+    asl a
+    sta f:TMP
     phb
     phk
     plb
-    ldx #8
-copy_i:
-    lda inter,x
-    sta f:$7FF030,x
-    dex
-    bpl copy_i
-    ldx #4
-copy_g:
-    lda gamer,x
-    sta f:$7FF03A,x
-    dex
-    bpl copy_g
-    ldx #6
-copy_n:
-    lda nov,x
-    sta f:$7FF044,x
-    dex
-    bpl copy_n
-    plb
-    lda a:$064C
-    cmp #4
-    beq draw_i
-    cmp #3
-    beq draw_g
     ldx #0
-dn2:
-    lda f:$7FF044,x
-    sta f:$7F22A4,x
+copy_n:
+    txa
+    clc
+    adc f:TMP
+    tay
+    lda names,y
+    sta f:$7FF030,x
     inx
-    cpx #7
-    bne dn2
-    rts
-draw_i:
+    cpx #8
+    bne copy_n
+    plb
+    lda #0
+    ldx #8
+blank_r:
+    sta f:$7F22B2,x
+    dex
+    bpl blank_r
     lda #$BB
     sta f:$7F22A3
     ldx #0
-di:
+wr:
     lda f:$7FF030,x
     sta f:$7F22A4,x
     inx
     cpx #8
-    bne di
-    rts
-draw_g:
-    lda #$BB
-    sta f:$7F22A3
-    ldx #0
-dg:
-    lda f:$7FF03A,x
-    sta f:$7F22A4,x
-    inx
-    cpx #5
-    bne dg
-    lda #0
-    sta f:$7F22A9
-    sta f:$7F22AA
+    bne wr
+    plp
     rts
 
 load_agility:
@@ -231,8 +211,11 @@ save_sram:
     sta SAVE_SKILL
     rts
 
-inter: .byte $C8,$CD,$D3,$C4,$D1,$CC,$C4,$C3,$B6
-gamer: .byte $C6,$C0,$CC,$C4,$D1
-nov:   .byte $CD,$CE,$D5,$C8,$C2,$C4,0
+; 8-char rows: skill 1,2,3,4 -> 0,1,2,3 after DEC
+names:
+    .byte $CD,$CE,$D5,$C8,$C2,$C4,0,0          ; NOVICE
+    .byte $C0,$C3,$D5,$C0,$CD,$C2,$C4,$C3      ; ADVANCED
+    .byte $C6,$C0,$CC,$C4,$D1,0,0,0            ; GAMER
+    .byte $C8,$CD,$D3,$C4,$D1,$CC,$C4,$C3      ; INTERMED
 next_t: .byte 1,4,3,1,2
 prev_t: .byte 1,3,4,2,1

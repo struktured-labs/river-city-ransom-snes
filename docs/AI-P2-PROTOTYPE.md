@@ -5,11 +5,11 @@ and not deployed to any MiSTer. The companion runs on the SNES CPU, not in an
 emulator input bot. Original graphics, combat, money, shops, item bonuses and
 equipment routines remain unchanged. There is no new XP or leveling system.
 
-Current candidate: `build/ai-p2-4163/native-cpu.sfc`, SHA-256
-`bd62a39387e2281ffb9ab3038ab531a4bfbf6cf1aa9bcea1754146f16cd00ba0`.
-Parent: difficulty **4162** (4146 splash + Intermediate/Gamer). Not on EverDrive.
-Tap **R** on 2P settings **or in-game** to toggle. HUD shows **AI** while on.
-Follow is lane-first with stuck detours. Review: `build/ai-p2-review-4163`.
+Current candidate: `build/ai-p2-4166/native-cpu.sfc`, SHA-256
+`b2136dc1471ffdf87a4671062d7482366641905cc0a6d79fcaa690341e23de8e`.
+Tap **R** on the 1P/2P title, the skill screen, or in-game. Enabling AI forces
+2P and shows **AI** next to 2P PLAY. HUD name **AI** in-game. LEVEL shows one
+skill name (NOVICE / INTERMED / ADVANCED / GAMER).
 
 Review: <http://127.0.0.1:8766/ai-p2-review-02/>.
 
