@@ -19,6 +19,15 @@ DIRECTION = $7FF00A
 BEST = $7FF00B
 SHOULDER = $7FF00C
 IN_GAME = $7FF00D
+LAST_X = $7FF00E
+LAST_Y = $7FF00F
+STUCK = $7FF010
+DETOUR = $7FF011
+NAME0 = $7FF012
+NAME1 = $7FF013
+NAME2 = $7FF014
+NAME3 = $7FF015
+LABEL_ON = $7FF016
 
 ai_p2:
     stz $4200
@@ -169,6 +178,19 @@ steer:
     lda f:TARGET
     tax
     jsr distances
+    cpx #0
+    bne full_steer          ; lane-first only while following P1
+    lda f:DX
+    cmp #17
+    bcc full_steer
+    lda f:DY
+    cmp #8
+    bcc full_steer
+    lda f:DIRECTION
+    and #$30              ; lane-first: match ground Y before a long X push
+    sta f:OUTPUT
+    bra path_stuck
+full_steer:
     lda f:DXHI
     bne move_x
     cpx #0
@@ -198,16 +220,84 @@ move_x:
 steer_y:
     lda f:DY
     cmp #7
-    bcc publish
+    bcc path_stuck
     lda f:DIRECTION
     and #$30
     ora f:OUTPUT
     sta f:OUTPUT
+path_stuck:
+    lda f:OUTPUT
+    and #$F0
+    bne :+
+    jmp reset_stuck
+:
+    lda a:$0389
+    cmp f:LAST_X
+    beq :+
+    jmp moved
+:
+    lda a:$0399
+    cmp f:LAST_Y
+    beq :+
+    jmp moved
+:
+    lda f:STUCK
+    clc
+    adc #1
+    sta f:STUCK
+    cmp #12
+    bcc path_done
+    lda #0
+    sta f:STUCK
+    lda f:DETOUR
+    clc
+    adc #1
+    cmp #4
+    bcc :+
+    lda #1
+:
+    sta f:DETOUR
+    cmp #1
+    beq detour_up
+    cmp #2
+    beq detour_down
+    lda f:OUTPUT
+    and #$3F
+    sta f:OUTPUT
+    lda f:DIRECTION
+    and #$C0
+    eor #$C0
+    ora f:OUTPUT
+    sta f:OUTPUT
+    bra path_done
+detour_up:
+    lda f:OUTPUT
+    and #$0F
+    ora #$20
+    sta f:OUTPUT
+    bra path_done
+detour_down:
+    lda f:OUTPUT
+    and #$0F
+    ora #$10
+    sta f:OUTPUT
+    bra path_done
+moved:
+    lda a:$0389
+    sta f:LAST_X
+    lda a:$0399
+    sta f:LAST_Y
+reset_stuck:
+    lda #0
+    sta f:STUCK
+    sta f:DETOUR
+path_done:
 publish:
     lda f:OUTPUT
     and #$F3              ; AI can NEVER generate Select/Start
     sta a:$1C81
 finish:
+    jsr apply_label
     plp
     ply
     plx
@@ -255,4 +345,54 @@ down:
     lda f:DIRECTION
     ora #$10
     sta f:DIRECTION
+    rts
+
+; RYAN HUD is original name RAM $0677 and CIRAM row 2 col 17 ($7F:2051).
+apply_label:
+    lda f:ENABLED
+    beq restore_name
+    lda f:IN_GAME
+    beq restore_name
+    lda a:$0035
+    cmp #2
+    bne restore_name
+    lda f:LABEL_ON
+    bne write_ai
+    lda a:$0677
+    sta f:NAME0
+    lda a:$0678
+    sta f:NAME1
+    lda a:$0679
+    sta f:NAME2
+    lda a:$067A
+    sta f:NAME3
+    lda #1
+    sta f:LABEL_ON
+write_ai:
+    lda #$C0
+    sta a:$0677
+    sta f:$7F2051
+    lda #$C8
+    sta a:$0678
+    sta f:$7F2052
+    lda #0
+    sta a:$0679
+    sta a:$067A
+    sta f:$7F2053
+    sta f:$7F2054
+    rts
+restore_name:
+    lda f:LABEL_ON
+    beq label_done
+    lda f:NAME0
+    sta a:$0677
+    lda f:NAME1
+    sta a:$0678
+    lda f:NAME2
+    sta a:$0679
+    lda f:NAME3
+    sta a:$067A
+    lda #0
+    sta f:LABEL_ON
+label_done:
     rts

@@ -1,5 +1,6 @@
 import unittest
 
+from tools.ai_p2_policy import AI_TILES, DOWN, LEFT, RIGHT, UP, lane_first, stuck_step
 from tools.build_ai_p2 import patch,HOOK,SLOT,SIZE
 from tools.review_ai_p2 import evaluate
 
@@ -51,3 +52,32 @@ class AiP2Tests(unittest.TestCase):
                         (0x4b0,'p2_original_equipment_stats'),(0x59d,'original_item_owner_is_p2')]:
             self.assertTrue(expected[gate]);mutant=bytearray(ram);mutant[at]^=1
             self.assertFalse(check(mutant)[gate])
+
+    def test_lane_first_drops_x_when_depth_is_wrong(self):
+        self.assertEqual(lane_first(40, 12, RIGHT | UP), UP)
+        self.assertEqual(lane_first(10, 12, RIGHT | UP), RIGHT | UP)
+        self.assertEqual(lane_first(40, 2, RIGHT), RIGHT)
+
+    def test_stuck_detour_cycles_up_down_then_reverse(self):
+        stuck, detour, out = 0, 0, RIGHT
+        for _ in range(12):
+            stuck, detour, out = stuck_step(stuck, detour, out, moved=False)
+        self.assertEqual((detour, out & 0xF0), (1, UP))
+        stuck, detour, out = 11, 1, RIGHT
+        stuck, detour, out = stuck_step(stuck, detour, out, moved=False)
+        self.assertEqual((detour, out & 0xF0), (2, DOWN))
+        stuck, detour, out = 11, 2, RIGHT
+        stuck, detour, out = stuck_step(stuck, detour, out, moved=False)
+        self.assertEqual((detour, out & 0xF0), (3, LEFT))
+
+    def test_follow_audit_requires_ai_name_tiles(self):
+        ram=bytearray(2048)
+        ram[0x677:0x67b]=bytes([0xD1,0xD8,0xC0,0xCD])  # RYAN
+        rows=[dict(frame=i+1,phase='ai_follow',fault=None,input_requested=[],
+                   input_delivered=[],game_ram_hex=ram.hex()) for i in range(8)]
+        states=[bytes(16).hex()]*8
+        self.assertFalse(evaluate(rows,states).get('hud_name_is_ai'))
+        ram[0x677:0x67b]=AI_TILES
+        rows=[dict(frame=i+1,phase='ai_follow',fault=None,input_requested=[],
+                   input_delivered=[],game_ram_hex=ram.hex()) for i in range(8)]
+        self.assertTrue(evaluate(rows,states)['hud_name_is_ai'])

@@ -5,11 +5,12 @@ and not deployed to any MiSTer. The companion runs on the SNES CPU, not in an
 emulator input bot. Original graphics, combat, money, shops, item bonuses and
 equipment routines remain unchanged. There is no new XP or leveling system.
 
-Current candidate: `build/ai-p2-4146/native-cpu.sfc`, SHA-256
-`2dbca7a3212e14f956404eb4b8dbf6687bdd0d317dcdedd70cb48cd2fe8b2fb7`.
-Parent: splash trial **4146** (4108 gameplay + chromatic WUB). Not on EverDrive
-yet. Earlier isolated cart `build/ai-p2-prototype-05` (parent 3252, SHA
-`549a0ee2be4f2406dcb297e9e3c27935f01d674d35b2bb834a8539b021745409`) is retained.
+Current candidate: `build/ai-p2-4149/native-cpu.sfc`, SHA-256
+`62d3bffa1655a68fba1352b4b22a3ce0c31830a0ca3313de8a3d89ecca257a6b`.
+Parent: splash trial **4146**. Not on EverDrive yet. HUD shows **AI** in P2's
+name slot while enabled. Follow is lane-first (match ground-Y before a long X
+push) with stuck detours (up, down, reverse). Combat still closes on enemies
+directly. Review: `build/ai-p2-review-4149`.
 
 Review: <http://127.0.0.1:8766/ai-p2-review-02/>.
 
@@ -83,11 +84,8 @@ slots 2/3, not object slots 4..7; follows P1 when separated; steers using origin
 world coordinates, whose ground Y increases toward screen-up. No navigation
 search or network/model calls run on the console.
 
-The current prototype has no obstacle/pathfinding policy, friendly-fire
-avoidance guarantee, recovery strategy for difficult terrain, death/revival
-policy, shopping AI or visible enable/status label. Manual management requires
-holding L. Performance overhead and human P2 takeover need dedicated tests.
-The original requested speed/audio fixes should remain the release priority.
+Friendly-fire avoidance, shopping AI, death/revival policy and human P2
+takeover still need work. Manual management still requires holding L.
 
 Earlier numbered prototype/capture attempts are retained as failed iterations;
 their source hashes can differ from the finalized tools. Only the final captures

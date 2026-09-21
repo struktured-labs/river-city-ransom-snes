@@ -57,7 +57,7 @@ def build(parent, out):
         rom,parent/'manifest.json',parent/'native_runtime.lbl',out/'ai-p2.bin']
     meta.update(rom_sha256=sha(out/'native-cpu.sfc'),experimental_ai_p2=dict(
         parent=str(parent), enabled_by_default=False, helper=SLOT, size=SIZE,
-        state_address='7ff000', state_size=16,
+        state_address='7ff000', state_size=32,
         sources={str(p):sha(p) for p in files},release_ready=False,
         controls='Select original 2P. Tap R on pregame settings to toggle AI. '
                  'Hold P1 L to drive P2 belongings/equipment; Start remains original global P1 pause. '

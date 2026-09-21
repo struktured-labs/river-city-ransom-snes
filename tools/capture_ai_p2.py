@@ -87,7 +87,7 @@ def observe(core_path,records,seed=None):
             run()
             ptr=core.retro_get_memory_data(2)
             if not ptr:raise ValueError('Missing WRAM')
-            records.append(C.string_at(ptr+0x1f000,16).hex())
+            records.append(C.string_at(ptr+0x1f000,32).hex())
         core.retro_run=execute
         return core
     C.CDLL=library

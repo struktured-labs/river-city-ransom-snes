@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import shutil
 
+from tools.ai_p2_policy import AI_TILES
 from tools.benchmark_report import sha,verify_capture
 from tools.capture_ai_p2 import installed
 
@@ -24,6 +25,9 @@ def evaluate(rows,states,equipment=False,disabled=False,seed=None):
         ready=[(r,bytes.fromhex(s)) for r,s in zip(rows,states) if r['phase']!='boot_to_menu']
         checks['default_off']=bool(ready) and all(s[0]==0 and s[3]==0 for r,s in ready)
         checks['no_synthetic_p2']=bool(ready) and all(bytes.fromhex(r['game_ram_hex'])[0xf1]==0 for r,s in ready)
+        street=[(r,s) for r,s in ready if r['phase'] in ('settle_street','ai_follow')]
+        if street:
+            checks['hud_name_not_ai']=all(bytes.fromhex(r['game_ram_hex'])[0x677:0x67b]!=AI_TILES for r,s in street)
         return checks
     checks['settings_toggle_debounced']=bool(samples('toggle_release')) and all(s[0]==1 for r,s in samples('toggle_release'))
     for name in ('manage_selector','manage_belongings','reacquire_menu'):
@@ -34,6 +38,7 @@ def evaluate(rows,states,equipment=False,disabled=False,seed=None):
     if not equipment:
         rr=samples('ai_follow')
         checks['p2_follow_moves']=bool(rr) and rr[-1][0][0x389]+256*rr[-1][0][0x391]>rr[0][0][0x389]+256*rr[0][0][0x391]
+        checks['hud_name_is_ai']=bool(rr) and all(r[0x677:0x67b]==AI_TILES for r,s in rr)
         rr=samples('ai_encounter')
         checks['p2_attacks_autonomously']=bool(rr) and any(r[0xf1]&0x80 for r,s in rr)
         checks['ai_never_start_select']=all(r[0xf1]&0x30==0 for name in ('ai_follow','ai_encounter','ai_resume') for r,s in samples(name))
@@ -89,8 +94,9 @@ def review(normal,equipment,disabled,candidate,out):
         'P1 with a neutral handoff. AI stays suspended while menus are open.</p><p><strong>Equipment test is synthetic:</strong> '
         'five bytes initialize P1 Loafers and P2 worn Sneakers + Boat Shoes with correct prior bonuses. '
         'Controller1 then makes the original game unequip Sneakers/equip Boat Shoes. P1 must remain unchanged.</p>'
-        '<p>No MiSTer deployment. No XP or progression changes. Pathfinding, friendly-fire avoidance, clear on-screen '
-        'AI indicator, preset compatibility and broader encounters remain unfinished.</p><a href="report.json">Hash-bound audit</a>'+table+
+        '<p>No MiSTer deployment. No XP or progression changes. HUD shows AI on P2 when enabled. '
+        'Follow uses lane-first pathing and stuck detours. Friendly-fire, shopping AI, preset compatibility '
+        'and broader encounters remain unfinished.</p><a href="report.json">Hash-bound audit</a>'+table+
         '<div class="grid">'+''.join(cards)+'</div>')
     report['artifacts']={p.name:sha(p) for p in out.iterdir() if p.is_file()}
     (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
