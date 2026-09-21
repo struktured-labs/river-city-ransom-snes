@@ -69,7 +69,7 @@ class NesDifficultyTests(unittest.TestCase):
         by_name = {row['name']: row for row in planned_skill_levels()}
         self.assertEqual(by_name['Novice']['ram'], 1)
         self.assertEqual(by_name['Advanced']['ram'], 2)
-        self.assertIsNone(by_name['Intermediate']['ram'])
+        self.assertEqual(by_name['Intermediate']['ram'], 4)
         self.assertEqual(by_name['Intermediate']['add'], 8)
         self.assertEqual(by_name['Gamer Mode']['ram'], 3)
         self.assertTrue(by_name['Gamer Mode']['unmask_agility_speed'])

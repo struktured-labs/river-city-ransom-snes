@@ -25,6 +25,8 @@ optional grind, Gamer-only speed>63, SRAM, NES+SNES passwords). Original NES Adv
 is not an overflow-easier fight (#22): +16 with 63/127 caps. Splash 4146 is on
 EverDrive for a listen. AI P2 (`build/ai-p2-4149`) has HUD **AI** label plus
 lane-first/stuck pathfinding; emulator audit pass; **not** on the card yet.
+Difficulty 4162: LEVEL cycles Novice / INTERMED / Advanced / GAMER (parent 4146,
+not on the card). Player food still original 63/127; 44-char passwords not in ROM yet.
 
 ROMs, extracted assets and generated cartridges stay local. Start with
 [visual audits](docs/audit/README.md) and the [development runbook](docs/DEVELOPMENT.md).

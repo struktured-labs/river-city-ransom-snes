@@ -73,6 +73,24 @@ def validate_render_options(environment):
 
 
 def scenario_for(name):
+    if name == 'difficulty-level':
+        prefix = SCENARIO[:next(i for i, p in enumerate(SCENARIO) if p['name'] == 'idle')]
+        return list(prefix) + [
+            dict(name='press_pause', frames=12, buttons=['Start']),
+            dict(name='pause_visible', frames=120),
+            dict(name='pause_right_1', frames=12, buttons=['Right']),
+            dict(name='pause_right_1_wait', frames=90),
+            dict(name='pause_right_2', frames=12, buttons=['Right']),
+            dict(name='pause_level_cursor', frames=90),
+            dict(name='open_level', frames=12, buttons=['A']),
+            dict(name='level_novice', frames=180),
+            dict(name='level_right_1', frames=12, buttons=['Right']),
+            dict(name='level_intermediate', frames=90),
+            dict(name='level_right_2', frames=12, buttons=['Right']),
+            dict(name='level_advanced', frames=90),
+            dict(name='level_right_3', frames=12, buttons=['Right']),
+            dict(name='level_gamer', frames=90),
+        ]
     if name == 'combat-knockdown-audio':
         # Input-only encounter: let the original enemies reach the player.
         # Keep every frame, including death/recovery or a missed pause. Phase
@@ -833,7 +851,7 @@ if __name__ == "__main__":
     parser.add_argument('--ppu-telemetry',action='store_true',help='Read actual NES PPU registers through the core-provided memory map')
     parser.add_argument('--palette-telemetry',action='store_true',help='Read native palette shadow and prepared snapshots from core-advertised SNES WRAM')
     parser.add_argument('--background-telemetry',action='store_true',help='Retain a diagnostic background plane from an observer core')
-    parser.add_argument('--scenario',choices=('baseline','combat-knockdown-audio','movement-probe','menu-audio','start','select','start-select','start-confirm','traversal','traversal-recovery','traversal-upper','traversal-jump','traversal-jump-lower','traversal-mall','traversal-shop','traversal-shop-exit','traversal-park-stress','traversal-park-coverage','traversal-park-single-sweep','traversal-expanded-sweep','traversal-shop-confirm','traversal-shop-repeat','traversal-shop-no','traversal-waypoint-shop','traversal-waypoint-shop-repeat','traversal-waypoint-shop-no','controls-presets','pause-cursor-return','pause-status','pause-status-after-combat'),default='baseline')
+    parser.add_argument('--scenario',choices=('baseline','difficulty-level','combat-knockdown-audio','movement-probe','menu-audio','start','select','start-select','start-confirm','traversal','traversal-recovery','traversal-upper','traversal-jump','traversal-jump-lower','traversal-mall','traversal-shop','traversal-shop-exit','traversal-park-stress','traversal-park-coverage','traversal-park-single-sweep','traversal-expanded-sweep','traversal-shop-confirm','traversal-shop-repeat','traversal-shop-no','traversal-waypoint-shop','traversal-waypoint-shop-repeat','traversal-waypoint-shop-no','controls-presets','pause-cursor-return','pause-status','pause-status-after-combat'),default='baseline')
     args = parser.parse_args()
     refs = {"menu": (args.title, 600), "settings": (args.walk, 600),
             "story": (args.walk, 900), "street": (args.walk, 1800)}

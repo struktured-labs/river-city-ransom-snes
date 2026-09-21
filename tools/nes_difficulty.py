@@ -104,8 +104,8 @@ def planned_skill_levels():
     """
     return (
         dict(name='Novice', ram=1, add=0, original=True),
-        dict(name='Intermediate', ram=None, add=8, original=False,
-             note='Needs a new $064C value and table byte; between +0 and +16.'),
+        dict(name='Intermediate', ram=4, add=8, original=False,
+             note='$064C=4 adds +8 in the native helper; table row 1/2 unchanged.'),
         dict(name='Advanced', ram=2, add=16, original=True),
         dict(name='Gamer Mode', ram=3, add=32, original=False,
              combat_cap=127, stamina_cap=255, player_cap_combat=127,
