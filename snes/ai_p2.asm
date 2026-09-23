@@ -141,9 +141,8 @@ choose:
     lda #0
     sta f:OUTPUT
     sta f:TARGET
-    lda a:$04BF            ; P1 stamina: dying -> both go down, P2 runs off
+    lda a:$04BF            ; P1 stamina: dying -> P2 runs for the edge (do not KO-poke)
     bne alive
-    sta a:$04C0
     lda a:$0389
     cmp #$80
     lda #$40
@@ -572,12 +571,14 @@ ov_plp:
 ov_done:
     rts
 
-; Gamer ($064C=3): enemy pal-0 heads -> pal 3 with black swapped to red.
-; P1/P2 skipped by OAM X vs $0388/$0389.
+; Gamer: red outline on goons (pal 0 color 1 -> $16). Skip P1/P2 via screen X
+; at $01E3/$02E3. Skip while P1 stamina is 0 so a fleeing companion stays normal.
 gamer_eyes:
     lda a:$064C
     cmp #3
     bne ge_done
+    lda a:$04BF
+    beq ge_done
     php
     sep #$30
     lda a:$0120
@@ -604,32 +605,32 @@ ge_spr:
     bne ge_next
     lda a:$0203,x
     sec
-    sbc a:$0388
+    sbc a:$01E3
     bcs :+
     eor #$FF
     clc
     adc #1
 :
-    cmp #32
+    cmp #28
     bcc ge_next
     lda a:$0203,x
     sec
-    sbc a:$0389
+    sbc a:$02E3
     bcs :+
     eor #$FF
     clc
     adc #1
 :
-    cmp #32
+    cmp #28
     bcc ge_next
     lda a:$0202,x
     ora #3
     sta a:$0202,x
 ge_next:
-    inx
-    inx
-    inx
-    inx
+    txa
+    clc
+    adc #4
+    tax
     bne ge_spr
     plp
 ge_done:
