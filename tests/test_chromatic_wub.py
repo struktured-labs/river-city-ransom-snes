@@ -20,6 +20,10 @@ class ChromaticWubTests(unittest.TestCase):
         self.assertGreater(volumes[6], volumes[0])
         self.assertLess(abs(volumes[DESCENT] - volumes[DESCENT - 1]), 40)
         self.assertLess(volumes[-1], 8)
+        tail = volumes[DESCENT:]
+        peaks = [i for i in range(1, len(tail) - 1) if tail[i] >= tail[i - 1] and tail[i] > tail[i + 1] and tail[i] > 80]
+        self.assertGreaterEqual(len(peaks), 3)
+        self.assertLessEqual(len(peaks), 5)
         self.assertNotEqual(curve(), stepped_curve())
 
     def test_parent_is_not_this_shape(self):

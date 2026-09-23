@@ -12,7 +12,7 @@ from tools.build_sub_wub_trial import curve as parent_curve
 DESCENT = 150
 START_HZ = 311
 END_HZ = 55
-TAIL_PERIOD = 40
+TAIL_PERIOD = 22
 PEAK = 118
 MASTER = bytes.fromhex('8f70f3')
 MASTER_LOUD = bytes.fromhex('8f7ff3')
@@ -38,6 +38,27 @@ def stepped_curve():
     return bytes(data)
 
 
+def previous_smooth_curve():
+    """4189 ident: one audible 55 Hz pulse. Used to find the table in parents."""
+    data = bytearray()
+    for frame in range(240):
+        if frame < DESCENT:
+            t = frame / (DESCENT - 1)
+            hz = START_HZ * (END_HZ / START_HZ) ** t
+            attack = min(1.0, (frame + 1) / 6)
+            wobble = 0.90 + 0.10 * math.cos(2 * math.pi * frame / 18)
+            volume = round(PEAK * attack * wobble)
+        else:
+            hz = END_HZ
+            t = frame - DESCENT
+            pulse = (0.5 + 0.5 * math.cos(2 * math.pi * t / 40)) ** 1.4
+            fade = 1.0 if t < 55 else max(0.0, 1.0 - (t - 55) / 35)
+            volume = round(PEAK * (0.30 + 0.70 * pulse) * fade)
+        pitch = max(1, min(0x3fff, round(hz * 4096 / 1000)))
+        data.extend((pitch & 255, pitch >> 8, min(127, volume)))
+    return bytes(data)
+
+
 def curve():
     data = bytearray()
     for frame in range(240):
@@ -50,9 +71,9 @@ def curve():
         else:
             hz = END_HZ
             t = frame - DESCENT
-            pulse = (0.5 + 0.5 * math.cos(2 * math.pi * t / TAIL_PERIOD)) ** 1.4
-            fade = 1.0 if t < 55 else max(0.0, 1.0 - (t - 55) / 35)
-            volume = round(PEAK * (0.30 + 0.70 * pulse) * fade)
+            pulse = 0.5 + 0.5 * math.cos(2 * math.pi * t / TAIL_PERIOD)
+            fade = 1.0 if t < 72 else max(0.0, 1.0 - (t - 72) / 18)
+            volume = round(PEAK * (0.12 + 0.88 * pulse) * fade)
         pitch = max(1, min(0x3fff, round(hz * 4096 / 1000)))
         data.extend((pitch & 255, pitch >> 8, min(127, volume)))
     return bytes(data)
@@ -60,7 +81,7 @@ def curve():
 
 def _find_table(image):
     spc = image[0x110000:0x120000]
-    for old in (stepped_curve(), parent_curve()):
+    for old in (previous_smooth_curve(), stepped_curve(), parent_curve()):
         if spc.count(old) == 1:
             return 0x110000 + spc.find(old)
     raise ValueError('Expected unique ident table')
