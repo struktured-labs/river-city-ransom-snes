@@ -130,6 +130,8 @@ ai_guard:
     bne finish_guard
     lda a:$1CA0
     bne finish_guard
+    lda a:$04C0
+    beq finish_guard       ; P2 down: no pad, 1P camera (see sync_2p)
     lda a:$0301
     bmi finish_guard
     bra choose
@@ -319,6 +321,7 @@ publish:
     sta a:$1C81
 finish:
     jsr apply_label
+    jsr sync_2p
     plp
     ply
     plx
@@ -647,6 +650,26 @@ ge_next:
     bne ge_spr
     plp
 ge_done:
+    rts
+
+; Dead/missing P2 must not keep 2P camera (next room waits at the edge forever).
+sync_2p:
+    lda f:ENABLED
+    beq s2_done
+    lda a:$0100
+    cmp #$C0
+    bne s2_done
+    lda a:$04C0
+    beq s2_one
+    lda a:$0301
+    bmi s2_one
+    lda #2
+    sta a:$0035
+    rts
+s2_one:
+    lda #1
+    sta a:$0035
+s2_done:
     rts
 
 skill_next: .byte 1,4,3,1,2
