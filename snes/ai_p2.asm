@@ -152,6 +152,19 @@ flee:
     sta f:OUTPUT
     jmp publish
 alive:
+    lda a:$01E3            ; P1 screen X: 2P will not leave the room until P2 is at the edge
+    cmp #200
+    bcc edge_left
+    lda #$80
+    sta f:OUTPUT
+    jmp publish
+edge_left:
+    cmp #48
+    bcs edge_done
+    lda #$40
+    sta f:OUTPUT
+    jmp publish
+edge_done:
     ldx #0                 ; stay near P1 before considering combat
     jsr distances
     lda f:DXHI
