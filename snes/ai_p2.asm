@@ -361,6 +361,7 @@ apply_label:
     jsr title_mark
     jsr title_skill
     jsr level_overlay
+    jsr gamer_eyes
     lda f:ENABLED
     beq restore_name
     lda f:IN_GAME
@@ -569,6 +570,69 @@ ov_wr:
 ov_plp:
     plp
 ov_done:
+    rts
+
+; Gamer ($064C=3): enemy pal-0 heads -> pal 3 with black swapped to red.
+; P1/P2 skipped by OAM X vs $0388/$0389.
+gamer_eyes:
+    lda a:$064C
+    cmp #3
+    bne ge_done
+    php
+    sep #$30
+    lda a:$0120
+    sta a:$012C
+    lda #$16
+    sta a:$012D
+    lda a:$0122
+    sta a:$012E
+    lda a:$0123
+    sta a:$012F
+    lda #$16
+    sta f:$7F3F1D
+    lda a:$0122
+    sta f:$7F3F1E
+    lda a:$0123
+    sta f:$7F3F1F
+    ldx #0
+ge_spr:
+    lda a:$0200,x
+    cmp #$EE
+    bcs ge_next
+    lda a:$0202,x
+    and #3
+    bne ge_next
+    lda a:$0203,x
+    sec
+    sbc a:$0388
+    bcs :+
+    eor #$FF
+    clc
+    adc #1
+:
+    cmp #32
+    bcc ge_next
+    lda a:$0203,x
+    sec
+    sbc a:$0389
+    bcs :+
+    eor #$FF
+    clc
+    adc #1
+:
+    cmp #32
+    bcc ge_next
+    lda a:$0202,x
+    ora #3
+    sta a:$0202,x
+ge_next:
+    inx
+    inx
+    inx
+    inx
+    bne ge_spr
+    plp
+ge_done:
     rts
 
 skill_next: .byte 1,4,3,1,2

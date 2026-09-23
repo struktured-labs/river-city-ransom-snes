@@ -84,6 +84,10 @@ def _find_table(image):
     for old in (previous_smooth_curve(), stepped_curve(), parent_curve()):
         if spc.count(old) == 1:
             return 0x110000 + spc.find(old)
+    slot = 1114719
+    table = image[slot:slot + 720]
+    if len(table) == 720 and spc.count(table) == 1:
+        return slot
     raise ValueError('Expected unique ident table')
 
 
