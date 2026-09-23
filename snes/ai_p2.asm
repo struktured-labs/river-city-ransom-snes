@@ -35,6 +35,7 @@ ai_p2:
     phx
     phy
     php
+    sep #$30
     cld
     lda a:$1C82
     beq :+
@@ -44,23 +45,19 @@ ai_p2:
     lda $4016              ; L: temporarily lend controller 1 to P2
     and #1
     sta f:SHOULDER
-    lda $4016              ; R: toggle AI on 1P/2P title, skill screen, or in-game
+    lda $4016              ; R: toggle AI (Snes9x default: W)
     and #1
     tay
     tya
     beq settings_done
     lda f:PREV_R
     bne settings_done
-    lda f:SHOULDER
-    bne settings_done
     lda a:$003F
-    bne settings_done
-    lda a:$0100
-    cmp #$C0
-    bne do_toggle          ; pregame (title $3D or skill $05)
-    lda a:$0035
-    cmp #2
-    bne settings_done      ; in-game needs a P2
+    beq do_toggle
+    cmp #$A0
+    beq settings_done      ; fully paused
+    cmp #$60
+    beq settings_done
 do_toggle:
     lda f:ENABLED
     eor #1
