@@ -141,6 +141,18 @@ choose:
     lda #0
     sta f:OUTPUT
     sta f:TARGET
+    lda a:$04BF            ; P1 stamina: dying -> both go down, P2 runs off
+    bne alive
+    sta a:$04C0
+    lda a:$0389
+    cmp #$80
+    lda #$40
+    bcc flee
+    lda #$80
+flee:
+    sta f:OUTPUT
+    jmp publish
+alive:
     ldx #0                 ; stay near P1 before considering combat
     jsr distances
     lda f:DXHI
@@ -154,6 +166,10 @@ choose:
 enemy:
     lda a:$0300,x
     bmi next_enemy
+    lda a:$04F5,x
+    beq next_enemy
+    lda a:$04BF,x
+    beq next_enemy
     jsr distances
     lda f:DXHI
     bne next_enemy
@@ -197,18 +213,15 @@ full_steer:
     bra move_x
 combat_distance:
     lda f:DX
-    cmp #22
+    cmp #14
     bcs move_x
     lda f:DY
-    cmp #9
+    cmp #6
     bcs steer_y
-    lda a:$1C04
-    and #8
-    beq steer_y
-    ; Keep attack pulses separate from jump (never synthesize both A+B).
+    ; Punch only when a live enemy is in range; never A+B jump.
     lda #1
     sta f:OUTPUT
-    bra steer_y
+    bra path_stuck
 move_x:
     lda f:DIRECTION
     and #$C0
