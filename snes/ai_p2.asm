@@ -502,11 +502,18 @@ skill_done:
 ; Skill/settings screen ($0006=5): keep a single name. The original draw
 ; shows NOVICE+ADVANCED for a beat; rewrite every poll so it does not linger.
 level_overlay:
-    lda a:$0006
-    cmp #5
-    bne ov_done
     php
     sep #$30
+    lda a:$0006
+    cmp #5
+    beq ov_go
+    lda a:$003F
+    cmp #$A0
+    bne ov_plp
+    lda f:$7F224B
+    cmp #$D2
+    bne ov_plp
+ov_go:
     lda a:$064C
     dec a
     asl a

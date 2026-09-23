@@ -85,6 +85,7 @@ def build(parent, out):
     patch_bytes(image, snes_unique(0x17b44), bytes.fromhex('ad4c06c902900160ee4c064c7bbb'), jmp('menu_next'))
     patch_bytes(image, snes_unique(0x17b55), bytes.fromhex('ce4c06d021ee4c0660'), jmp('menu_prev'))
     patch_bytes(image, snes_unique(0x17bfe), bytes.fromhex('20c0e260'), jmp('extra_level'))
+    patch_bytes(image, snes_unique(0x17ad5), bytes.fromhex('20c0e2'), jsr('extra_level'))
     patch_bytes(image, snes_unique(0x1a316), bytes.fromhex('bdaf04293f'), jsr('load_agility'))
     patch_bytes(image, snes_unique(0x1a389), bytes.fromhex('bdaf04293f'), jsr('load_agility'))
     for at in snes_fixed(0x1f97c):
