@@ -23,12 +23,15 @@ LAST_X = $7FF00E
 LAST_Y = $7FF00F
 STUCK = $7FF010
 DETOUR = $7FF011
-NAME0 = $7FF012
-NAME1 = $7FF013
-NAME2 = $7FF014
-NAME3 = $7FF015
+P1_LASTX = $7FF012
+P1_LASTXH = $7FF013
+P1_WALK = $7FF014
+P1_STILL = $7FF015
 LABEL_ON = $7FF016
 TITLE_PREV_L = $7FF017
+P1_FOCUS = $7FF018
+ROOM_LAST = $7FF019
+AREA_GRACE = $7FF01A
 
 ai_p2:
     stz $4200
@@ -143,30 +146,79 @@ choose:
     lda #0
     sta f:OUTPUT
     sta f:TARGET
-    lda a:$04BF            ; P1 stamina: dying -> P2 runs for the edge (do not KO-poke)
+    ; On the ground, stam 0 or downed/KO states 0,4..9: sprint for the edge.
+    ; Do not wait for $04BF=0 in the air (WP getup flash is on the ground).
+    lda a:$00B9
     bne alive
+    lda a:$04BF
+    beq do_flee
+    lda a:$0300
+    beq do_flee
+    cmp #4
+    bcc alive
+    cmp #10
+    bcs alive
+do_flee:
     lda a:$0389
     cmp #$80
     lda #$40
-    bcc flee
+    bcc :+
     lda #$80
-flee:
+:
     sta f:OUTPUT
-    jmp publish
+    jmp publish_flee
 alive:
-    lda a:$01E3            ; P1 screen X: 2P will not leave the room until P2 is at the edge
-    cmp #200
+    lda a:$1C80            ; Up = shop; do not edge-rush off the mat
+    and #$10
+    bne edge_done
+edge_rush:
+    ; $01E3=0 is not an edge (stale). Widen so 2P camera can catch a real exit.
+    lda a:$01E3
+    beq edge_done
+    cmp #176
     bcc edge_left
     lda #$80
     sta f:OUTPUT
     jmp publish
 edge_left:
-    cmp #48
+    cmp #80
     bcs edge_done
     lda #$40
     sta f:OUTPUT
     jmp publish
 edge_done:
+    ; Nearest live goon to P1 (slots 2/3). P2 will skip that slot.
+    lda #$FF
+    sta f:P1_FOCUS
+    lda #81
+    sta f:BEST
+    ldx #2
+p1scan:
+    lda a:$0300,x
+    bmi p1n
+    lda a:$04F5,x
+    beq p1n
+    lda a:$04BF,x
+    beq p1n
+    ldy #0
+    jsr distances_from
+    lda f:DXHI
+    bne p1n
+    lda f:DY
+    cmp #40
+    bcs p1n
+    lda f:DX
+    cmp #80
+    bcs p1n
+    cmp f:BEST
+    bcs p1n
+    sta f:BEST
+    txa
+    sta f:P1_FOCUS
+p1n:
+    inx
+    cpx #4
+    bne p1scan
     ldx #0                 ; stay near P1 before considering combat
     jsr distances
     lda f:DXHI
@@ -178,6 +230,9 @@ edge_done:
     sta f:BEST
     ldx #2
 enemy:
+    txa                    ; CPX has no long form; P1_FOCUS lives in bank $7F
+    cmp f:P1_FOCUS
+    beq next_enemy
     lda a:$0300,x
     bmi next_enemy
     lda a:$04F5,x
@@ -316,28 +371,96 @@ reset_stuck:
     sta f:DETOUR
 path_done:
 publish:
+    jsr p1_track
+    lda a:$1C80
+    and #$10
+    bne lr_done            ; P1 Up: keep still so shops/doors can fire
+    lda f:P1_WALK
+    bne apply_lr
+    lda a:$1C80
+    and #$C0
+    beq lr_done
+apply_lr:
+    sta f:BEST
+    lda f:OUTPUT
+    and #$3F
+    ora f:BEST
+    sta f:OUTPUT
+lr_done:
+publish_flee:
     lda f:OUTPUT
     and #$F3              ; AI can NEVER generate Select/Start
     sta a:$1C81
 finish:
     jsr apply_label
     jsr sync_2p
+    lda f:ENABLED
+    beq :+
+    lda a:$0036            ; AI 2P: 1P door/shop is enough (game ANDs $36 with $37)
+    sta a:$0037
+:
     plp
     ply
     plx
     jmp POLL
 
-; X = original actor slot. Unsigned 16-bit world X subtraction, absolute
-; distance and direction. Y is original ground-plane coordinate, not OAM Y.
+; Which way P1 actually moved this frame (world X). Pad $1C80 can already be
+; empty here; displacement is the source of truth.
+p1_track:
+    lda a:$0388
+    sec
+    sbc f:P1_LASTX
+    sta f:BEST
+    lda a:$0390
+    sbc f:P1_LASTXH
+    tay
+    lda a:$0388
+    sta f:P1_LASTX
+    lda a:$0390
+    sta f:P1_LASTXH
+    tya
+    bmi p1_left
+    bne p1_right
+    lda f:BEST
+    beq p1_idle
+p1_right:
+    lda #$80
+    sta f:P1_WALK
+    lda #0
+    sta f:P1_STILL
+    rts
+p1_left:
+    lda #$40
+    sta f:P1_WALK
+    lda #0
+    sta f:P1_STILL
+    rts
+p1_idle:
+    lda f:P1_STILL
+    cmp #20
+    bcs p1_clear
+    clc
+    adc #1
+    sta f:P1_STILL
+    rts
+p1_clear:
+    lda #0
+    sta f:P1_WALK
+    rts
+
+; X = actor slot. Y = origin slot (0=P1, 1=P2). Unsigned 16-bit world X
+; subtraction and facing. Ground Y is $0398,x, not OAM Y.
 distances:
+    ldy #1
+distances_from:
     lda #$80
     sta f:DIRECTION
     lda a:$0388,x
     sec
-    sbc a:$0389
+    sbc a:$0388,y
     sta f:DX
     lda a:$0390,x
-    sbc a:$0391
+    sbc a:$0390,y
     sta f:DXHI
     bpl x_done
     lda #$40
@@ -354,7 +477,7 @@ distances:
 x_done:
     lda a:$0398,x
     sec
-    sbc a:$0399
+    sbc a:$0398,y
     bcs down
     eor #$FF
     clc
@@ -371,61 +494,53 @@ down:
     sta f:DIRECTION
     rts
 
-; RYAN HUD is original name RAM $0677 and CIRAM row 2 col 17 ($7F:2051).
+; P2 HUD name stays $0677 (RYAN/ALEX/custom). Suffix " AI" after P2 HP
+; (row 2 cols 26-28). Font has no parentheses, so this is "RYAN AI".
 apply_label:
     jsr title_mark
     jsr title_skill
     jsr level_overlay
     jsr gamer_eyes
     lda f:ENABLED
-    beq restore_name
+    beq hud_off
     lda f:IN_GAME
-    beq restore_name
+    beq hud_off
     lda a:$0035
     cmp #2
-    bne restore_name
-    lda f:LABEL_ON
-    bne write_ai
-    lda a:$0677
-    sta f:NAME0
-    lda a:$0678
-    sta f:NAME1
-    lda a:$0679
-    sta f:NAME2
-    lda a:$067A
-    sta f:NAME3
-    lda #1
-    sta f:LABEL_ON
-write_ai:
+    bne hud_off
+    lda #0
+    sta f:$7F205A
     lda #$C0
-    sta a:$0677
-    sta f:$7F2051
+    sta f:$7F205B
     lda #$C8
-    sta a:$0678
-    sta f:$7F2052
-    lda #0
-    sta a:$0679
-    sta a:$067A
-    sta f:$7F2053
-    sta f:$7F2054
+    sta f:$7F205C
     rts
-restore_name:
-    lda f:LABEL_ON
-    beq label_done
-    lda f:NAME0
-    sta a:$0677
-    lda f:NAME1
-    sta a:$0678
-    lda f:NAME2
-    sta a:$0679
-    lda f:NAME3
-    sta a:$067A
+hud_off:
+    ; Every poll while off — a one-shot blank can miss the PPU copy and stick.
     lda #0
-    sta f:LABEL_ON
-label_done:
+    sta f:$7F205A
+    sta f:$7F205B
+    sta f:$7F205C
     rts
 
-; 1P/2P title ($0006=$3D): show AI beside 2P PLAY and move the cursor to 2P.
+; $0677 (4) + space + AI -> $7FF030. Callers copy 7 tiles with X.
+pack_caption:
+    ldx #0
+pcopy:
+    lda a:$0677,x
+    sta f:$7FF030,x
+    inx
+    cpx #4
+    bne pcopy
+    lda #0
+    sta f:$7FF034
+    lda #$C0
+    sta f:$7FF035
+    lda #$C8
+    sta f:$7FF036
+    rts
+
+; 1P/2P title: "2P RYAN AI" / "2P ALEX AI" from P2's name, cursor on 2P.
 title_mark:
     lda a:$0006
     cmp #$3D
@@ -436,13 +551,14 @@ title_mark:
     sta f:$7F20EB
     lda #$BB
     sta f:$7F212B
-    lda #$C0
-    sta f:$7F212F
-    lda #$C8
-    sta f:$7F2130
-    lda #0
-    sta f:$7F2131
-    sta f:$7F2132
+    jsr pack_caption
+    ldx #0
+tcap:
+    lda f:$7FF030,x
+    sta f:$7F212F,x
+    inx
+    cpx #7
+    bne tcap
     lda #2
     sta a:$0035
     rts
@@ -455,6 +571,10 @@ title_off:
     sta f:$7F2131
     lda #$D8
     sta f:$7F2132
+    lda #0
+    sta f:$7F2133
+    sta f:$7F2134
+    sta f:$7F2135
 title_done:
     rts
 
@@ -576,25 +696,47 @@ ov_wr:
     inx
     cpx #8
     bne ov_wr
-    lda f:ENABLED
-    beq ov_plp
-    lda #$C0
-    sta f:$7F22B6
-    lda #$C8
-    sta f:$7F22B7
 ov_plp:
     plp
 ov_done:
     rts
 
 ; Gamer: red outline on goons (pal 0 color 1 -> $16). Skip P1/P2 via screen X
-; at $01E3/$02E3. Skip while P1 stamina is 0 so a fleeing companion stays normal.
+; at $01E3/$02E3. Street only ($0100=$C0 and $003F=0). Pause/fade strips pal 3
+; so Alex/Ryan portraits are not left on the outline palette.
 gamer_eyes:
     lda a:$064C
     cmp #3
-    bne ge_done
+    bne ge_off
+    lda a:$0100
+    cmp #$C0
+    bne ge_off
+    lda a:$003F
+    bne ge_strip
     lda a:$04BF
-    beq ge_done
+    bne ge_go
+ge_strip:
+    lda a:$0121
+    sta a:$012D
+    sta f:$7F3F1D
+    ldx #0
+ge_clr:
+    lda a:$0202,x
+    and #3
+    cmp #3
+    bne ge_cn
+    lda a:$0202,x
+    and #$FC
+    sta a:$0202,x
+ge_cn:
+    txa
+    clc
+    adc #4
+    tax
+    bne ge_clr
+ge_off:
+    rts
+ge_go:
     php
     sep #$30
     lda a:$0120
@@ -649,13 +791,31 @@ ge_next:
     tax
     bne ge_spr
     plp
-ge_done:
     rts
 
-; Dead/missing P2 must not keep 2P camera (next room waits at the edge forever).
+; Dead P2: 1P camera so P1 can leave and shop. On room change, 2P for ~30
+; frames so the original "dead partner returns in the next area" path can run.
 sync_2p:
     lda f:ENABLED
     beq s2_done
+    lda a:$0042
+    cmp f:ROOM_LAST
+    beq s2_same
+    sta f:ROOM_LAST
+    lda #30
+    sta f:AREA_GRACE
+    lda #2
+    sta a:$0035
+    rts
+s2_same:
+    lda f:AREA_GRACE
+    beq s2_live
+    dec a
+    sta f:AREA_GRACE
+    lda #2
+    sta a:$0035
+    rts
+s2_live:
     lda a:$0100
     cmp #$C0
     bne s2_done

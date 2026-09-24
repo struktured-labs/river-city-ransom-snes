@@ -156,13 +156,6 @@ wr:
     inx
     cpx #8
     bne wr
-    lda f:$7FF000
-    beq no_ai
-    lda #$C0
-    sta f:$7F22B6
-    lda #$C8
-    sta f:$7F22B7
-no_ai:
     plp
     rts
 

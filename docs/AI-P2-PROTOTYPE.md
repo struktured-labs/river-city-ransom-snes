@@ -5,11 +5,13 @@ and not deployed to any MiSTer. The companion runs on the SNES CPU, not in an
 emulator input bot. Original graphics, combat, money, shops, item bonuses and
 equipment routines remain unchanged. There is no new XP or leveling system.
 
-Current candidate: `build/ai-p2-4166/native-cpu.sfc`, SHA-256
-`b2136dc1471ffdf87a4671062d7482366641905cc0a6d79fcaa690341e23de8e`.
+Current candidate: `build/ai-p2-4225/native-cpu.sfc`, SHA-256
+`23fad860cce1660252d1dc61ee9afdeda0116f87020f9feae5ba1ead83808477`.
 Tap **R** on the 1P/2P title, the skill screen, or in-game. Enabling AI forces
-2P and shows **AI** next to 2P PLAY. HUD name **AI** in-game. LEVEL shows one
-skill name (NOVICE / INTERMED / ADVANCED / GAMER).
+2P and labels the companion with their name plus **AI** (`RYAN AI` or `ALEX AI`,
+from P2's 4-letter name — whoever you did not pick as player 1). The original
+font has no parentheses. HUD keeps the real name and tags **AI** after P2's bar.
+LEVEL shows only the skill name (NOVICE / INTERMED / ADVANCED / GAMER), not an AI tag.
 
 Review: <http://127.0.0.1:8766/ai-p2-review-02/>.
 
@@ -83,8 +85,11 @@ slots 2/3, not object slots 4..7; follows P1 when separated; steers using origin
 world coordinates, whose ground Y increases toward screen-up. No navigation
 search or network/model calls run on the console.
 
-Friendly-fire avoidance, shopping AI, death/revival policy and human P2
-takeover still need work. Manual management still requires holding L.
+Combat targeting skips P1's nearest live goon (actor slots 2/3, DX<80 DY<40)
+so P2 punches someone else. If that is the only live enemy, P2 follows P1 and
+does not punch. Companion never walks against P1's held left/right (so 2P
+camera can leave a room). Shopping AI and death/revival policy still need work. Manual
+management still requires holding L.
 
 Earlier numbered prototype/capture attempts are retained as failed iterations;
 their source hashes can differ from the finalized tools. Only the final captures

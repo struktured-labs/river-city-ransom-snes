@@ -62,8 +62,11 @@ def build(parent, out):
         controls='Select original 2P. Tap R on pregame settings or in-game to toggle AI. '
                  'Hold P1 L to drive P2 belongings/equipment; Start remains original global P1 pause. '
                  'Release L for one neutral poll, then P1+AI resume. Physical P2 input overrides AI.',
-        limits='Lane-first follow and stuck detours. HUD AI label while enabled. '
-               'No friendly-fire guarantee, shopping AI or persistence. '
+        limits='Lane-first follow and stuck detours. HUD keeps P2 name (RYAN/ALEX) '
+               'plus AI tag; title 2P row shows NAME AI. LEVEL is skill only. '
+               'Skips P1 nearest goon so P2 does not punch the same target; '
+               'if that is the only enemy, P2 follows and does not punch. '
+               'No shopping AI or persistence. '
                'Not compatible yet with experimental control presets.'))
     (out/'manifest.json').write_text(json.dumps(meta,indent=2)+'\n')
     print(json.dumps(dict(out=str(out),rom_sha256=meta['rom_sha256'])))
