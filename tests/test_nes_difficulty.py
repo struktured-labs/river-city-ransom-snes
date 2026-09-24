@@ -13,6 +13,8 @@ ROM = Path('roms/river-city-ransom-us.nes')
 class NesDifficultyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        if not ROM.is_file():
+            raise unittest.SkipTest('US NES ROM not present')
         cls.prg = prg_from(ROM.read_bytes())
 
     def test_skill_add_table_has_four_slots(self):

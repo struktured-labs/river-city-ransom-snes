@@ -16,8 +16,10 @@ import numpy as np
 from PIL import Image
 
 try:
+    from .fceux_env import require_palette
     from .smoke_libretro import Game, Variable, AVInfo
 except ImportError:
+    from fceux_env import require_palette
     from smoke_libretro import Game, Variable, AVInfo
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -470,7 +472,7 @@ def capture(core_path, rom_path, system, references, out, scenario_name='baselin
                                  "source_rom": manifest["rom_sha256"], "rect": RECTS[name]}
     if len({value["source_rom"] for value in template_hashes.values()}) != 1:
         raise ValueError("Mixed reference ROMs")
-    palette = Path('/usr/share/fceux/palettes/FCEUX.pal')
+    palette = require_palette()
     palette_hash = sha(palette)
     if any(json.loads((directory / 'manifest.json').read_text())["palette_sha256"] != palette_hash
            for directory, frame in references.values()):

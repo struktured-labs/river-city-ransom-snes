@@ -11,8 +11,10 @@ import subprocess
 from PIL import Image
 
 try:
+    from .fceux_env import fceux_binary, require_palette
     from .rom import Rom
 except ImportError:
+    from fceux_env import fceux_binary, require_palette
     from rom import Rom
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -56,9 +58,10 @@ def main():
                    RCR_CAPTURE_PROFILE=args.profile, QT_QPA_PLATFORM=qt_platform)
         if args.replay:
             env['RCR_REPLAY_INPUT'] = str(out/'replay-input.txt')
+        palette = require_palette()
         command = (["xvfb-run", "-a"] if qt_platform == 'xcb' else []) + [
-                   "/usr/games/fceux", "--no-config", "1", "--sound", "0",
-                   "--palette", "/usr/share/fceux/palettes/FCEUX.pal",
+                   str(fceux_binary()), "--no-config", "1", "--sound", "0",
+                   "--palette", str(palette),
                    "--loadlua", str(ROOT / "tools/trace_nes.lua"), str(args.rom.resolve())]
         with (out / "emulator.log").open("w") as log:
             process = subprocess.Popen(command, cwd=out, env=env, stdout=log, stderr=log,
@@ -84,8 +87,8 @@ def main():
     manifest = {
         "schema": "rcr-nes-capture-v1", "rom_sha256": sha(args.rom),
         "script_sha256": sha(ROOT / "tools/trace_nes.lua"),
-        "emulator_sha256": sha(Path("/usr/games/fceux")),
-        "palette_sha256": sha(Path("/usr/share/fceux/palettes/FCEUX.pal")),
+        "emulator_sha256": sha(fceux_binary()),
+        "palette_sha256": sha(palette),
         "frames": args.frames, "profile": args.profile,
         "replay_binding": replay_binding,
         "files": {p.name: sha(p) for p in sorted(out.iterdir()) if p.is_file()},
