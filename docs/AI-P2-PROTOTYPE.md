@@ -26,6 +26,12 @@ The named card image **4163** (`build/ai-p2-4163`, SHA-256
 difficulty plus the AI stacked at `e4849b2`. Rebuild it with `make playable`
 (see the README). 4166 and 4225 are later than that recipe.
 
+Builds **4236** and **gamer-eyes-4239**, and a separate `snes/gamer_eyes.asm`,
+are not in this repository and are not on any pushed branch. They are local
+inputs only. `make playable` does not produce them. `main` does contain an
+inline `gamer_eyes` routine in `snes/ai_p2.asm`; that routine is not those
+cartridges.
+
 Review: <http://127.0.0.1:8766/ai-p2-review-02/>.
 
 ## Controls

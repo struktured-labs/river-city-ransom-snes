@@ -5,7 +5,8 @@ the louder stair-step WUB. 4162 adds Intermediate and Gamer Mode. 4163 stacks
 AI P2 on 4162. Checksums for 4146/4162/4163 match the builders at
 e4849b22be363338de681ec4678741c067e40890 (the commit that recorded 4163).
 Later main commits changed the splash and the companion; branch ai-p2-4225
-is not used.
+is not used. Builds 4236 and gamer-eyes-4239, and snes/gamer_eyes.asm, are
+not in this repository. This tool does not search for them.
 
 The US NES ROM is required so the parent manifest can be bound to it. It is
 not sufficient. Build 3955 (or, failing that, build 3800) is a local cartridge

@@ -120,6 +120,11 @@ That command does not emit 3800 or 3955; the prefix below 3800 is a further
 chain of local exact-SHA patches (3780 and earlier) that only exist on a
 machine that already built them.
 
+Builds 4236 and gamer-eyes-4239, and a separate `snes/gamer_eyes.asm`, are
+not in this repository or on any pushed branch. They are missing local inputs.
+This target does not look for them and does not emit them. `snes/ai_p2.asm` on
+`main` has an inline `gamer_eyes` routine; that is not those cartridges.
+
 4146, 4162, and 4163 are produced from the builders at
 `e4849b22be363338de681ec4678741c067e40890`, the commit that recorded 4163.
 The tool checks out that revision under `build/` (gitignored) so later splash
