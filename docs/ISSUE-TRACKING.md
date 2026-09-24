@@ -10,7 +10,7 @@ a pushed build or new hardware verification.
 | Issue | Scope |
 | --- | --- |
 | [#1](https://github.com/struktured-labs/river-city-ransom-snes/issues/1) | Original native-port objective |
-| [#2](https://github.com/struktured-labs/river-city-ransom-snes/issues/2) | AI-assisted P2 companion (4163: pathfinding + R toggle in-game; not on EverDrive) |
+| [#2](https://github.com/struktured-labs/river-city-ransom-snes/issues/2) | AI-assisted P2 companion (4163 on EverDrive as the AI Gamer card image; later `main` source has no new ROM hash; branch `ai-p2-4225` is parked and not merged) |
 | [#3](https://github.com/struktured-labs/river-city-ransom-snes/issues/3) | SNES/Struktured Labs branding and attribution |
 | [#4](https://github.com/struktured-labs/river-city-ransom-snes/issues/4) | Blank Present Status statistics |
 | [#5](https://github.com/struktured-labs/river-city-ransom-snes/issues/5) | Original-speed gameplay, rare slowdown, sprite latency |
@@ -26,8 +26,8 @@ a pushed build or new hardware verification.
 | [#15](https://github.com/struktured-labs/river-city-ransom-snes/issues/15) | Controller-one management of P2 equipment |
 | [#16](https://github.com/struktured-labs/river-city-ransom-snes/issues/16) | Immediate shop stat-gain display |
 | [#17](https://github.com/struktured-labs/river-city-ransom-snes/issues/17) | Closed: no RCG-style consumed-item marker (food stats stack) |
-| [#20](https://github.com/struktured-labs/river-city-ransom-snes/issues/20) | Intermediate difficulty (`$064C=4` +8 in 4162; not on EverDrive) |
-| [#21](https://github.com/struktured-labs/river-city-ransom-snes/issues/21) | Gamer Mode (`$064C=3` +32, 127/255; LEVEL GAMER; 4162; passwords/food cap still follow-up) |
+| [#20](https://github.com/struktured-labs/river-city-ransom-snes/issues/20) | Intermediate difficulty (`$064C=4` +8 in 4162; the EverDrive image that includes it is combined 4163, not a standalone 4162 file) |
+| [#21](https://github.com/struktured-labs/river-city-ransom-snes/issues/21) | Gamer Mode (`$064C=3` +32, 127/255; LEVEL GAMER; in 4162 and on the 4163 card image; 44-char encode/decode is still only `tools/rcr_password.py` length classification) |
 | [#22](https://github.com/struktured-labs/river-city-ransom-snes/issues/22) | Simon easier on Advanced? original NES overflow check (ROM: no wrap; Advanced is +16 with 63/127 caps) |
 
 The user's progression clarification is part of16/17: defeating gangsters yields

@@ -4,7 +4,10 @@ Issue [#21](https://github.com/struktured-labs/river-city-ransom-snes/issues/21)
 Original apply is in `tools/nes_difficulty.py` / [#22](https://github.com/struktured-labs/river-city-ransom-snes/issues/22).
 Implemented on parent 4146 as `build/difficulty-modes-4162/native-cpu.sfc`
 (SHA256 `c85acc903ad525619b999758660866afcc5f5dd9dbaf78278d7a31046fb2d18d`).
-Not on EverDrive yet. Novice (`$064C=1`) and Advanced (`$064C=2`) stay byte-identical.
+The EverDrive card image is combined **4163** (`build/ai-p2-4163`), not a
+separate 4162 file. Novice (`$064C=1`) and Advanced (`$064C=2`) stay byte-identical.
+44-character password encode/decode is not in that ROM. `tools/rcr_password.py`
+only classifies length. The password section below is the locked spec.
 
 ## Play
 

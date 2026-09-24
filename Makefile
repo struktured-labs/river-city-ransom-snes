@@ -3,7 +3,7 @@ CA65 ?= .deps/cc65/bin/ca65
 LD65 ?= .deps/cc65/bin/ld65
 SPC_DIR ?= .deps/upernes/source/asm
 
-.PHONY: all bootstrap test verify prepare port
+.PHONY: all bootstrap test verify prepare port playable
 all: build/audio-bringup.sfc
 
 bootstrap:
@@ -30,5 +30,10 @@ prepare:
 	$(PYTHON) tools/rom.py prepare "$(ROM)"
 
 port:
-	@echo 'Gameplay port is not implemented yet; see docs/ROADMAP.md. No game ROM generated.'
+	@echo 'Gameplay port is not a finished conversion. Named trials: make playable ROM=/path/to/River\ City\ Ransom\ \(USA\).nes BUILD=4108|4163'
 	@exit 1
+
+# Experimental 4108/4146/4162/4163. Fails with a named gap when build 3955 or 3800 is absent.
+playable:
+	@test -n "$(ROM)" || { echo 'Usage: make playable ROM="/path/to/River City Ransom (USA).nes" [BUILD=4108|4146|4162|4163]'; exit 1; }
+	$(PYTHON) tools/rebuild_playable.py --rom "$(ROM)" --build "$(or $(BUILD),4163)"

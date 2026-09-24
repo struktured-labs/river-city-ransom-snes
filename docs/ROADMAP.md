@@ -2,7 +2,10 @@
 
 The requested outcome is a playable native SNES conversion with unchanged NES
 graphics and NES-style SPC sound. The audio diagnostic is an initial milestone,
-not completion of that outcome.
+not completion of that outcome. The 1P trial ROM is
+[4108](TIMED-TOKEN-GRACE.md). Combined AI and Gamer **4163** is the later card
+image (`make playable` in the README). Branch `ai-p2-4225` holds candidate 4225
+and is intentionally not merged into `main`.
 
 1. **Implemented: foundation.** Strict original-ROM profile, lossless tiles,
    reproducible assembly, SNES boot and SPC pulse diagnostic, data tests.

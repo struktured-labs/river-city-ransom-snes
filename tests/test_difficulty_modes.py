@@ -8,18 +8,23 @@ PARENT = Path('build/chromatic-wub-game-4146/native-cpu.sfc')
 
 
 class DifficultyPatchLayoutTests(unittest.TestCase):
+    def parent_bytes(self):
+        if not PARENT.is_file():
+            self.skipTest('4146 not built')
+        return PARENT.read_bytes()
+
     def test_helper_slot_is_free_on_4146(self):
-        data = PARENT.read_bytes()
+        data = self.parent_bytes()
         for bank in range(1, 9):
             at = bank * 65536 + SLOT
             self.assertEqual(data[at:at + SIZE], b'\xff' * SIZE)
 
     def test_b900_preimage_still_original(self):
-        data = PARENT.read_bytes()
+        data = self.parent_bytes()
         self.assertEqual(data[snes_unique(0x13900):snes_unique(0x13900) + 3], bytes.fromhex('8c3400'))
 
     def test_menu_cmp_2_still_original(self):
-        data = PARENT.read_bytes()
+        data = self.parent_bytes()
         self.assertEqual(data[snes_unique(0x17b44) + 3:snes_unique(0x17b44) + 5], bytes.fromhex('c902'))
 
     def test_built_4162_keeps_original_add_table(self):

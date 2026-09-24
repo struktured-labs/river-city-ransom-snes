@@ -5,19 +5,41 @@ and not deployed to any MiSTer. The companion runs on the SNES CPU, not in an
 emulator input bot. Original graphics, combat, money, shops, item bonuses and
 equipment routines remain unchanged. There is no new XP or leveling system.
 
-Current candidate: `build/ai-p2-4166/native-cpu.sfc`, SHA-256
-`b2136dc1471ffdf87a4671062d7482366641905cc0a6d79fcaa690341e23de8e`.
-Tap **R** on the 1P/2P title, the skill screen, or in-game. Enabling AI forces
-2P and shows **AI** next to 2P PLAY. HUD name **AI** in-game. LEVEL shows one
-skill name (NOVICE / INTERMED / ADVANCED / GAMER).
+Main's last recorded AI cartridge is `build/ai-p2-4166/native-cpu.sfc`, SHA-256
+`b2136dc1471ffdf87a4671062d7482366641905cc0a6d79fcaa690341e23de8e`
+(commit `c77d549`). Tap **R** on the 1P/2P title, the skill screen, or in-game.
+Enabling AI forces 2P and shows **AI** next to 2P PLAY. HUD name **AI** in-game.
+LEVEL shows one skill name (NOVICE / INTERMED / ADVANCED / GAMER).
+
+Commits on `main` after `c77d549` changed `snes/ai_p2.asm` (skill text, combat,
+camera) without publishing a new ROM hash in this file. Those edits are source
+on `main`, not a named cartridge.
+
+Branch `ai-p2-4225` is parked on purpose and is **not** merged into `main`.
+Its candidate is `build/ai-p2-4225/native-cpu.sfc`, SHA-256
+`23fad860cce1660252d1dc61ee9afdeda0116f87020f9feae5ba1ead83808477`.
+That branch labels the companion with the P2 name plus **AI** (`RYAN AI` or
+`ALEX AI`). Do not treat 4225 as the `main` build.
+
+The named card image **4163** (`build/ai-p2-4163`, SHA-256
+`bd62a39387e2281ffb9ab3038ab531a4bfbf6cf1aa9bcea1754146f16cd00ba0`) is 4162
+difficulty plus the AI stacked at `e4849b2`. Rebuild it with `make playable`
+(see the README). 4166 and 4225 are later than that recipe.
+
+Builds **4236** and **gamer-eyes-4239**, and a separate `snes/gamer_eyes.asm`,
+are not in this repository and are not on any pushed branch. They are local
+inputs only. `make playable` does not produce them. `main` does contain an
+inline `gamer_eyes` routine in `snes/ai_p2.asm`; that routine is not those
+cartridges.
 
 Review: <http://127.0.0.1:8766/ai-p2-review-02/>.
 
 ## Controls
 
 1. Select the original **2-player** game mode.
-2. Tap **R** in the pregame settings screen to enable AI. It is off at reset;
-   a held R toggles once, not repeatedly. No on-screen AI indicator exists yet.
+2. Tap **R** in the pregame settings screen, or in-game, to toggle AI. It is off
+   at reset; a held R toggles once, not repeatedly. While AI is on, the HUD
+   shows **AI**. Enabling AI forces 2P.
 3. During gameplay, P2 follows P1 and approaches/attacks nearby enemy actors.
    AI never generates Start or Select.
 4. Hold **L on controller 1** to lend its controls to P2. Directions, attack/
@@ -36,7 +58,9 @@ integrated; this prototype assumes the current nine-bit adapter.
 
 ## Executed evidence
 
-All three current captures use the same actual cartridge and core:
+The captures below are the earlier isolated prototype whose parent was
+`build/sprite-copy-game-3252`, not 4163, 4166, or the parked 4225 branch.
+All three of those captures use the same actual cartridge and core:
 
 | Capture | Frames | What it establishes |
 | --- | ---: | --- |
@@ -76,9 +100,10 @@ normal shopping, which remains a separate test to add.
 
 ## Implementation and limits
 
-`snes/ai_p2.asm` intercepts cached inputs immediately before the existing fast
+`snes/ai_p2.asm` on `main` intercepts cached inputs immediately before the existing fast
 serial poll. It preserves X/Y/P, disables NMI during the bounded input operation
-and uses private reset-cleared `$7FF000..$7FF00F` WRAM. It selects original enemy
+and uses private reset-cleared WRAM from `$7FF000` (the assembly currently
+touches through `$7FF017`). It selects original enemy
 slots 2/3, not object slots 4..7; follows P1 when separated; steers using original
 world coordinates, whose ground Y increases toward screen-up. No navigation
 search or network/model calls run on the console.
@@ -87,10 +112,17 @@ Friendly-fire avoidance, shopping AI, death/revival policy and human P2
 takeover still need work. Manual management still requires holding L.
 
 Earlier numbered prototype/capture attempts are retained as failed iterations;
-their source hashes can differ from the finalized tools. Only the final captures
-listed above and review 02 are the current source-validated evidence.
+their source hashes can differ from the finalized tools. The captures in this
+file are that earlier prototype's evidence, not a certificate for 4163 or for
+branch `ai-p2-4225`.
 
 ## Reproduce
+
+Named 4163 (AI on difficulty 4162, parent splash 4146, gameplay 4108) is
+`make playable ROM=/path/to/the/US/ROM BUILD=4163`. That recipe uses the
+builders at `e4849b2` and checks the published SHA-256. It needs local build
+3955 or 3800; those cartridges are not in git. The 3252-parent commands below
+reproduce the earlier isolated prototype, not 4163.
 
 ```sh
 python -m tools.build_ai_p2 --parent build/sprite-copy-game-3252 --out build/ai-p2-NEW

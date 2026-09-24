@@ -1,4 +1,15 @@
-# Recorded validation — 2026-09-14
+# Recorded validation — 2026-09-14 foundation checkpoint
+
+This page is the 14 September 2026 foundation checkpoint. It is not the
+current playable trial. The 1P EverDrive ROM is
+[candidate 4108](TIMED-TOKEN-GRACE.md). Combined AI and Gamer **4163** is
+described in the [README](../README.md) and rebuilt with `make playable`.
+Later companion work that is not on `main` is branch `ai-p2-4225` (candidate
+4225). That branch is intentionally not merged.
+
+The test count and cartridge hash below are this checkpoint's results.
+`make verify` still builds the asset-free audio diagnostic; it does not
+rebuild 4108 or 4163.
 
 ## Latest incremental interrupt validation
 
@@ -10,7 +21,7 @@ Earlier checkpoints below are historical and do not establish full-speed play.
 
 This is development evidence, not a finished-port certification.
 
-- `make verify`: 18 tests pass, including attribute quadrants, flipped tall
+- `make verify` at this checkpoint: 18 tests pass, including attribute quadrants, flipped tall
   sprites, geometry and one-pixel negative controls, NMI reset/fault detection,
   coroutine tail hooks and the self-modifying audio operand.
   Gallery tests reject image tampering, forbidden ROM payloads and a false live pass.
@@ -32,7 +43,7 @@ This is development evidence, not a finished-port certification.
   (71 → 6557), no unknown-I/O or SPC timeout, NMI depth ≤1, audio peak 1846.
   This proves adapter liveness, not full gameplay or sound equivalence.
 
-Current cartridge SHA-256:
+Checkpoint cartridge SHA-256:
 `c03c27a625d91c268f6bbbb958db256bf2f8dcf8a06804ee37809dbd340129b1`.
 See [audit evidence](audit/README.md) for exact identities. Live comparisons are
 not frame/input synchronized. Scrolling, raster HUD, speed, full mapper coverage,
