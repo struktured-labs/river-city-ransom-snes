@@ -19,15 +19,19 @@ two-purchase; DMA envelopes. Notes:
 [roadmap](docs/ROADMAP.md),
 [issues](https://github.com/struktured-labs/river-city-ransom-snes/issues).
 
-Next requested work: 2P AI (#2), splash sound (#13), controller presets (#12),
-Intermediate difficulty (#20), Gamer Mode (#21, [locked](docs/GAMER-MODE.md):
-optional grind, Gamer-only speed>63, SRAM, NES+SNES passwords). Original NES Advanced Simon
-is not an overflow-easier fight (#22): +16 with 63/127 caps. Splash 4146 is on
-EverDrive for a listen. Combined **4163** (`build/ai-p2-4163`) is 4162 difficulty
-plus AI: R toggles on settings or in-game, HUD **AI** label, lane-first pathfinding.
-Emulator audit pass; on EverDrive as `River City Ransom SNES 4163 AI Gamer.sfc`.
-Player food still original 63/127;
-44-char passwords not in ROM yet.
+Combined **4163**
+(`build/ai-p2-4163`, SHA256
+`bd62a39387e2281ffb9ab3038ab531a4bfbf6cf1aa9bcea1754146f16cd00ba0`) is 4162
+difficulty plus AI: R toggles on settings or in-game, HUD **AI** label,
+lane-first pathfinding. Emulator audit pass; on EverDrive as
+`River City Ransom SNES 4163 AI Gamer.sfc`. Intermediate and Gamer Mode are
+[locked](docs/GAMER-MODE.md): optional grind, Gamer-only speed>63, SRAM.
+Original NES Advanced Simon is not an overflow-easier fight (#22): +16 with
+63/127 caps. Player food is still the original 63/127. 44-char password
+encode/decode is not in the ROM (`tools/rcr_password.py` only classifies
+length). Controller presets (#12) are still open. Later `main` commits changed
+the companion and splash without a new published hash. Branch `ai-p2-4225`
+records candidate 4225 and is intentionally not merged.
 
 ROMs, extracted assets and generated cartridges stay local. Start with
 [visual audits](docs/audit/README.md) and the [development runbook](docs/DEVELOPMENT.md).
@@ -82,8 +86,54 @@ Preparation accepts the US PRG CRC32 `78784CBF`, CHR CRC32 `204AA5EB`, mapper 4,
 an existing extraction. Inspection can report other clean iNES 1.0 images;
 preparation rejects unrecognized revisions. ROMs and extracted assets stay local.
 
-`make port` still refuses to imply a finished conversion. To reproduce the
-experimental cartridge and audits, follow [the development runbook](docs/DEVELOPMENT.md).
+`make port` still refuses to imply a finished conversion. Named experimental
+cartridges are rebuilt with `make playable` below. Audits follow
+[the development runbook](docs/DEVELOPMENT.md).
+
+## Rebuild a named playable trial
+
+`BUILD` is `4108` (1P trial), `4146` (louder splash on that gameplay), `4162`
+(Intermediate and Gamer on 4146), or `4163` (AI on 4162). The default is `4163`.
+Each finished ROM is checked against the SHA-256 published above and in
+`docs/GAMER-MODE.md` / `docs/TIMED-TOKEN-GRACE.md`.
+
+```sh
+make bootstrap
+make playable ROM='/path/to/River City Ransom (USA).nes' BUILD=4108
+make playable ROM='/path/to/River City Ransom (USA).nes' BUILD=4163
+```
+
+The US ROM is required and must be the image recorded in the parent manifest
+(`source_rom_sha256`). It is not enough by itself. 4108's parent is early-OAM
+build **3955** at `build/early-oam-live-half-game-3955/native-cpu.sfc`
+(SHA256 `f6f69215716ecc077c9082da0a20db1eaaa064daab81b0992a54cade834d1e16`).
+If that directory is absent, the same target will advance build **3800**
+(`build/palette-reserve-absolute-game-3800/native-cpu.sfc`, SHA256
+`6a01aa4269338cc90098fce914dd65c09b1f0618ea57c28e8de2549449c4d33e`) through the
+exact-SHA builders up to 3955. Neither cartridge is in git (`build/` and
+`*.sfc` are ignored). Without one of them, `make playable` exits and names
+the missing files.
+
+FCEUX title/walk traces are not an input to this target and are not committed.
+`docs/DEVELOPMENT.md` still uses them for a generic `build_native.py` image.
+That command does not emit 3800 or 3955; the prefix below 3800 is a further
+chain of local exact-SHA patches (3780 and earlier) that only exist on a
+machine that already built them.
+
+Builds 4236 and gamer-eyes-4239, and a separate `snes/gamer_eyes.asm`, are
+not in this repository or on any pushed branch. They are missing local inputs.
+This target does not look for them and does not emit them. `snes/ai_p2.asm` on
+`main` has an inline `gamer_eyes` routine; that is not those cartridges.
+
+4146, 4162, and 4163 are produced from the builders at
+`e4849b22be363338de681ec4678741c067e40890`, the commit that recorded 4163.
+The tool checks out that revision under `build/` (gitignored) so later splash
+and AI edits on `main` do not change those checksums. `make bootstrap` must
+have run first (`ca65`/`ld65`).
+
+FCEUX's palette, used by captures and `build_native.py`, defaults to
+`/usr/share/fceux/palettes/FCEUX.pal`. Set `FCEUX_PALETTE` (and `FCEUX` for
+the emulator binary) when it lives elsewhere.
 
 ## References and credit
 

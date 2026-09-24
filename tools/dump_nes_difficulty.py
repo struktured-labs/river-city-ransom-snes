@@ -9,6 +9,7 @@ import subprocess
 
 from PIL import Image
 
+from .fceux_env import fceux_binary, require_palette
 from .nes_difficulty import prg_from, simon_spawn, skill_add_table
 from .rom import Rom
 
@@ -35,8 +36,8 @@ def main():
     with (ROOT / 'build/emulator.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         env = dict(os.environ, RCR_CAPTURE_DIR=str(out), QT_QPA_PLATFORM='xcb')
-        command = ['xvfb-run', '-a', '/usr/games/fceux', '--no-config', '1', '--sound', '0',
-                   '--palette', '/usr/share/fceux/palettes/FCEUX.pal',
+        command = ['xvfb-run', '-a', str(fceux_binary()), '--no-config', '1', '--sound', '0',
+                   '--palette', str(require_palette()),
                    '--loadlua', str(ROOT / 'tools/dump_nes_difficulty.lua'),
                    str(args.rom.resolve())]
         with (out / 'emulator.log').open('w') as log:

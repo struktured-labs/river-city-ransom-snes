@@ -12,9 +12,11 @@ import struct
 import subprocess
 
 try:
+    from .fceux_env import require_palette
     from .rom import Rom, convert_chr
     from .prepare_audio import prepare_engine, paired_engine, triple_engine, suppress_duty_keyons, nearest_clock_engine, triangle_dac_release_engine
 except ImportError:
+    from fceux_env import require_palette
     from rom import Rom, convert_chr
     from prepare_audio import prepare_engine, paired_engine, triple_engine, suppress_duty_keyons, nearest_clock_engine, triangle_dac_release_engine
 
@@ -310,7 +312,7 @@ def build(rom_path, traces, out, experimental_fastrom=False, experimental_raster
             from tools.build_sweep_driver import build as build_sweep_driver
         patched_engine, sweep_driver_layout = build_sweep_driver(patched_engine)
     (out / 'Memblers_2a03.bin').write_bytes(patched_engine)
-    rgb = Path("/usr/share/fceux/palettes/FCEUX.pal").read_bytes()
+    rgb = require_palette().read_bytes()
     colors = [(rgb[i] >> 3) | ((rgb[i + 1] >> 3) << 5) | ((rgb[i + 2] >> 3) << 10) for i in range(0, 192, 3)]
     (out / "native_palette.inc").write_text(".word " + ",".join(f"${n:04X}" for n in colors) + "\n")
     for name in ("native_boot", "native_runtime"):

@@ -7,14 +7,15 @@ import struct
 import subprocess
 
 try:
-    from .rom import convert_chr
     from .checksum import finalize
+    from .fceux_env import require_palette
+    from .rom import convert_chr
 except ImportError:
-    from rom import convert_chr
     from checksum import finalize
+    from fceux_env import require_palette
+    from rom import convert_chr
 
 ROOT = Path(__file__).resolve().parents[1]
-PALETTE = Path("/usr/share/fceux/palettes/FCEUX.pal")
 
 
 def digest(path):
@@ -83,11 +84,12 @@ def main():
         path = args.capture / (prefix + suffix)
         if digest(path) != manifest["files"][path.name]:
             raise ValueError(f"Capture file changed: {path.name}")
-    if digest(PALETTE) != manifest["palette_sha256"]:
+    palette = require_palette()
+    if digest(palette) != manifest["palette_sha256"]:
         raise ValueError("Palette differs from reference capture")
     state = json.loads((args.capture / (prefix + ".json")).read_text())
     data = assets((args.capture / (prefix + ".ppu")).read_bytes(),
-                  (args.capture / (prefix + ".oam")).read_bytes(), state["ppu_ctrl"], PALETTE.read_bytes())
+                  (args.capture / (prefix + ".oam")).read_bytes(), state["ppu_ctrl"], palette.read_bytes())
     args.out.mkdir(parents=True, exist_ok=False)
     for name, value in data.items():
         (args.out / name).write_bytes(value)

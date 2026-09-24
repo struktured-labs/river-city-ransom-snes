@@ -1,8 +1,11 @@
 # Reproducing the experiments
 
 Prerequisites: Python 3.10+, Make, C/C++ compiler, Git, FCEUX 2.6.5 with Lua,
-Xvfb/xvfb-run, and FCEUX's `FCEUX.pal`. Current capture defaults use Debian paths
-`/usr/games/fceux` and `/usr/share/fceux/palettes/FCEUX.pal`.
+Xvfb/xvfb-run, and FCEUX's `FCEUX.pal`. Capture and `tools/build_native.py`
+default to the Debian paths `/usr/games/fceux` and
+`/usr/share/fceux/palettes/FCEUX.pal`. Override them with `FCEUX` and
+`FCEUX_PALETTE` when FCEUX is installed somewhere else. A missing palette
+fails with that path named, before a native ROM is written.
 
 ```sh
 make bootstrap
@@ -18,6 +21,11 @@ receipts identify the exact shared library and harness hashes.
 
 Place your validated original US ROM at `roms/river-city-ransom-us.nes`.
 Each output directory below must be new; captures/builds refuse overwrite.
+
+Named playable trials (4108, 4146, 4162, 4163) are not this generic native
+image. Rebuild those with `make playable` as documented in the README. That
+target needs local build 3955 or 3800, which are not produced by the two
+captures below.
 
 ```sh
 python3 tools/capture_nes.py --out build/reference-title --profile title --frames 600
