@@ -1,9 +1,11 @@
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from tools.fceux_env import DEFAULT_FCEUX, DEFAULT_PALETTE, fceux_binary, fceux_palette
+import tools.rebuild_playable as rebuild
 from tools.rebuild_playable import (
-    ANCESTRY, BUILDS, DEFAULT_3800, DEFAULT_3955, ORDER, SHA_3780, SHA_3800,
+    ANCESTRY, BUILDS, ORDER, SHA_3780, SHA_3800,
     SHA_3955, collect_problems,
 )
 
@@ -24,16 +26,21 @@ class RebuildPlayableTests(unittest.TestCase):
         self.assertEqual(ANCESTRY[0][1], 'aaa09580b6aaa8201e022089ccf91e3d51d35d32f15869961a1c73fec9ecec88')
 
     def test_missing_rom_and_parents_are_named(self):
-        text = '\n'.join(collect_problems(
-            '4163', Path('/no/such/river-city-ransom-us.nes'),
-            DEFAULT_3955, DEFAULT_3800))
+        parent = Path('build/does-not-exist-3955')
+        ancestor = Path('build/does-not-exist-3800')
+        # Default paths may already exist in a local build tree. The gap list
+        # is only emitted for those defaults, so point the defaults at absences.
+        with patch.object(rebuild, 'DEFAULT_3955', parent), patch.object(
+                rebuild, 'DEFAULT_3800', ancestor):
+            text = '\n'.join(collect_problems(
+                '4163', Path('/no/such/river-city-ransom-us.nes'), parent, ancestor))
         self.assertIn('Missing US NES ROM', text)
         self.assertIn('78784cbf', text)
         self.assertIn('204aa5eb', text)
         self.assertIn(SHA_3955, text)
         self.assertIn(SHA_3800, text)
         self.assertIn(SHA_3780, text)
-        self.assertIn('build/early-oam-live-half-game-3955', text)
+        self.assertIn(str(parent), text)
         self.assertIn('splash-ident-curve.bin', text)
         self.assertIn('native_runtime.lbl', text)
         self.assertIn('build_palette_pending_row_room.py', text)
