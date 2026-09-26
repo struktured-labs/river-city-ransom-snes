@@ -27,7 +27,7 @@ P1_LASTX = $7FF012
 P1_LASTXH = $7FF013
 P1_WALK = $7FF014
 P1_STILL = $7FF015
-LABEL_ON = $7FF016
+DASH = $7FF016
 TITLE_PREV_L = $7FF017
 P1_FOCUS = $7FF018
 ROOM_LAST = $7FF019
@@ -168,25 +168,6 @@ do_flee:
     sta f:OUTPUT
     jmp publish_flee
 alive:
-    lda a:$1C80            ; Up = shop; do not edge-rush off the mat
-    and #$10
-    bne edge_done
-edge_rush:
-    ; $01E3=0 is not an edge (stale). Widen so 2P camera can catch a real exit.
-    lda a:$01E3
-    beq edge_done
-    cmp #176
-    bcc edge_left
-    lda #$80
-    sta f:OUTPUT
-    jmp publish
-edge_left:
-    cmp #80
-    bcs edge_done
-    lda #$40
-    sta f:OUTPUT
-    jmp publish
-edge_done:
     ; Nearest live goon to P1 (slots 2/3). P2 will skip that slot.
     lda #$FF
     sta f:P1_FOCUS
@@ -224,7 +205,7 @@ p1n:
     lda f:DXHI
     bne steer
     lda f:DX
-    cmp #73
+    cmp #96
     bcs steer
     lda #81
     sta f:BEST
@@ -259,35 +240,23 @@ steer:
     lda f:TARGET
     tax
     jsr distances
-    cpx #0
-    bne full_steer          ; lane-first only while following P1
-    lda f:DX
-    cmp #17
-    bcc full_steer
-    lda f:DY
-    cmp #8
-    bcc full_steer
-    lda f:DIRECTION
-    and #$30              ; lane-first: match ground Y before a long X push
-    sta f:OUTPUT
-    bra path_stuck
 full_steer:
     lda f:DXHI
     bne move_x
     cpx #0
     bne combat_distance
     lda f:DX
-    cmp #33
+    cmp #16
     bcc steer_y
     bra move_x
 combat_distance:
     lda f:DX
-    cmp #14
+    cmp #24
     bcs move_x
     lda f:DY
-    cmp #6
+    cmp #14
     bcs steer_y
-    ; Punch only when a live enemy is in range; never A+B jump.
+    ; Punch while still inside the Y band we stop seeking (was dy<6 but stop at dy<7).
     lda #1
     sta f:OUTPUT
     bra path_stuck
@@ -297,7 +266,7 @@ move_x:
     sta f:OUTPUT
 steer_y:
     lda f:DY
-    cmp #7
+    cmp #8
     bcc path_stuck
     lda f:DIRECTION
     and #$30
@@ -330,7 +299,7 @@ path_stuck:
     lda f:DETOUR
     clc
     adc #1
-    cmp #4
+    cmp #3
     bcc :+
     lda #1
 :
@@ -372,21 +341,26 @@ reset_stuck:
 path_done:
 publish:
     jsr p1_track
-    lda a:$1C80
-    and #$10
-    bne lr_done            ; P1 Up: keep still so shops/doors can fire
-    lda f:P1_WALK
-    bne apply_lr
-    lda a:$1C80
-    and #$C0
-    beq lr_done
-apply_lr:
-    sta f:BEST
     lda f:OUTPUT
-    and #$3F
-    ora f:BEST
+    and #$C0
+    beq dash_off
+    lda f:P1_WALK
+    beq dash_off
+    lda f:DASH
+    cmp #6
+    bcs publish_flee
+    clc
+    adc #1
+    sta f:DASH
+    cmp #3
+    bne publish_flee
+    lda f:OUTPUT
+    and #$3F              ; one-frame release so the second press is a run
     sta f:OUTPUT
-lr_done:
+    bra publish_flee
+dash_off:
+    lda #0
+    sta f:DASH
 publish_flee:
     lda f:OUTPUT
     and #$F3              ; AI can NEVER generate Select/Start
@@ -419,9 +393,17 @@ p1_track:
     lda a:$0390
     sta f:P1_LASTXH
     tya
-    bmi p1_left
+    bmi p1_neg
     bne p1_right
     lda f:BEST
+    cmp #2
+    bcc p1_idle
+    bcs p1_right
+p1_neg:
+    cmp #$FF
+    bne p1_left
+    lda f:BEST
+    cmp #$FF
     beq p1_idle
 p1_right:
     lda #$80
@@ -500,7 +482,7 @@ apply_label:
     jsr title_mark
     jsr title_skill
     jsr level_overlay
-    jsr gamer_eyes
+    jsr gamer_outline
     lda f:ENABLED
     beq hud_off
     lda f:IN_GAME
@@ -701,10 +683,10 @@ ov_plp:
 ov_done:
     rts
 
-; Gamer: red outline on goons (pal 0 color 1 -> $16). Skip P1/P2 via screen X
-; at $01E3/$02E3. Street only ($0100=$C0 and $003F=0). Pause/fade strips pal 3
-; so Alex/Ryan portraits are not left on the outline palette.
-gamer_eyes:
+; Gamer: red clothing outline on goons (palette color 1 -> $16, not the eyes).
+; Skip P1/P2 via screen X at $01E3/$02E3. Street only ($0100=$C0 and $003F=0).
+; Pause/fade strips pal 3 so Alex/Ryan portraits are not left on that palette.
+gamer_outline:
     lda a:$064C
     cmp #3
     bne ge_off

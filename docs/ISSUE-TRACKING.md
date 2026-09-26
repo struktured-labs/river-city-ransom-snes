@@ -10,7 +10,7 @@ a pushed build or new hardware verification.
 | Issue | Scope |
 | --- | --- |
 | [#1](https://github.com/struktured-labs/river-city-ransom-snes/issues/1) | Original native-port objective |
-| [#2](https://github.com/struktured-labs/river-city-ransom-snes/issues/2) | AI-assisted P2 companion (4163 on EverDrive as the AI Gamer card image; later `main` source has no new ROM hash; branch `ai-p2-4225` is parked and not merged) |
+| [#2](https://github.com/struktured-labs/river-city-ransom-snes/issues/2) | AI P2 companion parked 2026-09-23 (better, still bad; no pathfinder; not in the no-AI ROM). Earlier EverDrive image was 4163. Branch `ai-p2-4225` is not merged. |
 | [#3](https://github.com/struktured-labs/river-city-ransom-snes/issues/3) | SNES/Struktured Labs branding and attribution |
 | [#4](https://github.com/struktured-labs/river-city-ransom-snes/issues/4) | Blank Present Status statistics |
 | [#5](https://github.com/struktured-labs/river-city-ransom-snes/issues/5) | Original-speed gameplay, rare slowdown, sprite latency |

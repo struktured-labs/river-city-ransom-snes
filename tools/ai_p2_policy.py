@@ -49,6 +49,11 @@ def match_p1_horizontal(p1_pad, output):
     return (output & 0x3F) | lr
 
 
+def in_punch_range(dx, dy):
+    """Must overlap the Y distance where steering stops. Stop-at-7 and punch-at-6 never fired."""
+    return dx < 24 and dy < 14
+
+
 def shop_join_ready(dx, dy, dxhi=0):
     """2P shop/door: P2 presses Up only when standing on P1 (AND of $36/$37)."""
     return dxhi == 0 and dx < 6 and dy < 6
@@ -64,11 +69,11 @@ def should_flee(height, stam, state):
 
 
 def follow_p1_motion(p1_dx, output):
-    """P1 world-X delta wins over combat/follow so the companion cannot run the other way."""
+    """If P1 is moving L/R, companion runs that way only (no punch, no opposite)."""
     if p1_dx > 0:
-        return (output & 0x3F) | RIGHT
+        return RIGHT
     if p1_dx < 0:
-        return (output & 0x3F) | LEFT
+        return LEFT
     return output
 
 
@@ -79,13 +84,10 @@ def stuck_step(stuck, detour, output, moved):
         return 0, 0, output
     stuck += 1
     if stuck >= STUCK_FRAMES:
-        detour = 1 if detour >= 3 else detour + 1
+        detour = 1 if detour >= 2 else detour + 1
         stuck = 0
     if detour == 1:
         output = (output & ~MOVE) | UP
     elif detour == 2:
         output = (output & ~MOVE) | DOWN
-    elif detour == 3:
-        lr = LEFT if output & RIGHT else RIGHT
-        output = (output & ~(LEFT | RIGHT)) | lr
     return stuck, detour, output

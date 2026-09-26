@@ -82,6 +82,7 @@ def build(parent, out):
     patch_bytes(image, snes_unique(0x13900), bytes.fromhex('8c3400'), jmp('apply_combat'))
     patch_bytes(image, snes_unique(0x13923), bytes.fromhex('8c3400'), jmp('apply_stam'))
     patch_bytes(image, snes_unique(0x138d1), bytes.fromhex('ac4c06187946b9'), jsr('add_skill'))
+    patch_bytes(image, snes_unique(0x17b1f), bytes.fromhex('203dbb'), jsr('skill_gate'))
     patch_bytes(image, snes_unique(0x17b44), bytes.fromhex('ad4c06c902900160ee4c064c7bbb'), jmp('menu_next'))
     patch_bytes(image, snes_unique(0x17b55), bytes.fromhex('ce4c06d021ee4c0660'), jmp('menu_prev'))
     patch_bytes(image, snes_unique(0x17bfe), bytes.fromhex('20c0e260'), jmp('extra_level'))

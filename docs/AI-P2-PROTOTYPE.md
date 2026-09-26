@@ -16,7 +16,7 @@ camera) without publishing a new ROM hash in this file. Those edits are source
 on `main`, not a named cartridge.
 
 Branch `ai-p2-4225` is parked on purpose and is **not** merged into `main`.
-Its candidate is `build/ai-p2-4225/native-cpu.sfc`, SHA-256
+Its pushed candidate is `build/ai-p2-4225/native-cpu.sfc`, SHA-256
 `23fad860cce1660252d1dc61ee9afdeda0116f87020f9feae5ba1ead83808477`.
 That branch labels the companion with the P2 name plus **AI** (`RYAN AI` or
 `ALEX AI`, from P2's 4-letter name). The original font has no parentheses.
@@ -28,10 +28,12 @@ The named card image **4163** (`build/ai-p2-4163`, SHA-256
 difficulty plus the AI stacked at `e4849b2`. Rebuild it with `make playable`
 (see the README). 4166 and 4225 are later than that recipe.
 
+The last local companion cartridge, not pushed, is `build/ai-p2-4236/native-cpu.sfc`,
+SHA-256 `a5e3165d50a1af4dc18e123febc3eb9e4f3fd15afee7130383095fcf1f3df7c5`.
 Builds **4236** and **gamer-eyes-4239**, and a separate `snes/gamer_eyes.asm`,
-are not on any pushed branch. They are local inputs only. `make playable` does
-not produce them. `main` does contain an inline `gamer_eyes` routine in
-`snes/ai_p2.asm`; that routine is not those cartridges.
+are not on any pushed branch. `make playable` does not produce them. `main`
+does contain an inline `gamer_eyes` routine in `snes/ai_p2.asm`; that routine
+is not those cartridges.
 
 Review: <http://127.0.0.1:8766/ai-p2-review-02/>.
 

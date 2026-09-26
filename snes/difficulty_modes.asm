@@ -6,9 +6,11 @@
 .i8
 .segment "CODE"
 .export apply_combat, apply_stam, add_skill, menu_next, menu_prev
-.export extra_level, load_agility, load_sram
+.export extra_level, load_agility, load_sram, skill_gate
 
 TMP = $7FF020
+SKILL_PREV = $7FF018
+SKILL_EDGE = $7FF019
 MAGIC = $206000
 SAVE_SKILL = $206004
 
@@ -88,36 +90,71 @@ oks: rts
 cap255:
     rts
 
-; Right 1→4→2→3→1. Left reverse.
+; Right 1→4→2→3→1. Left reverse. One rising edge, one step.
 menu_next:
     php
     sep #$30
+    lda f:SKILL_EDGE
+    and #1
+    beq menu_skip
     ldx a:$064C
     phb
     phk
     plb
     lda next_t,x
-    plb
-    sta a:$064C
-    plp
-    jmp $BB7B
-
+    bra menu_apply
 menu_prev:
     php
     sep #$30
+    lda f:SKILL_EDGE
+    and #2
+    beq menu_skip
     ldx a:$064C
     phb
     phk
     plb
     lda prev_t,x
+menu_apply:
     plb
     sta a:$064C
+    jsr paint_skill
     plp
+    jsr $BB7B
+    jmp one_cursor
+menu_skip:
+    plp
+    rts
+
+; Called every LEVEL frame, before the original level-triggered handler.
+; Rising bits of Right/Left ($EE|$EF bits 0 and 1) are the only steps.
+skill_gate:
+    lda $EE
+    ora $EF
+    and #$03
+    pha
+    eor f:SKILL_PREV
+    sta f:SKILL_EDGE
+    pla
+    sta f:SKILL_PREV
+    and f:SKILL_EDGE
+    sta f:SKILL_EDGE
+    jmp $BB3D
+
+; $BB7B plants a second arrow at $0133,Y. Skill 2 lands on the old
+; Advanced slot, and 3/4 land past it. The name is always the left one.
+one_cursor:
+    lda #0
+    sta $0135
+    sta $0136
+    sta $0137
+    lda #$BB
+    sta $0134
     rts
 
 extra_level:
     jsr save_sram
     jsr $E2C0
+paint_skill:
     php
     sep #$30
     lda a:$064C
@@ -125,37 +162,23 @@ extra_level:
     asl a
     asl a
     asl a
-    sta f:TMP
+    tay
     phb
     phk
     plb
     ldx #0
-copy_n:
-    txa
-    clc
-    adc f:TMP
-    tay
-    lda names,y
-    sta f:$7FF030,x
-    inx
-    cpx #8
-    bne copy_n
-    plb
-    lda #0
-    ldx #27
-blank_r:
-    sta f:$7F22A2,x
-    dex
-    bpl blank_r
-    lda #$BB
-    sta f:$7F22AB
-    ldx #0
 wr:
-    lda f:$7FF030,x
+    lda names,y
     sta f:$7F22AC,x
+    iny
     inx
     cpx #8
     bne wr
+    plb
+    lda #1
+    sta a:$1D15
+    sta a:$1D55
+    sta a:$1C85
     plp
     rts
 

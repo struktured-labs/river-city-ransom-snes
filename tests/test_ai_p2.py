@@ -2,7 +2,8 @@ import unittest
 
 from tools.ai_p2_policy import (
     AI_TILES, DOWN, LEFT, RIGHT, UP, companion_caption, follow_p1_motion, lane_first,
-    match_p1_horizontal, pick_ai_target, pick_p1_focus, shop_join_ready, should_flee,
+    in_punch_range, match_p1_horizontal, pick_ai_target, pick_p1_focus, shop_join_ready,
+    should_flee,
     stuck_step,
 )
 from tools.build_ai_p2 import patch,HOOK,SLOT,SIZE
@@ -74,7 +75,7 @@ class AiP2Tests(unittest.TestCase):
         self.assertEqual(lane_first(10, 12, RIGHT | UP), RIGHT | UP)
         self.assertEqual(lane_first(40, 2, RIGHT), RIGHT)
 
-    def test_stuck_detour_cycles_up_down_then_reverse(self):
+    def test_stuck_detour_cycles_up_down_without_reverse(self):
         stuck, detour, out = 0, 0, RIGHT
         for _ in range(12):
             stuck, detour, out = stuck_step(stuck, detour, out, moved=False)
@@ -84,7 +85,13 @@ class AiP2Tests(unittest.TestCase):
         self.assertEqual((detour, out & 0xF0), (2, DOWN))
         stuck, detour, out = 11, 2, RIGHT
         stuck, detour, out = stuck_step(stuck, detour, out, moved=False)
-        self.assertEqual((detour, out & 0xF0), (3, LEFT))
+        self.assertEqual((detour, out & 0xF0), (1, UP))
+
+    def test_punch_range_includes_the_old_dead_zone(self):
+        self.assertTrue(in_punch_range(12, 6))
+        self.assertTrue(in_punch_range(12, 10))
+        self.assertFalse(in_punch_range(12, 14))
+        self.assertFalse(in_punch_range(24, 4))
 
     def test_shop_join_only_presses_up_when_on_p1(self):
         self.assertTrue(shop_join_ready(2, 3))
@@ -109,9 +116,10 @@ class AiP2Tests(unittest.TestCase):
         self.assertFalse(should_flee(0, 40, 1))   # standing, has stam
 
     def test_ai_follows_p1_world_x_motion_not_combat(self):
-        self.assertEqual(follow_p1_motion(3, LEFT | UP), RIGHT | UP)
-        self.assertEqual(follow_p1_motion(-2, RIGHT | DOWN), LEFT | DOWN)
+        self.assertEqual(follow_p1_motion(3, LEFT | UP), RIGHT)
+        self.assertEqual(follow_p1_motion(-2, RIGHT | DOWN), LEFT)
         self.assertEqual(follow_p1_motion(0, LEFT), LEFT)
+        self.assertEqual(follow_p1_motion(5, 1), RIGHT)
 
     def test_companion_caption_is_p2_name_plus_ai(self):
         ryan=bytes([0xD1,0xD8,0xC0,0xCD])
