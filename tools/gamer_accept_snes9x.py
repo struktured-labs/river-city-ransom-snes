@@ -9,6 +9,7 @@ each sprite is audited in Mesen2, which can watch the metasprite writer.
 usage: python3 -m tools.gamer_accept_snes9x ROM OUTDIR
 """
 import ctypes as C
+import itertools
 import os
 import sys
 from pathlib import Path
@@ -25,6 +26,8 @@ NAMES = {1: '00cdced5c8c2c400', 2: 'c0c3d5c0cdc2c4c3', 3: '00c6c0ccc4d10000', 4:
 # parts ($FC branch at $EE4B), and never by an enemy body sprite ("item tiles"
 # log line). snes9x has no write callbacks, so ownership is judged by tile.
 ITEM_TILES = {0xD0, 0xDC, 0xDD, 0xE0, 0xEC, 0xED, 0xEE, 0xFE}
+# red share of the composed silhouette-edge outline pixels (as accept.lua)
+COVERAGE_MIN = 80
 CARRY_WAITS = (2, 11, 23, 0, 4, 28, 37, 43, 6, 1, 3, 5, 7, 8, 9, 10, 12, 13, 14, 15)
 PATS = {'GAMER': 'c6c0ccc4d1', 'NOVICE': 'cdced5c8c2c4', 'ADVANCED': 'c0c3d5c0cdc2c4c3',
         'INTERMED': 'c8cdd3c4d1ccc4c3'}
@@ -485,11 +488,13 @@ def main(rom, out):
             stats['palBad'] = stats.get('palBad', 0) + 1
         if e.frame % 15 == 0:
             edge_audit(r)
+            composed_audit(r)
         hist.insert(0, cur)
         del hist[3:]
         stats['frames'] += 1
 
-    edge = dict(tiles=0, red=0, bad=0, pal6=0, plain=0, plainBad=0, redInside=0, darkEdge=0, darkInside=0)
+    edge = dict(tiles=0, red=0, bad=0, pal6=0, plain=0, plainBad=0, redInside=0, darkEdge=0, darkInside=0,
+                composedFrames=0, skipped=0, edgeOutline=0, edgeRed=0, redInsideComposed=0)
 
     def edge_audit(r):
         # Tile level, from VRAM, as in accept.lua: every visible sprite in the
@@ -530,19 +535,67 @@ def main(rom, out):
                     val = px[rr][c]
                     near = [px[a_][d] for a_, d in ((rr - 1, c), (rr + 1, c), (rr, c - 1), (rr, c + 1))
                             if 0 <= a_ < 8 and 0 <= d < 8]
+                    # in-tile view, reported only (a border pixel may be
+                    # outer only across the border; see composed_audit)
                     if val == 5:
                         edge['red'] += 1
                         if 0 not in near:
                             edge['redInside'] += 1
-                            edge['bad'] += 1
                     elif val == 1:
                         if 0 in near:
                             edge['darkEdge'] += 1
-                            edge['bad'] += 1
                         else:
                             edge['darkInside'] += 1
                     elif val not in (0, 2, 3):
                         edge['bad'] += 1
+
+    def composed_audit(r):
+        # Composed silhouette, as compositeAudit in accept.lua, from the NES
+        # OAM ($0200) with pixel indices from VRAM (sprite table 1, word
+        # $5000). Without write callbacks each marked sprite is given to the
+        # nearest enemy actor by screen x (base x as the metasprite writer
+        # computes it); frames with two enemy actors within 64 px are skipped,
+        # so one goon's body never counts as another's.
+        scroll = r[0xDC] + 256 * r[0xDD]
+        actors = []
+        for sl in range(2, 8):
+            if r[0xCB + sl] < 8 and (r[0xD3 + sl] & 0x7F) != 0x7F:
+                bx = (r[0x83 + sl] + 256 * r[0x8C + sl] - scroll + r[0x3B]) & 0xFFFF
+                actors.append((bx - 0x10000 if bx >= 0x8000 else bx, sl))
+        if any(abs(a[0] - b[0]) < 64 for a, b in itertools.combinations(actors, 2)) or not actors:
+            edge['skipped'] += 1
+            return
+        edge['composedFrames'] += 1
+        v = e.vram()
+        groups = {}
+        for i in range(64):
+            y, t, a, x = r[0x200 + i * 4], r[0x201 + i * 4], r[0x202 + i * 4], r[0x203 + i * 4]
+            if y >= 0xEF or not a & 4 or a & 3 == 2:
+                continue
+            owner = min(actors, key=lambda ac: abs(ac[0] - x))[1]
+            groups.setdefault(owner, []).append((x, y, t, a))
+        for spr in groups.values():
+            canvas = {}
+            for x, y, t, a in spr:
+                w = (0x5000 + t * 16) & 0x7FFF
+                b = v[w * 2:w * 2 + 32]
+                for rr in range(8):
+                    ro = 7 - rr if a & 0x80 else rr
+                    p0, p1, p2, p3 = b[2 * ro], b[2 * ro + 1], b[16 + 2 * ro], b[17 + 2 * ro]
+                    for c in range(8):
+                        sh = c if a & 0x40 else 7 - c
+                        val = ((p0 >> sh) & 1) | (((p1 >> sh) & 1) << 1) | (((p2 >> sh) & 1) << 2) | (((p3 >> sh) & 1) << 3)
+                        if val:
+                            canvas.setdefault((x + c, y + rr), val)
+            for (x, y), val in canvas.items():
+                if val not in (1, 5):
+                    continue
+                if any(q not in canvas for q in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1))):
+                    edge['edgeOutline'] += 1
+                    edge['edgeRed'] += val == 5
+                elif val == 5:
+                    edge['redInsideComposed'] += 1
+                    edge['bad'] += 1
 
     def red_pixels(img):
         # native_palette[$16] = $00BB -> 5-bit R=27 G=5 B=0
@@ -575,11 +628,13 @@ def main(rom, out):
     e.held = {}
     log('outline', stats)
     check('3 no skill name during play', name_hits == 0, f'hits={name_hits}')
+    edge['coverage'] = round(100 * edge['edgeRed'] / max(1, edge['edgeOutline']), 1)
     log('red edge', edge)
     check('4 NES goon marks carried to SNES OAM; red outline visible, only on the outer silhouette; '
           'color 5 = color 1 in every sprite palette',
           stats['mismatch'] == 0 and stats['marked'] > 0 and max(reds) > 0 and not stats.get('palBad')
-          and edge['red'] > 0 and edge['bad'] == 0, f'{stats} red={reds} edge={edge}')
+          and edge['red'] > 0 and edge['bad'] == 0 and edge['coverage'] >= COVERAGE_MIN,
+          f'{stats} red={reds} edge={edge} (coverage min {COVERAGE_MIN}%)')
     check('7 no freeze in 70 s of street play', alive_fail == 0 and street(), st())
     # 5. pause, with marked goons on screen
     for i in range(900):

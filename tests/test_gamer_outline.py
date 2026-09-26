@@ -158,3 +158,89 @@ class GamerOutlineTests(unittest.TestCase):
     def test_recolor_needs_a_zero_extended_tile(self):
         with self.assertRaises(ValueError):
             outline_tile(bytes(16) + b'\x01' + bytes(15))
+
+
+def grid(rows):
+    return [[int(ch) for ch in row] for row in rows]
+
+
+# LEFT: body with an outline column on its right tile border (every in-tile
+# neighbour of that column is opaque); RIGHT: outline one pixel inside.
+LEFT = grid(["22222221"] * 8)
+RIGHT = grid(["22222210"] * 8)
+FULL = grid(["22222222"] * 8)
+EMPTY = grid(["00000000"] * 8)
+
+
+class SilhouetteTests(unittest.TestCase):
+    BANKS = {0: [0x40], 1: [0x42], 2: [0x45], 3: [0x41]}
+
+    def outer(self, comps, tiles):
+        from tools.gamer_silhouette import silhouette
+        return silhouette(comps, self.BANKS, lambda t: tiles[t])
+
+    def test_border_pixel_is_outer_when_nothing_lies_across(self):
+        # tile 0 (bank $40 -> physical $1000) alone: its right column touches
+        # nothing, so it is silhouette even though it is on the tile border
+        out = self.outer([((0, 0, 0, 0),)], {0x1000: LEFT})
+        self.assertTrue(out[(0x1000, 3, 7)])
+
+    def test_border_pixel_next_to_another_sprite_is_inside(self):
+        # tile 1 placed 8 px to the right covers the column across the border
+        out = self.outer([((0, 0, 0, 0), (1, 8, 0, 0))], {0x1000: LEFT, 0x1001: FULL})
+        self.assertFalse(out[(0x1000, 3, 7)])
+
+    def test_a_tile_used_both_ways_stays_dark(self):
+        # alone in one frame, covered in another: no red inside the body wins
+        out = self.outer([((0, 0, 0, 0),), ((0, 0, 0, 0), (1, 8, 0, 0))], {0x1000: LEFT, 0x1001: FULL})
+        self.assertFalse(out[(0x1000, 3, 7)])
+
+    def test_transparent_neighbour_covered_by_an_overlapping_sprite_is_inside(self):
+        # RIGHT's outline column 6 has a transparent pixel to its right in the
+        # tile, but a sprite overlapping by one pixel covers it
+        out = self.outer([((0, 0, 0, 0), (1, 7, 0, 0))], {0x1000: RIGHT, 0x1001: FULL})
+        self.assertFalse(out[(0x1000, 3, 6)])
+        out = self.outer([((0, 0, 0, 0),)], {0x1000: RIGHT})
+        self.assertTrue(out[(0x1000, 3, 6)])
+
+    def test_flipped_sprites_are_judged_in_tile_coordinates(self):
+        # LEFT mirrored (attr $40) has its outline on the screen-left column;
+        # a sprite to its left covers it, one to its right does not
+        tiles = {0x1000: LEFT, 0x1001: FULL}
+        self.assertFalse(self.outer([((0, 8, 0, 0x40), (1, 0, 0, 0))], tiles)[(0x1000, 3, 7)])
+        self.assertTrue(self.outer([((0, 0, 0, 0x40), (1, 8, 0, 0))], tiles)[(0x1000, 3, 7)])
+
+    def test_head_window_is_judged_under_every_bank(self):
+        # tile $40 (window 1) is bank $42 or $43; a pixel next to it is outer
+        # only if it is transparent in both
+        banks = {0: [0x40], 1: [0x42, 0x43], 2: [0x45], 3: [0x41]}
+        from tools.gamer_silhouette import silhouette
+        tiles = {0x1000: LEFT, 0x42 * 64: EMPTY, 0x43 * 64: FULL}
+        out = silhouette([((0, 0, 0, 0), (0x40, 8, 0, 0))], banks, lambda t: tiles[t])
+        self.assertFalse(out[(0x1000, 3, 7)])
+        tiles[0x43 * 64] = EMPTY
+        out = silhouette([((0, 0, 0, 0), (0x40, 8, 0, 0))], banks, lambda t: tiles[t])
+        self.assertTrue(out[(0x1000, 3, 7)])
+
+    def test_outline_tile_takes_the_silhouette_set(self):
+        tile = tile_from(["00000001"] * 8)
+        px = tile_pixels(outline_tile(tile, {(3, 7)}))
+        self.assertEqual([px[r][7] for r in range(8)], [1, 1, 1, 5, 1, 1, 1, 1])
+        with self.assertRaises(ValueError):
+            outline_tile(tile, {(3, 0)})       # not an outline pixel
+
+    def test_parent_metasprites_parse(self):
+        import os
+        from pathlib import Path
+        rom = Path('build/difficulty-modes-4260/native-cpu.sfc')
+        if not rom.exists():
+            self.skipTest('parent build not present')
+        from tools import gamer_silhouette as gs
+        r = gs.Rom(rom.read_bytes(), None)
+        self.assertEqual([gs.frame_count(r, k) for k in gs.HUMAN_KINDS], [63, 63, 63, 64, 67, 66, 66, 68])
+        comps = gs.compositions(r)
+        self.assertGreater(len(comps), 200)
+        banks = gs.window_banks(r)
+        self.assertEqual(banks[0], [0x40])
+        self.assertEqual(banks[3], [0x41])
+        self.assertTrue({0x42, 0x44, 0x47} <= set(banks[1]) and {0x45, 0x49} <= set(banks[2]))

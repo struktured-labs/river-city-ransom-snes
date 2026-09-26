@@ -7,9 +7,12 @@ stores become a JSR that stores it with NES attribute bit 2 set when slot $47 is
 A held-object part ($0012 = $80) is judged by the held actor $03B7,holder,
 so a goon Alex carries stays red and a goon's weapon does not.
 The SNES attribute map sends bit 2 to palette +4 for NES palettes 0, 1 and 3
-(enemy head, jeans, shirt; palette 2 is items). In the 4bpp sprite tiles every
-outline pixel (color 1) that touches a transparent pixel (the outer
-silhouette) becomes color 5. Normal sprite palettes get color 5 = color 1 (kept in
+(enemy head, jeans, shirt; palette 2 is items). In the 4bpp sprite tiles the
+outline pixels (color 1) on the outer silhouette become color 5. For tiles
+the human metasprites use, the silhouette is taken from the composed frames
+(tools/gamer_silhouette.py): a pixel is recolored when a 4-neighbour is
+transparent in every frame and CHR bank combination that uses the tile, tile
+borders included; other tiles use the in-tile rule. Normal sprite palettes get color 5 = color 1 (kept in
 the WRAM palette shadow, so the existing sprite palette DMA carries it: one
 108-byte DMA replaces the four 8-byte ones); in Gamer palettes 4, 5 and 7 are
 copies of 0, 1 and 3 with color 5 red.
@@ -27,6 +30,7 @@ import tempfile
 from tools.audio_packet_log import labels
 from tools.benchmark_report import sha
 from tools.build_inline_pitch_trial import checksum
+from tools import gamer_silhouette as gs
 
 # $6900-$6FFF is empty in the parent. Difficulty code begins at $7058.
 SLOT, SIZE = 0x6900, 0x200
@@ -105,12 +109,15 @@ def tile_pixels(tile):
              for c in range(8)] for r in range(8)]
 
 
-def outline_tile(tile):
-    """Recolor the outer silhouette: outline pixels (color 1) with a
-    transparent 4-neighbour inside the tile become color 5 (bitplane 2 set).
-    A tile edge counts as not outer (tiles are shared by many metasprites, so
-    what lies across the edge is not known here). Interior dark pixels and
-    every other color stay as they are. The tile must be zero-extended 2bpp."""
+def outline_tile(tile, red=None):
+    """Recolor the outer silhouette: outline pixels (color 1) become color 5
+    (bitplane 2 set). With red (a set of (row, col)) from silhouette_pixels,
+    exactly those pixels: the tile is used by the human metasprites, and
+    those pixels are on the composed silhouette in every use (tile borders
+    included). Without it (tiles no human metasprite uses) outline pixels
+    with a transparent 4-neighbour inside the tile, a tile edge counting as
+    not outer. Interior dark pixels and every other color stay as they are.
+    The tile must be zero-extended 2bpp."""
     tile = bytearray(tile)
     if len(tile) != 32 or any(tile[16:]):
         raise ValueError('Expected a zero-extended 4bpp tile')
@@ -118,12 +125,37 @@ def outline_tile(tile):
     for r in range(8):
         for c in range(8):
             if px[r][c] != OUTLINE:
+                if red and (r, c) in red:
+                    raise ValueError('Silhouette pixel is not an outline pixel')
                 continue
-            near = [px[rr][cc] for rr, cc in ((r - 1, c), (r + 1, c), (r, c - 1), (r, c + 1))
-                    if 0 <= rr < 8 and 0 <= cc < 8]
-            if TRANSPARENT in near:
+            if red is not None:
+                outer = (r, c) in red
+            else:
+                near = [px[rr][cc] for rr, cc in ((r - 1, c), (r + 1, c), (r, c - 1), (r, c + 1))
+                        if 0 <= rr < 8 and 0 <= cc < 8]
+                outer = TRANSPARENT in near
+            if outer:
                 tile[16 + 2 * r] |= 0x80 >> c
     return bytes(tile)
+
+
+def silhouette_pixels(image):
+    """{physical tile: set of (row, col)} red on the composed silhouette, for
+    every tile the human metasprites use (tools/gamer_silhouette.py)."""
+    rom = gs.Rom(image, None)
+    cache = {}
+
+    def chr_px(t):
+        if t not in cache:
+            cache[t] = tile_pixels(image[SPRITE_TILES + 32 * t:SPRITE_TILES + 32 * t + 32])
+        return cache[t]
+    outer = gs.silhouette(gs.compositions(rom), gs.window_banks(rom), chr_px)
+    red = {}
+    for (t, r, c), o in outer.items():
+        red.setdefault(t, set())
+        if o:
+            red[t].add((r, c))
+    return red
 
 
 # Sprite kind $00CB,slot: 0-7 use the human animation sets (bank 6 $8000);
@@ -253,9 +285,10 @@ def build(parent, out):
         allowed.update(range(at, at + 4))
     image[ATTR_MAP:ATTR_MAP + 256] = nes_attr_map()
     recolored = 0
+    sil = silhouette_pixels(image)
     for t in range(TILE_COUNT):
         at = SPRITE_TILES + 32 * t
-        new = outline_tile(image[at:at + 32])
+        new = outline_tile(image[at:at + 32], sil.get(t))
         if new != image[at:at + 32]:
             recolored += 1
             image[at:at + 32] = new
@@ -287,9 +320,10 @@ def build(parent, out):
         note=('Goon sprites (actor type 2) get NES attr bit 2 in the metasprite writer; '
               'the SNES attribute map sends it to palette +4 (red outline copies made in '
               'the palette batch). Skill name via NES nametable shadow on the settings screen only. '
-              'Silhouette outline pixels (next to transparent) recolored to color 5 in the 4bpp sprite tiles; '
+              'Silhouette outline pixels recolored to color 5 in the 4bpp sprite tiles (composed-metasprite silhouette, '
+              'tile borders included, for tiles the human metasprites use; in-tile rule for the rest); '
               'red only on color 5 of palettes 4, 5 and 7; shadow color 5 = color 1; one sprite palette DMA; held parts judged by the held actor.'),
-        recolored_tiles=recolored))
+        recolored_tiles=recolored, silhouette_tiles=len(sil)))
     (out / 'manifest.json').write_text(json.dumps(meta, indent=2) + '\n')
     used = len(helper.rstrip(b'\xff'))
     print(json.dumps(dict(out=str(out), rom_sha256=meta['rom_sha256'], recolored_tiles=recolored,

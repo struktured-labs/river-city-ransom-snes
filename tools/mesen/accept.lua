@@ -83,12 +83,15 @@ function edgeAudit()
       for r=0,7 do for c=0,7 do
         local v = pxl[r][c]
         local function nb(want) for _,d in ipairs({{-1,0},{1,0},{0,-1},{0,1}}) do local rr, cc = r+d[1], c+d[2] if rr >= 0 and rr < 8 and cc >= 0 and cc < 8 and pxl[rr][cc] == want then return true end end return false end
+        -- in-tile view, reported only: a red pixel on a tile border may be
+        -- outer only across the border, and a dark one next to a transparent
+        -- pixel may be covered by another sprite of the same metasprite (the
+        -- composed audit below decides)
         if v == 5 then
           EDGE.tileRed = EDGE.tileRed + 1
-          if not nb(0) then EDGE.redInside = EDGE.redInside + 1 edgeBad(string.format("f%d spr%d tile%02x red inside (%d,%d)", frameNo, i, tile, c, r)) end
+          if not nb(0) then EDGE.redInside = EDGE.redInside + 1 end
         elseif v == 1 then
-          if nb(0) then EDGE.darkEdge = EDGE.darkEdge + 1 edgeBad(string.format("f%d spr%d tile%02x dark silhouette (%d,%d)", frameNo, i, tile, c, r))
-          else EDGE.darkInside = EDGE.darkInside + 1 end
+          if nb(0) then EDGE.darkEdge = EDGE.darkEdge + 1 else EDGE.darkInside = EDGE.darkInside + 1 end
         elseif v ~= 0 and v ~= 2 and v ~= 3 then
           edgeBad(string.format("f%d spr%d tile%02x idx%d", frameNo, i, tile, v))
         end
@@ -104,13 +107,71 @@ function edgeAudit()
     end
   end end
 end
+-- Composed silhouette audit (Gamer), per actor: the game's own sprites for
+-- this frame (NES OAM $0200, drawing slot from the write callback; a held
+-- part belongs to the held actor) are drawn into one canvas per actor, pixel
+-- indices from VRAM (lower OAM index on top). For an enemy actor (goon bit on
+-- a non-item palette), a silhouette-edge pixel is a visible outline pixel
+-- (index 1 or 5) with a 4-neighbour no sprite of the actor covers.
+--   comp red inside: a visible red pixel all of whose 4 neighbours the actor
+--     covers (fails check 4)
+--   coverage: red share of the silhouette-edge outline pixels
+function compositeAudit()
+  local st = emu.getState()
+  local base = (st["ppu.oamBaseAddress"] + st["ppu.oamAddressOffset"]) & 0x7FFF
+  local groups = {}
+  for i=0,63 do
+    local y = rd(0x200+i*4)
+    local s = writer[i]
+    if y < 0xEF and s ~= nil then
+      local o = (heldW[i] == true) and heldA[i] or s
+      if o ~= nil then
+        local a = rd(0x202+i*4)
+        groups[o] = groups[o] or {}
+        table.insert(groups[o], {x=rd(0x203+i*4), y=y, t=rd(0x201+i*4), a=a, enemy=((a & 4) ~= 0 and (a & 3) ~= 2)})
+      end
+    end
+  end
+  for o, spr in pairs(groups) do
+    local anyEnemy = false
+    for _, sp in ipairs(spr) do if sp.enemy then anyEnemy = true end end
+    if anyEnemy then
+      local canvas = {}
+      for _, sp in ipairs(spr) do
+        local w = (base + sp.t * 16) & 0x7FFF
+        for r=0,7 do
+          local rr = (sp.a & 0x80) ~= 0 and 7 - r or r
+          local p0, p1 = emu.read(((w + rr) & 0x7FFF) * 2, V), emu.read(((w + rr) & 0x7FFF) * 2 + 1, V)
+          local p2, p3 = emu.read(((w + 8 + rr) & 0x7FFF) * 2, V), emu.read(((w + 8 + rr) & 0x7FFF) * 2 + 1, V)
+          for c=0,7 do
+            local cc = (sp.a & 0x40) ~= 0 and c or 7 - c
+            local v = ((p0 >> cc) & 1) | (((p1 >> cc) & 1) << 1) | (((p2 >> cc) & 1) << 2) | (((p3 >> cc) & 1) << 3)
+            local k = (sp.y + r) * 512 + sp.x + c
+            if v ~= 0 and canvas[k] == nil then canvas[k] = sp.enemy and v or -v end
+          end
+        end
+      end
+      for k, v in pairs(canvas) do
+        if v == 1 or v == 5 then
+          local edge = canvas[k-1] == nil or canvas[k+1] == nil or canvas[k-512] == nil or canvas[k+512] == nil
+          if edge then EDGE.cEdge = EDGE.cEdge + 1 if v == 5 then EDGE.cRed = EDGE.cRed + 1 end
+          elseif v == 5 then EDGE.cInside = EDGE.cInside + 1 edgeBad(string.format("f%d actor%d red inside the composed body at x%d y%d", frameNo, o, k % 512, k // 512)) end
+        end
+      end
+    end
+  end
+end
+-- red share of the composed silhouette-edge outline pixels the build must reach
+-- (4291, in-tile rule only: 58%; composed silhouette from the metasprites: 88%)
+COVERAGE_MIN = 0.80
+function coverage() return EDGE.cEdge > 0 and EDGE.cRed / EDGE.cEdge or 0 end
 -- one frame's outline audit. Returns counts; records failures in stats.
 stats = {}
 -- weapons/items: objects of sprite kind $08-$11 (bank 6 $8000 kind table,
 -- room object list bank 13 $B6D9) or a held-object sub-part. Never outlined.
 ITEM = {spr=0, red=0, held=0, heldGoon=0, ground=0, flying=0, bad={}}
 CARRY = {spr=0, unred=0, linkBad=0, after=0, afterUnred=0, slots={}, bad={}, shots=0}
-EDGE = {plain=0, plain5=0, plainBad=0, frames=0, red=0, bad=0, badList={}, tiles=0, tileRed=0, redInside=0, darkEdge=0, darkInside=0, screenInside=0}
+EDGE = {plain=0, plain5=0, plainBad=0, frames=0, red=0, bad=0, badList={}, tiles=0, tileRed=0, redInside=0, darkEdge=0, darkInside=0, screenInside=0, cEdge=0, cRed=0, cInside=0}
 itemShots = {held=0, ground=0}
 TILES = {item={}, body={}, carried={}, other={}}
 function resetStats() stats = {frames=0, goonSpr=0, goonRed=0, otherSpr=0, otherRed=0, snesMismatch=0, palBad=0, goonPal2=0, bad={}} end
@@ -185,7 +246,7 @@ function audit(tag)
       if cg(red) ~= cg(base) or cg(red+1) ~= cg(base+1) or cg(red+2) ~= cg(base+2) or cg(red+3) ~= cg(base+3) or cg(red+5) ~= RED then stats.palBad = stats.palBad + 1 break end
     end
   end
-  if sk == 3 and frameNo % 15 == 0 then edgeAudit() end
+  if sk == 3 and frameNo % 15 == 0 then edgeAudit() compositeAudit() end
   -- SNES OAM (PPU) palette bit 3 must follow the NES goon bit for visible sprites
   -- (PPU OAM is uploaded in the vblank after the game writes $0200, so compare
   -- against both this and the previous frame's NES attributes)
@@ -214,7 +275,7 @@ function auditEnd() local t = {} for i=0,63 do t[i] = rd(0x202+i*4) end table.in
 function report(tag, needGoons)
   log(string.format("%s frames=%d goonSpr=%d goonRed=%d otherSpr=%d otherRed=%d snesMismatch=%d palBad=%d goonNesPal2=%d %s", tag, stats.frames, stats.goonSpr, stats.goonRed, stats.otherSpr, stats.otherRed, stats.snesMismatch, stats.palBad, stats.goonPal2, table.concat(stats.bad, "; ")))
   log(string.format("%s plain-sprite tiles=%d color5px=%d badTiles=%d (color 5 = color 1 in palettes 0-3: palBad above)", tag, EDGE.plain, EDGE.plain5, EDGE.plainBad))
-  log(string.format("%s red-edge frames=%d redTiles=%d tileRedPx=%d redInsideBody=%d darkLeftOnSilhouette=%d interiorDarkKept=%d | screen redPx=%d screenRedSurroundedByBody(overlap, reported)=%d %s", tag, EDGE.frames, EDGE.tiles, EDGE.tileRed, EDGE.redInside, EDGE.darkEdge, EDGE.darkInside, EDGE.red, EDGE.screenInside, table.concat(EDGE.badList, " ")))
+  log(string.format("%s composed silhouette: edgeOutlinePx=%d red=%d coverage=%.1f%% redInsideComposedBody=%d | in-tile (reported): redTiles=%d tileRedPx=%d redNoInTileTransparent=%d darkNextToInTileTransparent=%d interiorDark=%d | screen redPx=%d screenRedSurrounded(reported)=%d %s", tag, EDGE.cEdge, EDGE.cRed, 100 * coverage(), EDGE.cInside, EDGE.tiles, EDGE.tileRed, EDGE.redInside, EDGE.darkEdge, EDGE.darkInside, EDGE.red, EDGE.screenInside, table.concat(EDGE.badList, " ")))
   local ok = stats.otherRed == 0 and stats.goonRed == stats.goonSpr and stats.palBad == 0 and stats.snesMismatch == 0 and EDGE.bad == 0
   if needGoons then ok = ok and stats.goonSpr > 0 end
   return ok
@@ -408,7 +469,7 @@ run(function()
   held = {}
   local secs = (frameNo - t0) / 60
   check("3 no skill name on street during play", nameHits == 0, "hits="..nameHits)
-  check("4 red only on goons (by actor), only on their outer silhouette, no other color changed; palettes correct", report("street", true) and EDGE.tileRed > 0)
+  check("4 red only on goons (by actor), only on their outer silhouette, no other color changed; palettes correct", report("street", true) and EDGE.tileRed > 0 and coverage() >= COVERAGE_MIN, string.format("coverage=%.1f%% (min %.0f%%)", 100 * coverage(), 100 * COVERAGE_MIN))
   local hist = {} for k,v in pairs(slotHist) do hist[#hist+1] = string.format("%d:%d", k, v) end table.sort(hist)
   log("metasprite slots", table.concat(hist, " "))
   check("7 no freeze/black in "..secs.."s of street play incl. fighting", (not dead) and fights > 0, state().." fights="..fights)
