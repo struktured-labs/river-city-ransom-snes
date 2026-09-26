@@ -1,6 +1,7 @@
 import unittest
 
-from tools.build_gamer_outline import outline_colors, sprite_palette
+from tools.build_gamer_outline import (GOON_BIT, is_enemy, marked_attr, nes_attr_map,
+                                       outline_colors, sprite_palette)
 
 # Street sprite palettes: color 1 is the black outline, color 2 is the shirt.
 STREET = (
@@ -9,6 +10,10 @@ STREET = (
     (0x0F, 0x0F, 0x20, 0x10),
     (0x0F, 0x0F, 0x2C, 0x26),
 )
+# Room gang table at $B5E8: every gang class the game spawns.
+GANGS = (0x02, 0x08, 0x04, 0x05, 0x06, 0x01, 0x07, 0x00, 0x03)
+BOSSES = range(0x09, 0x19)
+TOWNSFOLK = (0x19, 0x1A, 0x1C, 0x1D, 0x20, 0x21, 0x22, 0x25)
 
 
 class GamerOutlineTests(unittest.TestCase):
@@ -16,27 +21,41 @@ class GamerOutlineTests(unittest.TestCase):
         copied = [tuple(outline_colors(pal)) for pal in STREET]
         self.assertEqual(copied[0], (0x0F, 0x16, 0x30, 0x26))
         self.assertEqual(copied[1], (0x0F, 0x16, 0x11, 0x26))
-        self.assertEqual(copied[2][2], 0x20)
-        self.assertEqual(copied[3][2], 0x2C)
         self.assertTrue(all(pal[1] == 0x16 and pal[2] == src[2] and pal[3] == src[3]
                             for pal, src in zip(copied, STREET)))
 
-    def test_player_sprites_stay_on_the_original_palette(self):
-        self.assertEqual(sprite_palette(0, 116, 128, (116, 83), 3, (40,)), 0)
-        self.assertEqual(sprite_palette(1, 124, 140, (116, 83), 3, (40,)), 1)
-        self.assertEqual(sprite_palette(0, 108, 121, (116, 83), 3, (40,)), 0)
-        # Alex is wider than 16px. The working bubble was 28.
-        self.assertEqual(sprite_palette(0, 96, 128, (116,), 3, (40,)), 0)
+    def test_every_gang_and_boss_in_an_enemy_slot_moves_to_the_red_copy(self):
+        for cls in (*GANGS, *BOSSES):
+            for slot in (2, 3, 7):
+                for pal in range(4):
+                    self.assertEqual(sprite_palette(pal, slot, cls, 3), pal + 4)
 
-    def test_other_sprites_use_the_red_outline_copy(self):
-        # A bystander, even on palette 0, is not recolored.
-        self.assertEqual(sprite_palette(0, 10, 128, (116, 83), 3), 0)
-        # The goon keeps his own shirt palette and moves to the red-outline copy.
-        self.assertEqual(sprite_palette(0, 48, 128, (116, 83), 3, (40,)), 4)
-        self.assertEqual(sprite_palette(1, 48, 140, (116, 83), 3, (40,)), 5)
-        self.assertEqual(sprite_palette(2, 48, 130, (116,), 3, (40,)), 6)
-        self.assertEqual(sprite_palette(0, 80, 130, (116,), 3, (200,)), 0)
+    def test_players_are_never_marked_even_with_a_gang_class(self):
+        # Alex and Ryan are class 0, which is also a gang number.
+        for slot in (0, 1):
+            for cls in (0, 2, 8):
+                self.assertFalse(is_enemy(slot, cls))
+                self.assertEqual(sprite_palette(1, slot, cls, 3), 1)
 
-    def test_leaving_gamer_and_hidden_sprites_are_not_retinted(self):
-        self.assertEqual(sprite_palette(0, 40, 128, (116, 83), 1), 0)
-        self.assertEqual(sprite_palette(1, 40, 0xF0, (116, 83), 3), 1)
+    def test_townsfolk_and_shops_are_never_marked(self):
+        for cls in TOWNSFOLK:
+            for slot in (2, 3, 8, 9):
+                self.assertEqual(sprite_palette(2, slot, cls, 3), 2)
+        for slot in (8, 9, 10):
+            self.assertEqual(sprite_palette(0, slot, 2, 3), 0)
+        self.assertEqual(sprite_palette(0, 2, 2, 3, shop=1), 0)
+
+    def test_flips_and_priority_survive_the_goon_bit(self):
+        for attr in (0x00, 0x21, 0x42, 0x83, 0xE3):
+            plain = nes_attr_map()[attr]
+            red = nes_attr_map()[marked_attr(attr, 2, 2, 3)]
+            self.assertEqual(red, plain | 0x08)
+
+    def test_other_skills_never_mark(self):
+        for skill in (1, 2, 4):
+            self.assertEqual(marked_attr(0x01, 2, 2, skill), 0x01)
+
+    def test_unmarked_map_is_the_parent_map(self):
+        for a in range(256):
+            if not a & GOON_BIT:
+                self.assertEqual(nes_attr_map()[a], nes_attr_map(False)[a])

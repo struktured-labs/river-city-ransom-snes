@@ -1,51 +1,61 @@
-"""Gamer clothing outline only. Does not install the P2 companion.
+"""Gamer Mode red goon outline and skill name. Does not install the P2 AI.
 
-Goon sprites keep their NES palette. The fused OAM tail sets bit 3 so
-they use a copy of that palette with a red outline. Shirts stay. The
-joypad poll is not used to recolor anyone.
+Goons are chosen by the game's own actor data, not by screen distance. The
+NES metasprite writer stores each sprite attribute for actor slot $47; a
+hook on its tail JMP sets NES attribute bit 2 when slot $47 is an enemy slot
+(2-7) whose class $04F5 is a gang member or boss (< $19), outside shops.
+The SNES sprite attribute map sends bit 2 to palette +4, and palettes 4-7
+are copies of 0-3 whose color 1 (outline) is NES red. The copy is made in
+the existing palette batch, which only runs when a palette changed.
+
+The skill name is written only to the NES nametable shadow, only on the
+settings screen, and published through the normal dirty-row path.
 """
 import argparse
 import json
 from pathlib import Path
 import shutil
 import subprocess
+import tempfile
 
 from tools.audio_packet_log import labels
 from tools.benchmark_report import sha
-from tools.build_difficulty_modes import snes_unique
 from tools.build_inline_pitch_trial import checksum
 
 # $6900-$6FFF is empty in the parent. Difficulty code begins at $7058.
-SLOT, SIZE = 0x6900, 0x400
-# Leave the vblank OAM address reset alone. A hook there, and a per-sprite
-# call in the prepare loop, blows the Start fade on the MiSTer.
-VIDEO = 0x5100
-OLD_VIDEO = bytes.fromhex('9c02219c0321')
-ATTR_STORE = 0xB55E
-OLD_ATTR = bytes.fromhex('9f03507e')
-# prepare_sprite_delta tail stays stock. The fused copy is where the
-# on-screen attributes are, after each goon's own palette is chosen.
-FRAME = 0xC7AB
-OLD_FRAME = bytes.fromhex('9c871cad791c')
-FUSED = 0x3215
-OLD_FUSED = bytes.fromhex('9c871cc230')
-# Last of the four sprite-palette DMAs. The lda #$B0 that selects
-# palette 3 is 16 bytes before this sta $420B. Used only to draw the
-# skill name on the message-speed screen.
+SLOT, SIZE = 0x6900, 0x200
+# Last of the four sprite-palette DMAs in the final palette batch (bank $C0).
+# The lda #$B0 that selects palette 3 is 17 bytes before this lda #1.
 PALETTE = 0x84F4
 OLD_PALETTE = bytes.fromhex('a9018d0b42')
-# Every-frame register write. A hook here froze the MiSTer two seconds
-# into the level. Leave it.
-FINAL = 0x84F9
-OLD_FINAL = bytes.fromhex('ad201c2902')
-JOY = 0xFD8E
-# paint_skill. Replaced with RTS so the level nametable is not rewritten
-# with the skill name outside the message-speed screen.
+# NES metasprite writer tail in the fixed bank: jmp $3454 right after the
+# sprite attribute store(s) sta $0202,x. Present in every bank 1-8.
+META_TAIL = 0xEEEE
+OLD_META_TAIL = bytes.fromhex('4c5434')
+META_STORE = 0xEEDC
+OLD_META_STORE = bytes.fromhex('a5074505' '9d0202')
+# paint_skill in the difficulty helper. Its entry becomes a JMP to name_paint.
 PAINT = 0x7140
 OLD_PAINT = bytes.fromhex('08e230ad4c06')
-MENU_JSR = snes_unique(0x17B1F)
+# NES OAM attribute -> SNES OAM attribute table (bank $C0).
+ATTR_MAP = 0xC7D3
+GOON_BIT = 0x04          # NES attribute bit 2, unused by NES hardware
 RED_NES = 0x16
-NEAR = 28
+RED_SNES = 0x00BB        # native_palette[$16]
+PLAYER_SLOTS = (0, 1)     # Alex, Ryan
+ENEMY_SLOTS = range(2, 8)
+TOWNSFOLK_CLASS = 0x19    # $04F5 classes: 0-8 gangs, 9-$18 bosses, $19+ townsfolk
+
+
+def nes_attr_map(goon_red=True):
+    """SNES attribute for every NES attribute byte (sprite_attribute_map)."""
+    out = []
+    for a in range(256):
+        v = (a & 0xC0) | ((a & 3) << 1) | (0 if a & 0x20 else 0x30)
+        if goon_red and a & GOON_BIT:
+            v |= 0x08
+        out.append(v)
+    return bytes(out)
 
 
 def outline_colors(colors):
@@ -57,15 +67,21 @@ def outline_colors(colors):
     return out
 
 
-def sprite_palette(index, x, y, anchors, skill, goons=()):
-    """SNES palette. A goon's own palette plus 4. Everyone else stays."""
-    if skill != 3 or y >= 0xF0 or index > 3:
-        return index
-    if any(abs(x - anchor) < NEAR for anchor in anchors):
-        return index
-    if any(abs(x - goon) < 25 for goon in goons):
-        return index + 4
-    return index
+def is_enemy(slot, actor_class, shop=0):
+    """Actor slot $47 and class $04F5,slot, as the metasprite hook tests them."""
+    return not shop and slot in ENEMY_SLOTS and actor_class < TOWNSFOLK_CLASS
+
+
+def marked_attr(attr, slot, actor_class, skill, shop=0):
+    """NES attribute after the metasprite hook for a sprite of this actor."""
+    if skill == 3 and is_enemy(slot, actor_class, shop):
+        return attr | GOON_BIT
+    return attr
+
+
+def sprite_palette(nes_attr, slot, actor_class, skill, shop=0):
+    """SNES palette that the sprite ends up on."""
+    return (nes_attr_map()[marked_attr(nes_attr, slot, actor_class, skill, shop)] >> 1) & 7
 
 
 def build(parent, out):
@@ -77,117 +93,94 @@ def build(parent, out):
         raise ValueError('Parent ROM does not match its manifest')
     if meta.get('experimental_ai_p2'):
         raise ValueError('Parent already has the companion')
-    poll = labels(parent / 'native_runtime.lbl')['native_joypad_poll']
-    out.mkdir(parents=True)
-    shutil.copy2(parent / 'native_runtime.lbl', out / 'native_runtime.lbl')
-    subprocess.run(['.deps/cc65/bin/ca65', '-D', f'POLL={poll}',
-                    '-o', str(out / 'gamer_outline.o'), 'snes/gamer_outline.asm'], check=True)
+    if meta.get('experimental_gamer_outline'):
+        raise ValueError('Parent already has a gamer outline')
+    # Assemble in a scratch directory so a failed build leaves no output dir.
+    final, out = out, Path(tempfile.mkdtemp(prefix='gamer-outline-'))
+    subprocess.run(['.deps/cc65/bin/ca65', '-o', str(out / 'gamer_outline.o'),
+                    'snes/gamer_outline.asm'], check=True)
     subprocess.run(['.deps/cc65/bin/ld65', '-C', 'snes/gamer_outline.cfg',
                     '-Ln', str(out / 'gamer_outline.lbl'), '-o', str(out / 'gamer_outline.bin'),
                     str(out / 'gamer_outline.o')], check=True)
     helper = (out / 'gamer_outline.bin').read_bytes()
     if len(helper) != SIZE:
         raise ValueError(f'Helper is {len(helper)} bytes, slot is {SIZE}')
-    if helper[:2] == b'\xff\xff':
-        raise ValueError('Helper entry is empty')
-    # ca65 sizes immediates from .a8/.i8, not from SEP. A 16-bit LDA #$BB
-    # would leave a BRK in the CGRAM write.
-    if bytes.fromhex('a9bb00') in helper or bytes.fromhex('a20000') in helper:
-        raise ValueError('An immediate was assembled 16-bit')
-    if bytes.fromhex('a9bb') not in helper or bytes.fromhex('4cffff') not in helper:
-        raise ValueError('Red outline or skill-gate jump missing')
-    if bytes.fromhex('4c') + poll.to_bytes(2, 'little') not in helper:
-        raise ValueError('Joypad poll jump missing')
     names = {}
     for line in (out / 'gamer_outline.lbl').read_text().splitlines():
         parts = line.split()
         if len(parts) >= 3 and parts[2].startswith('.'):
             names[parts[2][1:]] = int(parts[1], 16)
-    for need in ('joy_outline', 'fused_outline', 'upload_red', 'menu_skill', 'street_maintain'):
+    for need in ('goon_attr', 'name_paint', 'pal_red'):
         if need not in names:
             raise ValueError(f'{need} is missing from the helper')
-    if names['joy_outline'] != SLOT:
-        raise ValueError('Joypad outline is not the helper entry')
-    gate = labels(parent / 'difficulty_modes.lbl')['skill_gate']
-    helper = bytearray(helper)
-    jump = helper.find(bytes.fromhex('4cffff'))
-    if jump < 0 or helper.find(bytes.fromhex('4cffff'), jump + 1) >= 0:
-        raise ValueError('skill_gate jump is not unique')
-    helper[jump + 1:jump + 3] = gate.to_bytes(2, 'little')
+    # ca65 sizes immediates from .a8/.i8, not from SEP. A 16-bit LDA #$BB
+    # would leave a BRK in the CGRAM write.
+    if bytes.fromhex('a9bb00') in helper or bytes.fromhex('a20000') in helper:
+        raise ValueError('An immediate was assembled 16-bit')
+    if helper.count(bytes.fromhex('a9bb8d2221')) != 4:
+        raise ValueError('Red outline color writes missing')
+    if bytes.fromhex('4c5434') not in helper:
+        raise ValueError('Metasprite tail jump missing')
+    goon = names['goon_attr'] - SLOT
+    # php / sep #$30 first: every hook entry pins its register width.
+    if helper[goon:goon + 3] != bytes.fromhex('08e230'):
+        raise ValueError('goon_attr does not pin 8-bit registers')
+    pal = names['pal_red'] - SLOT
+    if helper[pal:pal + 5] != bytes.fromhex('08e220c210'):
+        raise ValueError('pal_red does not pin A8/X16')
     image = bytearray(rom.read_bytes())
-    if image[VIDEO:VIDEO + len(OLD_VIDEO)] != OLD_VIDEO:
-        raise ValueError('OAM DMA entry moved')
-    if image[ATTR_STORE:ATTR_STORE + 4] != OLD_ATTR:
-        raise ValueError('Sprite attribute store moved')
-    if image[FRAME:FRAME + len(OLD_FRAME)] != OLD_FRAME:
-        raise ValueError('Sprite-prepare tail moved')
-    if image[FUSED:FUSED + len(OLD_FUSED)] != OLD_FUSED:
-        raise ValueError('Fused OAM copy tail moved')
+    work, out = out, final
+    out.mkdir(parents=True)
+    shutil.copy2(parent / 'native_runtime.lbl', out / 'native_runtime.lbl')
+    for name in ('gamer_outline.o', 'gamer_outline.bin', 'gamer_outline.lbl'):
+        shutil.move(str(work / name), out / name)
+    shutil.rmtree(work)
     if image[PALETTE:PALETTE + len(OLD_PALETTE)] != OLD_PALETTE:
         raise ValueError('Palette DMA site moved')
     if image[PALETTE - 17:PALETTE - 15] != bytes.fromhex('a9b0'):
         raise ValueError('Palette hook is not the palette-3 DMA')
-    if image[FINAL:FINAL + len(OLD_FINAL)] != OLD_FINAL:
-        raise ValueError('Final vblank tail moved')
-    for bank in range(1, 9):
-        at = bank * 65536 + PAINT
-        if image[at:at + len(OLD_PAINT)] != OLD_PAINT:
-            raise ValueError(f'paint_skill moved in bank {bank}')
-    menu_jsr = image[MENU_JSR:MENU_JSR + 3]
-    if menu_jsr != b'\x20' + gate.to_bytes(2, 'little'):
-        raise ValueError('Skill menu JSR is not skill_gate')
-    joy = b'\x4c' + poll.to_bytes(2, 'little')
-
-    def jsl(name):
-        addr = names[name]
-        return bytes((0x22, addr & 0xFF, (addr >> 8) & 0xFF, 0xC1))
-
+    if image[ATTR_MAP:ATTR_MAP + 256] != nes_attr_map(goon_red=False):
+        raise ValueError('Sprite attribute map moved')
     allowed = set(range(0xffdc, 0xffe0))
     allowed.update(range(PALETTE, PALETTE + len(OLD_PALETTE)))
-    allowed.update(range(MENU_JSR, MENU_JSR + 3))
-    allowed.update(range(FINAL, FINAL + len(OLD_FINAL)))
-    allowed.update(range(FUSED, FUSED + len(OLD_FUSED)))
-    image[PALETTE:PALETTE + len(OLD_PALETTE)] = jsl('upload_red') + b'\xea'
-    image[FINAL:FINAL + len(OLD_FINAL)] = jsl('street_maintain') + b'\xea'
-    image[FUSED:FUSED + len(OLD_FUSED)] = jsl('fused_outline') + b'\xea'
-    image[MENU_JSR:MENU_JSR + 3] = b'\x20' + names['menu_skill'].to_bytes(2, 'little')
+    allowed.update(range(ATTR_MAP, ATTR_MAP + 256))
+    pal_red = names['pal_red']
+    image[PALETTE:PALETTE + len(OLD_PALETTE)] = (
+        bytes((0x22, pal_red & 0xFF, pal_red >> 8, 0xC1)) + b'\xea')
+    image[ATTR_MAP:ATTR_MAP + 256] = nes_attr_map()
     for bank in range(1, 9):
-        at = bank * 65536 + PAINT
-        allowed.add(at)
-        image[at] = 0x60
-    joy_hook = b'\x4c' + SLOT.to_bytes(2, 'little')
-    for bank in range(1, 9):
-        at, hook = bank * 65536 + SLOT, bank * 65536 + JOY
+        base = bank * 65536
+        at = base + SLOT
         if image[at:at + SIZE] != b'\xff' * SIZE:
             raise ValueError('Occupied gamer-outline slot')
-        if image[hook:hook + 3] != joy:
-            raise ValueError('Joypad hook is not the stock poll')
+        if image[base + META_STORE:base + META_STORE + len(OLD_META_STORE)] != OLD_META_STORE:
+            raise ValueError(f'Metasprite attribute store moved in bank {bank}')
+        if image[base + META_TAIL:base + META_TAIL + 3] != OLD_META_TAIL:
+            raise ValueError(f'Metasprite tail moved in bank {bank}')
+        if image[base + PAINT:base + PAINT + len(OLD_PAINT)] != OLD_PAINT:
+            raise ValueError(f'paint_skill moved in bank {bank}')
         image[at:at + SIZE] = helper
-        image[hook:hook + 3] = joy_hook
+        image[base + META_TAIL:base + META_TAIL + 3] = b'\x4c' + names['goon_attr'].to_bytes(2, 'little')
+        image[base + PAINT:base + PAINT + 3] = b'\x4c' + names['name_paint'].to_bytes(2, 'little')
         allowed.update(range(at, at + SIZE))
-        allowed.update(range(hook, hook + 3))
+        allowed.update(range(base + META_TAIL, base + META_TAIL + 3))
+        allowed.update(range(base + PAINT, base + PAINT + 3))
     checksum(image)
     if any(i not in allowed for i, (a, b) in enumerate(zip(rom.read_bytes(), image)) if a != b):
         raise ValueError('Unrelated ROM mutation')
-    if image[VIDEO:VIDEO + len(OLD_VIDEO)] != OLD_VIDEO:
-        raise ValueError('OAM DMA hook was modified')
-    if image[FRAME:FRAME + len(OLD_FRAME)] != OLD_FRAME:
-        raise ValueError('Sprite-prepare tail was modified')
-    if image[FUSED] != 0x22 or image[FUSED + 3] != 0xC1:
-        raise ValueError('Fused outline hook did not land')
-    if image[FINAL] != 0x22 or image[FINAL + 3] != 0xC1:
-        raise ValueError('Sidewalk hook did not land')
-    if image[0x1fd8e:0x1fd91] != joy_hook:
-        raise ValueError('Joypad hook did not land')
     (out / 'native-cpu.sfc').write_bytes(image)
     meta.update(rom_sha256=sha(out / 'native-cpu.sfc'), experimental_gamer_outline=dict(
         parent=str(parent), helper=SLOT, size=SIZE, ai_companion=False,
-        video=VIDEO,
-        note='Gamer outline recolors NES palette 3 from the joypad poll. No P2 AI.'))
+        sources={str(p): sha(p) for p in (
+            Path('snes/gamer_outline.asm'), Path('snes/gamer_outline.cfg'), Path(__file__))},
+        note=('Goon sprites (actor type 2) get NES attr bit 2 in the metasprite writer; '
+              'the SNES attribute map sends it to palette +4 (red outline copies made in '
+              'the palette batch). Skill name via NES nametable shadow on the settings screen only.')))
     (out / 'manifest.json').write_text(json.dumps(meta, indent=2) + '\n')
-    used = next(i for i, b in enumerate(helper) if helper[i:] == b'\xff' * (SIZE - i))
+    used = len(helper.rstrip(b'\xff'))
     print(json.dumps(dict(out=str(out), rom_sha256=meta['rom_sha256'],
-                          helper_used=used, helper_slack=SIZE - used)))
+                          helper_used=used, helper_slack=SIZE - used,
+                          symbols={k: hex(v) for k, v in names.items() if not k.startswith('__')})))
 
 
 if __name__ == '__main__':
