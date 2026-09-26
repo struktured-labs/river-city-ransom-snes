@@ -1,8 +1,8 @@
 """Gamer Mode red goon outline and skill name. Does not install the P2 AI.
 
 Goons are chosen by the game's own actor data, not by screen distance. The
-NES metasprite writer stores each sprite attribute for actor slot $47; a
-hook on its tail JMP sets NES attribute bit 2 when slot $47 is an enemy slot
+NES metasprite writer stores each sprite attribute for actor slot $47; both
+stores become a JSR that stores it with NES attribute bit 2 set when slot $47 is an enemy slot
 (2-7) whose class $04F5 is a gang member or boss (< $19), outside shops.
 The SNES sprite attribute map sends bit 2 to palette +4, and palettes 4-7
 are copies of 0-3 whose color 1 (outline) is NES red. The copy is made in
@@ -28,12 +28,13 @@ SLOT, SIZE = 0x6900, 0x200
 # The lda #$B0 that selects palette 3 is 17 bytes before this lda #1.
 PALETTE = 0x84F4
 OLD_PALETTE = bytes.fromhex('a9018d0b42')
-# NES metasprite writer tail in the fixed bank: jmp $3454 right after the
-# sprite attribute store(s) sta $0202,x. Present in every bank 1-8.
-META_TAIL = 0xEEEE
-OLD_META_TAIL = bytes.fromhex('4c5434')
-META_STORE = 0xEEDC
-OLD_META_STORE = bytes.fromhex('a5074505' '9d0202')
+# NES metasprite writer in the fixed bank (every bank 1-8). Its two sprite
+# attribute stores, sta $0202,x, become JSR goon_sta:
+#   EEDC lda $07 / eor $05 / EEE0 sta $0202,x / lda $31 / beq EEEE
+#   EEE7 lda ($30),y / eor $05 / EEEB sta $0202,x / EEEE jmp $3454
+META = 0xEEDC
+OLD_META = bytes.fromhex('a5074505' '9d0202' 'a531' 'f007' 'b130' '4505' '9d0202' '4c5434')
+META_STORES = (0xEEE0, 0xEEEB)
 # paint_skill in the difficulty helper. Its entry becomes a JMP to name_paint.
 PAINT = 0x7140
 OLD_PAINT = bytes.fromhex('08e230ad4c06')
@@ -110,7 +111,7 @@ def build(parent, out):
         parts = line.split()
         if len(parts) >= 3 and parts[2].startswith('.'):
             names[parts[2][1:]] = int(parts[1], 16)
-    for need in ('goon_attr', 'name_paint', 'pal_red'):
+    for need in ('goon_sta', 'name_paint', 'pal_red'):
         if need not in names:
             raise ValueError(f'{need} is missing from the helper')
     # ca65 sizes immediates from .a8/.i8, not from SEP. A 16-bit LDA #$BB
@@ -119,12 +120,12 @@ def build(parent, out):
         raise ValueError('An immediate was assembled 16-bit')
     if helper.count(bytes.fromhex('a9bb8d2221')) != 4:
         raise ValueError('Red outline color writes missing')
-    if bytes.fromhex('4c5434') not in helper:
-        raise ValueError('Metasprite tail jump missing')
-    goon = names['goon_attr'] - SLOT
+    if helper.count(bytes.fromhex('9d0202')) != 2:
+        raise ValueError('goon_sta must perform the attribute store on both paths')
+    goon = names['goon_sta'] - SLOT
     # php / sep #$30 first: every hook entry pins its register width.
     if helper[goon:goon + 3] != bytes.fromhex('08e230'):
-        raise ValueError('goon_attr does not pin 8-bit registers')
+        raise ValueError('goon_sta does not pin 8-bit registers')
     pal = names['pal_red'] - SLOT
     if helper[pal:pal + 5] != bytes.fromhex('08e220c210'):
         raise ValueError('pal_red does not pin A8/X16')
@@ -153,17 +154,16 @@ def build(parent, out):
         at = base + SLOT
         if image[at:at + SIZE] != b'\xff' * SIZE:
             raise ValueError('Occupied gamer-outline slot')
-        if image[base + META_STORE:base + META_STORE + len(OLD_META_STORE)] != OLD_META_STORE:
-            raise ValueError(f'Metasprite attribute store moved in bank {bank}')
-        if image[base + META_TAIL:base + META_TAIL + 3] != OLD_META_TAIL:
-            raise ValueError(f'Metasprite tail moved in bank {bank}')
+        if image[base + META:base + META + len(OLD_META)] != OLD_META:
+            raise ValueError(f'Metasprite attribute stores moved in bank {bank}')
         if image[base + PAINT:base + PAINT + len(OLD_PAINT)] != OLD_PAINT:
             raise ValueError(f'paint_skill moved in bank {bank}')
         image[at:at + SIZE] = helper
-        image[base + META_TAIL:base + META_TAIL + 3] = b'\x4c' + names['goon_attr'].to_bytes(2, 'little')
+        for store in META_STORES:
+            image[base + store:base + store + 3] = b'\x20' + names['goon_sta'].to_bytes(2, 'little')
+            allowed.update(range(base + store, base + store + 3))
         image[base + PAINT:base + PAINT + 3] = b'\x4c' + names['name_paint'].to_bytes(2, 'little')
         allowed.update(range(at, at + SIZE))
-        allowed.update(range(base + META_TAIL, base + META_TAIL + 3))
         allowed.update(range(base + PAINT, base + PAINT + 3))
     checksum(image)
     if any(i not in allowed for i, (a, b) in enumerate(zip(rom.read_bytes(), image)) if a != b):

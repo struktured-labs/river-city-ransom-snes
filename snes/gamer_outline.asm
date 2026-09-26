@@ -3,9 +3,9 @@
 ; palette copy inside the existing, time-checked palette batch.
 ;
 ; Outline: the NES metasprite writer ($EE82-$EEEE, fixed bank) stores each
-; sprite's attribute at $0202,X for actor slot $47, then JMPs to $3454. The
-; hook sits on that JMP. If the actor is an enemy the sprite gets NES
-; attribute bit 2, which the NES never uses. Enemy = actor slot 2-7 (slots
+; sprite's attribute at $0202,X for actor slot $47. Both stores become a JSR
+; to goon_sta. If the actor is an enemy the stored attribute gets NES bit 2,
+; which the NES never uses. Enemy = actor slot 2-7 (slots
 ; 0-1 are Alex and Ryan, 8+ townsfolk) whose class $04F5,slot is a gang
 ; member (0-8, the room table at $B5E8) or a gang boss (9-$18). Townsfolk
 ; classes start at $19. Nothing is marked inside a shop ($00CC). The SNES attribute map
@@ -25,40 +25,50 @@
 .a8
 .i8
 .segment "CODE"
-.export goon_attr, name_paint, pal_red
+.export goon_sta, name_paint, pal_red
 
 CHANGED = $7FF01A
 
-; E=1, A8/X8. X = OAM offset of the sprite just written. A/X/Y/P kept.
-goon_attr:
+; Replaces both "sta $0202,x" attribute stores of the metasprite writer
+; (JSR, same 3 bytes). A = the attribute, X = OAM offset, $47 = actor slot.
+; The marked value is written by the one store, so no OAM copy can ever see
+; an enemy sprite without its mark. E=1, A8/X8. A, X, Y and P come back as
+; they were after the original store.
+goon_sta:
     php
     sep #$30
     pha
     lda a:$064C
     cmp #3
-    bne ga_out
+    bne gs_plain
     lda a:$00CC
-    bne ga_out
+    bne gs_plain
     phy
     ldy a:$0047
     cpy #2
-    bcc ga_player
+    bcc gs_plain_y
     cpy #8
-    bcs ga_player
+    bcs gs_plain_y
     lda a:$04F5,y
     ply
     cmp #$19
-    bcs ga_out
-    lda a:$0202,x
+    bcs gs_plain
+    pla
+    pha
     ora #$04
     sta a:$0202,x
-ga_out:
     pla
     plp
-    jmp $3454
-ga_player:
+    rts
+gs_plain_y:
     ply
-    bra ga_out
+gs_plain:
+    pla
+    pha
+    sta a:$0202,x
+    pla
+    plp
+    rts
 
 ; Replaces paint_skill. Called with JSR from extra_level (every frame of the
 ; settings screen) and from menu_next (after one step). E=1.
