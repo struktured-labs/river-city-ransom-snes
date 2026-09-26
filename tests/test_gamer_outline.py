@@ -14,6 +14,10 @@ STREET = (
 GANGS = (0x02, 0x08, 0x04, 0x05, 0x06, 0x01, 0x07, 0x00, 0x03)
 BOSSES = range(0x09, 0x19)
 TOWNSFOLK = (0x19, 0x1A, 0x1C, 0x1D, 0x20, 0x21, 0x22, 0x25)
+# Sprite kinds: bank 9 $B95B gives gangs kind 2 and the big bosses 3-7; room
+# objects (sticks, chains, boxes, cans, money) are $08-$11.
+FIGHTER_KINDS = (2, 3, 4, 5, 6, 7)
+OBJECT_KINDS = range(0x08, 0x12)
 
 
 class GamerOutlineTests(unittest.TestCase):
@@ -59,3 +63,17 @@ class GamerOutlineTests(unittest.TestCase):
         for a in range(256):
             if not a & GOON_BIT:
                 self.assertEqual(nes_attr_map()[a], nes_attr_map(False)[a])
+
+    def test_weapons_and_objects_in_enemy_slots_are_never_marked(self):
+        # Objects share slots 2-7 with gang members and keep a stale class.
+        for kind in OBJECT_KINDS:
+            for cls in (*GANGS, 0x0C):
+                for slot in (2, 5, 7):
+                    self.assertEqual(sprite_palette(1, slot, cls, 3, kind=kind), 1)
+
+    def test_a_held_weapon_drawn_by_its_goon_is_not_marked(self):
+        for kind in FIGHTER_KINDS:
+            self.assertEqual(sprite_palette(2, 3, 2, 3, kind=kind, part=0x80), 2)
+            self.assertEqual(sprite_palette(2, 3, 2, 3, kind=kind, part=0), 6)
+            # $FF sub-parts ($0012 = return index < $80) are still body
+            self.assertEqual(sprite_palette(2, 3, 2, 3, kind=kind, part=0x05), 6)

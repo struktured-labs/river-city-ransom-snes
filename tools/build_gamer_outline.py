@@ -68,21 +68,31 @@ def outline_colors(colors):
     return out
 
 
-def is_enemy(slot, actor_class, shop=0):
-    """Actor slot $47 and class $04F5,slot, as the metasprite hook tests them."""
-    return not shop and slot in ENEMY_SLOTS and actor_class < TOWNSFOLK_CLASS
+# Sprite kind $00CB,slot: 0-7 use the human animation sets (bank 6 $8000);
+# $08-$11 are weapons and other objects from the room object list.
+BODY_KINDS = range(0, 8)
+# $0012 is $80 while the metasprite writer draws a held object as part of its
+# holder ($FC branch, $EE34-$EE67).
+HELD_PART = 0x80
 
 
-def marked_attr(attr, slot, actor_class, skill, shop=0):
+def is_enemy(slot, actor_class, shop=0, kind=2, part=0):
+    """Actor slot $47, class $04F5,slot, kind $00CB,slot and the writer's part
+    flag $0012, as the metasprite hook tests them."""
+    return (not shop and slot in ENEMY_SLOTS and actor_class < TOWNSFOLK_CLASS
+            and kind in BODY_KINDS and not part & HELD_PART)
+
+
+def marked_attr(attr, slot, actor_class, skill, shop=0, kind=2, part=0):
     """NES attribute after the metasprite hook for a sprite of this actor."""
-    if skill == 3 and is_enemy(slot, actor_class, shop):
+    if skill == 3 and is_enemy(slot, actor_class, shop, kind, part):
         return attr | GOON_BIT
     return attr
 
 
-def sprite_palette(nes_attr, slot, actor_class, skill, shop=0):
+def sprite_palette(nes_attr, slot, actor_class, skill, shop=0, kind=2, part=0):
     """SNES palette that the sprite ends up on."""
-    return (nes_attr_map()[marked_attr(nes_attr, slot, actor_class, skill, shop)] >> 1) & 7
+    return (nes_attr_map()[marked_attr(nes_attr, slot, actor_class, skill, shop, kind, part)] >> 1) & 7
 
 
 def build(parent, out):

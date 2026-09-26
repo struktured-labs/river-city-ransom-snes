@@ -19,6 +19,11 @@ B, Y, SELECT, START, UP, DOWN, LEFT, RIGHT, A = 0, 1, 2, 3, 4, 5, 6, 7, 8
 NEXT = {1: 4, 4: 2, 2: 3, 3: 1}
 PREV = {1: 3, 3: 2, 2: 4, 4: 1}
 NAMES = {1: '00cdced5c8c2c400', 2: 'c0c3d5c0cdc2c4c3', 3: '00c6c0ccc4d10000', 4: 'c8cdd3c4d1ccc4c3'}
+# Weapon/item tiles on the test route (rooms 00-01): tiles Mesen2's accept.lua
+# saw drawn by weapon/item objects (sprite kind $08-$11) or by held-object
+# parts ($FC branch at $EE4B), and never by an enemy body sprite ("item tiles"
+# log line). snes9x has no write callbacks, so ownership is judged by tile.
+ITEM_TILES = {0xD0, 0xDC, 0xDD, 0xE0, 0xEC, 0xED, 0xEE, 0xFE}
 PATS = {'GAMER': 'c6c0ccc4d1', 'NOVICE': 'cdced5c8c2c4', 'ADVANCED': 'c0c3d5c0cdc2c4c3',
         'INTERMED': 'c8cdd3c4d1ccc4c3'}
 
@@ -268,6 +273,7 @@ def main(rom, out):
     e.png('3-street-start')
 
     hist = []
+    items = dict(spr=0, red=0, heldFrames=0, groundFrames=0, heldShots=0, groundShots=0)
 
     def outline_audit(stats):
         # The SNES OAM shadow is filled by the game's next OAM copy, so it may
@@ -287,6 +293,23 @@ def main(rom, out):
                 stats['mismatch'] += 1
             if attr & 4:
                 stats['marked'] += 1
+            if tile in ITEM_TILES:
+                items['spr'] += 1
+                if attr & 4:
+                    items['red'] += 1
+        # scenario screenshots: a goon holding a weapon, a weapon on the ground
+        for s in range(2, 8):
+            kind, fl, p = r[0xCB + s], r[0x56 + s], r[0x3B7 + s]
+            if kind < 8 and fl & 0x40 and p < 8 and 8 <= r[0xCB + p] <= 0x11 and r[0x3B7 + p] == s:
+                items['heldFrames'] += 1
+                if items['heldShots'] < 2 and e.frame % 90 == 0:
+                    items['heldShots'] += 1
+                    e.png(f"8-goon-holding-weapon-{items['heldShots']}")
+            if 8 <= kind <= 0x11 and not fl & 0x40 and (r[0xD3 + s] & 0x7F) != 0x7F:
+                items['groundFrames'] += 1
+                if items['groundShots'] < 2 and e.frame % 90 == 0:
+                    items['groundShots'] += 1
+                    e.png(f"8-weapon-on-ground-{items['groundShots']}")
         hist.insert(0, cur)
         del hist[3:]
         stats['frames'] += 1
@@ -367,6 +390,9 @@ def main(rom, out):
     img, _ = e.png('6-low-stamina')
     check('6 marks persist at low stamina', stats['mismatch'] == 0 and stats['marked'] > 0,
           f'{stats} red={red_pixels(img)}')
+    check('8 no weapon/item sprite outlined (ground and held by a goon)',
+          items['red'] == 0 and items['spr'] > 0 and items['heldFrames'] > 0 and items['groundFrames'] > 0,
+          f'{items}')
     log('DONE fails', len(fails), fails)
     return fails
 

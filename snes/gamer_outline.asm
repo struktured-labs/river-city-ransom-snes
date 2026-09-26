@@ -8,7 +8,18 @@
 ; which the NES never uses. Enemy = actor slot 2-7 (slots
 ; 0-1 are Alex and Ryan, 8+ townsfolk) whose class $04F5,slot is a gang
 ; member (0-8, the room table at $B5E8) or a gang boss (9-$18). Townsfolk
-; classes start at $19. Nothing is marked inside a shop ($00CC). The SNES attribute map
+; classes start at $19. The slot's sprite kind $00CB,slot must also be a
+; fighter body (0-7): the game assigns kinds from class via bank 9 $B95B
+; (fighters 2-7, townsfolk-style $13+), objects get kinds $08-$11 from the
+; room object list (bank 13 $B6D9; $0A sticks/pipes, $0E/$0F boxes and cans,
+; $10 dropped money), and the kind table at bank 6 $8000 gives 0-7 the human
+; animation sets. The game makes the same split for face tiles ($EEC3,
+; cmp #$08). A weapon, box or can that someone is holding is not drawn by its
+; own object slot: the holder's metasprite has a $FC part that, when the
+; holder's $56 bit 6 is set, draws the held object's frame ($EE34-$EE67) with
+; $0012 = $80 until the part ends ($EF6D-$EF7F clears it). $FF sub-parts keep
+; $0012 below $80. So nothing is marked while $0012 bit 7 is set.
+; Nothing is marked inside a shop ($00CC). The SNES attribute map
 ; turns bit 2 into palette +4. Palettes 4-7 are copies of 0-3 with color 1
 ; (the black outline) red, so shirts keep their colors. Players,
 ; shopkeepers and townsfolk are never marked. No screen-distance
@@ -49,6 +60,11 @@ goon_sta:
     bcc gs_plain_y
     cpy #8
     bcs gs_plain_y
+    lda a:$00CB,y
+    cmp #8
+    bcs gs_plain_y
+    lda a:$0012
+    bmi gs_plain_y
     lda a:$04F5,y
     ply
     cmp #$19

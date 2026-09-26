@@ -7,18 +7,37 @@ RED = 0x00BB
 function vname() local t={} for i=0,7 do t[#t+1]=string.format("%02x", emu.read((0x22AC+i)*2, V)) end return table.concat(t) end
 -- ground truth: which actor slot wrote each NES OAM attribute this frame
 writer = {}
+heldW = {}
 slotHist = {}
+-- Held objects (a weapon, box or can in someone's hands) are drawn as a
+-- sub-part of the holder's own metasprite: the $FC opcode branch at $EE4B
+-- (taken only when the holder's $56 bit 6 is set) draws the held object's
+-- frame and returns at $EF7D. Track that control flow independently of the
+-- ROM's own test so held-object sprites can be told apart from body sprites.
+heldPart = false
+for b=0xC1,0xC8 do
+  emu.addMemoryCallback(function() heldPart = true end, emu.callbackType.exec, b*65536+0xEE4B, b*65536+0xEE4B, emu.cpuType.snes, emu.memType.snesMemory)
+  emu.addMemoryCallback(function() heldPart = false end, emu.callbackType.exec, b*65536+0xEF7D, b*65536+0xEF7D, emu.cpuType.snes, emu.memType.snesMemory)
+  emu.addMemoryCallback(function() heldPart = false end, emu.callbackType.exec, b*65536+0xED0E, b*65536+0xED0E, emu.cpuType.snes, emu.memType.snesMemory)
+end
 emu.addMemoryCallback(function(addr, value)
   if (addr & 3) ~= 2 then return end
   writer[(addr & 0xFF) // 4] = rd(0x47)
+  heldW[(addr & 0xFF) // 4] = heldPart
   slotHist[rd(0x47)] = (slotHist[rd(0x47)] or 0) + 1
 end, emu.callbackType.write, 0x200, 0x2FF, emu.cpuType.snes, emu.memType.snesWorkRam)
 function cg(i) return emu.read(i*2, CG) + 256*emu.read(i*2+1, CG) end
 -- one frame's outline audit. Returns counts; records failures in stats.
 stats = {}
+-- weapons/items: objects of sprite kind $08-$11 (bank 6 $8000 kind table,
+-- room object list bank 13 $B6D9) or a held-object sub-part. Never outlined.
+ITEM = {spr=0, red=0, held=0, heldGoon=0, ground=0, flying=0, bad={}}
+itemShots = {held=0, ground=0}
+TILES = {item={}, body={}}
 function resetStats() stats = {frames=0, goonSpr=0, goonRed=0, otherSpr=0, otherRed=0, snesMismatch=0, palBad=0, bad={}} end
 function audit(tag)
   stats.frames = stats.frames + 1
+  frameHeldGoon = false frameGround = false
   local sk = rd(0x64C)
   for i=0,63 do
     local y = rd(0x200+i*4)
@@ -28,8 +47,19 @@ function audit(tag)
       local a = rd(0x202+i*4)
       local marked = (a & 4) ~= 0
       -- game semantics: slots 0-1 players, classes 0-8 gangs (room table $B5E8), 9-$18 bosses, $19+ townsfolk
-      local enemy = s >= 2 and s <= 7 and t < 0x19 and rd(0xCC) == 0
+      local kind = rd(0xCB + s)
+      local held = heldW[i] == true
+      local item = held or (kind >= 8 and kind <= 0x11)
+      local enemy = s >= 2 and s <= 7 and t < 0x19 and kind < 8 and not held and rd(0xCC) == 0
       if sk ~= 3 then enemy = false end
+      local tile = rd(0x201+i*4)
+      if item then TILES.item[tile] = true elseif s >= 2 and s <= 7 and kind < 8 then TILES.body[tile] = true end
+      if item then
+        ITEM.spr = ITEM.spr + 1
+        if held then ITEM.held = ITEM.held + 1 if s >= 2 and s <= 7 and kind < 8 then ITEM.heldGoon = ITEM.heldGoon + 1 frameHeldGoon = true end
+        else ITEM.ground = ITEM.ground + 1 frameGround = true if (rd(0x56 + s) & 0x80) ~= 0 then ITEM.flying = ITEM.flying + 1 end end
+        if marked then ITEM.red = ITEM.red + 1 if #ITEM.bad < 8 then ITEM.bad[#ITEM.bad+1] = string.format("ITEM %s spr%d slot%d kind%02x held=%s tile%02x attr%02x", tag, i, s, kind, tostring(held), rd(0x201+i*4), a) end end
+      end
       if enemy then
         stats.goonSpr = stats.goonSpr + 1
         if marked then stats.goonRed = stats.goonRed + 1 elseif #stats.bad < 6 then stats.bad[#stats.bad+1] = string.format("UNMARKED %s spr%d slot%d type%02x attr%02x", tag, i, s, t, a) end
@@ -39,6 +69,8 @@ function audit(tag)
       end
     end
   end
+  if frameHeldGoon and itemShots.held < 3 and frameNo % 90 == 0 then itemShots.held = itemShots.held + 1 shot(string.format("8-goon-holding-weapon-%d", itemShots.held)) end
+  if frameGround and not frameHeldGoon and itemShots.ground < 3 and frameNo % 90 == 0 then itemShots.ground = itemShots.ground + 1 shot(string.format("8-weapon-on-ground-%d", itemShots.ground)) end
   -- palettes 4-7 = palettes 0-3 with color 1 red (only meaningful in Gamer)
   if sk == 3 then
     for p=0,3 do
@@ -95,7 +127,7 @@ function alive()
   return sameCount < 4 and blackCount < 8
 end
 function frameHook() writer = {} end
-function stepA(n, tag) for i=1,n do writer = {} step() audit(tag) end end
+function stepA(n, tag) for i=1,n do writer = {} heldW = {} step() audit(tag) end end
 
 run(function()
   -- 1. skill select
@@ -151,7 +183,7 @@ run(function()
       held.right = (sec % 10) < 6
       held.left = (sec % 10) >= 8
       held.y = ph == 1 held.b = ph == 3 held.up = (sec % 7) == 3 held.down = (sec % 7) == 5
-      writer = {} step() audit("street") auditEnd()
+      writer = {} heldW = {} step() audit("street") auditEnd()
       if f % 15 == 0 and not alive() then dead = true end
       if rd(0x4C1) ~= es[1] or rd(0x4C2) ~= es[2] or rd(0x4BF) ~= (es[3] or rd(0x4BF)) then fights = fights + 1 end
       es = {rd(0x4C1), rd(0x4C2), rd(0x4BF)}
@@ -178,26 +210,32 @@ run(function()
   press("start", 6, 2)
   local sawPause = false
   local minRed, maxRed = 999, 0
-  for i=1,120 do writer = {} step() audit("pause") auditEnd() if rd(0x3F) ~= 0 then sawPause = true local n = redCount() minRed = math.min(minRed, n) maxRed = math.max(maxRed, n) end end
+  for i=1,120 do writer = {} heldW = {} step() audit("pause") auditEnd() if rd(0x3F) ~= 0 then sawPause = true local n = redCount() minRed = math.min(minRed, n) maxRed = math.max(maxRed, n) end end
   shot("5-paused")
   local snapPaused = nesSnap()
   local changed = 0 for i=0,255 do if snapPaused[i] ~= snapBefore[i] then changed = changed + 1 end end
   log(string.format("pause: red sprites before=%d (visible %d) during=%d..%d, NES OAM bytes changed=%d", redBefore, visBefore, minRed, maxRed, changed))
   local pauseOk = report("paused", false) and redBefore > 0 and minRed > 0
   press("start", 6, 2)
-  for i=1,120 do writer = {} step() audit("unpause") auditEnd() end
+  for i=1,120 do writer = {} heldW = {} step() audit("unpause") auditEnd() end
   shot("5-after-unpause")
   local palSame = true for i=0x80,0xBF do if cg(i) ~= before[i] then palSame = false end end
   resetStats()
-  for i=1,240 do held.right = (i % 60) < 30 writer = {} step() audit("after-pause") auditEnd() end
+  for i=1,240 do held.right = (i % 60) < 30 writer = {} heldW = {} step() audit("after-pause") auditEnd() end
   held = {}
   local afterOk = report("after-pause", true)
   check("5 pause/unpause: marks + palettes intact", sawPause and pauseOk and afterOk and palSame, string.format("sawPause=%s palSame=%s", tostring(sawPause), tostring(palSame)))
   -- 6. low stamina (forced), outline must persist
   resetStats()
-  for i=1,240 do emu.write(0x4BF, 2, W) held.right = (i % 40) < 20 held.y = (i % 20) == 5 writer = {} step() audit("lowstam") auditEnd() end
+  for i=1,240 do emu.write(0x4BF, 2, W) held.right = (i % 40) < 20 held.y = (i % 20) == 5 writer = {} heldW = {} step() audit("lowstam") auditEnd() end
   held = {}
   shot("6-low-stamina")
   check("6 outline persists at low stamina (stam forced to 2)", report("lowstam", true), state())
+  check("8 no weapon/item sprite outlined (on ground, thrown, held by a goon)", ITEM.red == 0 and ITEM.heldGoon > 0 and ITEM.ground > 0,
+    string.format("itemSpr=%d red=%d heldSpr=%d heldByGoonSpr=%d groundSpr=%d flyingSpr=%d shots held=%d ground=%d %s", ITEM.spr, ITEM.red, ITEM.held, ITEM.heldGoon, ITEM.ground, ITEM.flying, itemShots.held, itemShots.ground, table.concat(ITEM.bad, "; ")))
+  local it, both = {}, {}
+  for t,_ in pairs(TILES.item) do it[#it+1] = string.format("%02x", t) if TILES.body[t] then both[#both+1] = string.format("%02x", t) end end
+  table.sort(it) table.sort(both)
+  log("item tiles", table.concat(it, " "), "shared with enemy bodies:", table.concat(both, " "))
   log("final", state())
 end)
