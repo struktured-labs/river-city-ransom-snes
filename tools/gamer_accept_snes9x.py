@@ -9,6 +9,7 @@ each sprite is audited in Mesen2, which can watch the metasprite writer.
 usage: python3 -m tools.gamer_accept_snes9x ROM OUTDIR
 """
 import ctypes as C
+import os
 import sys
 from pathlib import Path
 
@@ -24,6 +25,7 @@ NAMES = {1: '00cdced5c8c2c400', 2: 'c0c3d5c0cdc2c4c3', 3: '00c6c0ccc4d10000', 4:
 # parts ($FC branch at $EE4B), and never by an enemy body sprite ("item tiles"
 # log line). snes9x has no write callbacks, so ownership is judged by tile.
 ITEM_TILES = {0xD0, 0xDC, 0xDD, 0xE0, 0xEC, 0xED, 0xEE, 0xFE}
+CARRY_WAITS = (2, 11, 23, 0, 4, 28, 37, 43, 6, 1, 3, 5, 7, 8, 9, 10, 12, 13, 14, 15)
 PATS = {'GAMER': 'c6c0ccc4d1', 'NOVICE': 'cdced5c8c2c4', 'ADVANCED': 'c0c3d5c0cdc2c4c3',
         'INTERMED': 'c8cdd3c4d1ccc4c3'}
 
@@ -99,6 +101,7 @@ class Emu:
         core.retro_get_memory_data.restype = C.c_void_p
         core.retro_get_memory_size.argtypes = [C.c_uint]
         core.retro_get_memory_size.restype = C.c_size_t
+        core.retro_reset.restype = None
         core.retro_init()
         payload = Path(rom).read_bytes()
         self._data = C.create_string_buffer(payload)
@@ -205,6 +208,168 @@ def main(rom, out):
                     i = s.find(p, i + 1)
         return hits
 
+    def carry_attempt(wait_frames):
+        # 9. Alex carries a knocked-down goon (route of accept.lua carryPhase):
+        # from a fresh boot, walk to the nearest goon and punch; punch over a
+        # lying goon ($4F state $11/$12) picks it up, punch again throws it.
+        # Without write callbacks the carried goon's sprites are found by place:
+        # while Alex carries ($56 bit 6, $03B7,0 = goon, goon $4F = $15), shirt
+        # sprites (NES palette 3; Alex's torso is palette 0) in a box around
+        # Alex and away from every other goon are the carried goon's.
+        for a_ in range(0x20000):     # work RAM as at power-on, then reset
+            e.wr(a_, 0)
+        e.core.retro_reset()
+        e.held = {}
+        if not wait(title, 2400):
+            check('9 reach title after reset', False, st())
+            return None
+        e.press(START, 12, 18)
+        if not wait(settings, 600):
+            check('9 reach settings after reset', False, st())
+            return None
+        e.step(20)
+        e.wr(0x64C, 1)                # the skill survives a reset
+        while e.rd(0x64C) != 3:
+            e.press(RIGHT, 6, 20)
+        # frames to wait on the skill screen: picks the fight (the game's
+        # random numbers run every frame)
+        e.step(wait_frames)
+        e.press(START, 3, 1)
+        for _ in range(40):
+            e.step(15)
+        for _ in range(60):
+            if street():
+                break
+            e.press(A, 8, 12)
+        r8 = e.rd
+
+        def px(sl):
+            return r8(0x83 + sl) + 256 * r8(0x8C + sl)
+
+        carry = dict(frames=0, judged=0, boxMarked=0, unredFrames=0, shots=0)
+        carry_t = 0
+        unstick = unstick_n = 0
+        last_ax = None
+        for f in range(1, 6001):
+            e.wr(0x4BF, 0x7F)
+            best, bd = None, 10 ** 9
+            for sl in range(2, 8):
+                if r8(0xCB + sl) < 8 and (r8(0xD3 + sl) & 0x7F) != 0x7F and px(sl) > 0:
+                    d = abs(px(sl) - px(0))
+                    if d < bd:
+                        bd, best = d, sl
+            h = {}
+            g = r8(0x3B7)
+            carrying = (r8(0x56) & 0x40) and 2 <= g <= 7 and r8(0xCB + g) < 8
+            st4f = (r8(0x4F + best) & 0x7F) if best is not None else 0
+            if carrying:
+                carry_t += 1
+                h[RIGHT if carry_t % 120 < 60 else LEFT] = 1
+                if carry_t % 150 == 90:
+                    h[Y] = 1
+            elif best is not None and st4f in (0x11, 0x12):
+                carry_t = 0
+                dx, dy = px(best) - px(0), r8(0x9E + best) - r8(0x9E)
+                if dx > 3:
+                    h[RIGHT] = 1
+                elif dx < -3:
+                    h[LEFT] = 1
+                if dy > 1:
+                    h[DOWN] = 1
+                elif dy < -1:
+                    h[UP] = 1
+                if abs(dx) <= 6 and abs(dy) <= 1 and f % 10 < 2:
+                    h[Y] = 1
+            elif best is not None:
+                carry_t = 0
+                dx, dy = px(best) - px(0), r8(0x9E + best) - r8(0x9E)
+                if dx > 6:
+                    h[RIGHT] = 1
+                elif dx < -6:
+                    h[LEFT] = 1
+                if dy > 2:
+                    h[DOWN] = 1
+                elif dy < -2:
+                    h[UP] = 1
+                if abs(dx) <= 12 and abs(dy) <= 4 and f % 16 < 3:
+                    h[Y] = 1
+                if f % 40 == 20:
+                    h[B] = 1
+            else:
+                h[RIGHT] = int(f % 200 < 150)
+                if f % 40 == 20:
+                    h[B] = 1
+            # unstick (as in accept.lua): Alex moved less than 4 px in 90
+            # frames while not carrying -> walk away diagonally for 60 frames
+            ax0 = px(0)
+            if f % 90 == 0:
+                if not carrying and last_ax is not None and abs(ax0 - last_ax) < 4:
+                    unstick, unstick_n = 60, unstick_n + 1
+                last_ax = ax0
+            if unstick > 0:
+                unstick -= 1
+                h = {UP: 1, LEFT: 1} if unstick_n % 2 == 1 else {DOWN: 1, RIGHT: 1}
+            e.held = h
+            e.step()
+            if f % 300 == 0:
+                log(f'carry phase f={f} best={best} dx={px(best) - px(0) if best is not None else 0} '
+                    f'dy={r8(0x9E + best) - r8(0x9E) if best is not None else 0} '
+                    f'goon4F={r8(0x4F + best) if best is not None else 0:02x} alexX={px(0)} '
+                    f'alex4F={r8(0x4F):02x} carried={carry["frames"]}', st())
+            r = e.ram()
+            g = r[0x3B7]
+            if r[0x56] & 0x40 and 2 <= g <= 7 and r[0xCB + g] < 8 and (r[0x4F + g] & 0x7F) == 0x15:
+                carry['frames'] += 1
+                scroll = r[0xDC] + 256 * r[0xDD]      # camera left edge (world x)
+                ax, ay = px(0) - scroll, r[0x9E]
+                others = [(px(sl) - scroll, r[0x9E + sl]) for sl in range(2, 8) if sl != g
+                          and r[0xCB + sl] < 8 and (r[0xD3 + sl] & 0x7F) != 0x7F]
+                # shirt sprites (NES palette 3; Alex's torso is palette 0) in a
+                # box around Alex, away from every other goon: the carried goon
+                shirts = [i for i in range(64) if r[0x200 + i * 4] < 0xEF
+                          and r[0x202 + i * 4] & 3 == 3
+                          and ax - 40 <= r[0x203 + i * 4] <= ax + 32
+                          and ay - 56 <= r[0x200 + i * 4] <= ay + 16
+                          and not any(abs(r[0x203 + i * 4] - ox) <= 32 and oy - 56 <= r[0x200 + i * 4] <= oy + 16
+                                      for ox, oy in others)]
+                if os.environ.get('RCR_CARRY_DEBUG') and carry['frames'] % 8 == 1:
+                    box = [(r[0x203 + i * 4], r[0x200 + i * 4], r[0x202 + i * 4]) for i in range(64)
+                           if r[0x200 + i * 4] < 0xEF and ax - 40 <= r[0x203 + i * 4] <= ax + 32]
+                    log('carry dbg', ax, ay, px(0), others, sorted((r[0x203 + i * 4], r[0x200 + i * 4], r[0x202 + i * 4]) for i in range(64) if r[0x200 + i * 4] < 0xEF))
+                if not shirts:
+                    continue
+                carry['judged'] += 1
+                unred = sum(1 for i in shirts if not r[0x202 + i * 4] & 4)
+                carry['boxMarked'] += len(shirts) - unred
+                if unred:
+                    carry['unredFrames'] += 1
+                if carry['shots'] < 3 and carry['judged'] % 20 == 1:
+                    carry['shots'] += 1
+                    e.png(f"9-alex-carrying-goon-{carry['shots']}")
+            if carry['judged'] > 40 and f > 1200:
+                break
+        e.held = {}
+        return carry
+
+    def carry_check():
+        # The route does not always get a goon down in snes9x; try a few
+        # fights (fixed list, same for every build) until one is carried.
+        waits = [int(os.environ['RCR_CARRY_WAIT'])] if 'RCR_CARRY_WAIT' in os.environ else CARRY_WAITS
+        carry = None
+        for n in waits:
+            carry = carry_attempt(n)
+            if carry is None:
+                return
+            log('carry attempt', n, carry)
+            if carry['judged'] >= 20:
+                break
+        check('9 a goon carried by Alex keeps its red outline',
+              carry['judged'] > 0 and carry['unredFrames'] == 0, f'{carry}')
+
+    if os.environ.get('RCR_ONLY_CARRY'):
+        carry_check()
+        log('DONE fails', len(fails), fails)
+        return fails
     # 1. skill
     if not wait(title, 2400):
         check('reach title', False, st())
@@ -288,7 +453,7 @@ def main(rom, out):
             stats['pairs'] += 1
             wants = []
             for a in [cur[i]] + [h[i] for h in hist]:
-                wants.append((a & 0xC0) | ((a & 3) << 1) | (0 if a & 0x20 else 0x30) | (8 if a & 4 else 0))
+                wants.append((a & 0xC0) | ((a & 3) << 1) | (0 if a & 0x20 else 0x30) | (8 if a & 4 and a & 3 != 2 else 0))
             if snes not in wants:
                 stats['mismatch'] += 1
             if attr & 4:
@@ -314,9 +479,70 @@ def main(rom, out):
                 if on_screen and items['groundShots'] < 2 and e.frame % 90 == 0:
                     items['groundShots'] += 1
                     e.png(f"8-weapon-on-ground-{items['groundShots']}")
+        # every sprite palette: color 5 (recolored outline) = color 1 in the
+        # palette shadow the sprite palette DMA uploads
+        if any(r[0x5502 + 32 * p:0x5504 + 32 * p] != r[0x550A + 32 * p:0x550C + 32 * p] for p in range(4)):
+            stats['palBad'] = stats.get('palBad', 0) + 1
+        if e.frame % 15 == 0:
+            edge_audit(r)
         hist.insert(0, cur)
         del hist[3:]
         stats['frames'] += 1
+
+    edge = dict(tiles=0, red=0, bad=0, pal6=0, plain=0, plainBad=0, redInside=0, darkEdge=0, darkInside=0)
+
+    def edge_audit(r):
+        # Tile level, from VRAM, as in accept.lua: every visible sprite in the
+        # SNES OAM shadow on a red palette (4, 5, 7) uses only indices 0-3 and
+        # 5; red (5) only where a transparent pixel touches it in the tile
+        # (outer silhouette, nothing red inside), and no color-1 pixel next to
+        # a transparent one left dark. Plane 2 only on former index-1 pixels.
+        # OBSEL = 2: sprite tiles at VRAM word $4000, second table +$1000.
+        v = e.vram()
+        for i in range(64):     # one SNES sprite per NES sprite
+            y, tile, attr = r[0x5001 + i * 4], r[0x5002 + i * 4], r[0x5003 + i * 4]
+            pal = (attr >> 1) & 7
+            if y >= 0xE0:
+                continue
+            if pal == 6:
+                edge['pal6'] += 1
+                edge['bad'] += 1
+            w = (0x4000 + (0x1000 if attr & 1 else 0) + tile * 16) & 0x7FFF
+            b = v[w * 2:w * 2 + 32]
+            if pal <= 3:
+                # other sprites: plane 3 never set, plane 2 only on index 5,
+                # which palettes 0-3 draw as color 1 (palBad)
+                edge['plain'] += 1
+                for rr in range(8):
+                    p0, p1, p2, p3 = b[2 * rr], b[2 * rr + 1], b[16 + 2 * rr], b[17 + 2 * rr]
+                    if p3 or p2 & ~(p0 & ~p1) & 0xFF:
+                        edge['bad'] += 1
+                        edge['plainBad'] += 1
+                continue
+            if pal not in (4, 5, 7):
+                continue
+            px = [[((b[2 * rr] >> (7 - c)) & 1) | (((b[2 * rr + 1] >> (7 - c)) & 1) << 1)
+                   | (((b[16 + 2 * rr] >> (7 - c)) & 1) << 2) | (((b[17 + 2 * rr] >> (7 - c)) & 1) << 3)
+                   for c in range(8)] for rr in range(8)]
+            edge['tiles'] += 1
+            for rr in range(8):
+                for c in range(8):
+                    val = px[rr][c]
+                    near = [px[a_][d] for a_, d in ((rr - 1, c), (rr + 1, c), (rr, c - 1), (rr, c + 1))
+                            if 0 <= a_ < 8 and 0 <= d < 8]
+                    if val == 5:
+                        edge['red'] += 1
+                        if 0 not in near:
+                            edge['redInside'] += 1
+                            edge['bad'] += 1
+                    elif val == 1:
+                        if 0 in near:
+                            edge['darkEdge'] += 1
+                            edge['bad'] += 1
+                        else:
+                            edge['darkInside'] += 1
+                    elif val not in (0, 2, 3):
+                        edge['bad'] += 1
 
     def red_pixels(img):
         # native_palette[$16] = $00BB -> 5-bit R=27 G=5 B=0
@@ -349,8 +575,11 @@ def main(rom, out):
     e.held = {}
     log('outline', stats)
     check('3 no skill name during play', name_hits == 0, f'hits={name_hits}')
-    check('4 NES goon marks carried to SNES OAM; red outline visible',
-          stats['mismatch'] == 0 and stats['marked'] > 0 and max(reds) > 0, f'{stats} red={reds}')
+    log('red edge', edge)
+    check('4 NES goon marks carried to SNES OAM; red outline visible, only on the outer silhouette; '
+          'color 5 = color 1 in every sprite palette',
+          stats['mismatch'] == 0 and stats['marked'] > 0 and max(reds) > 0 and not stats.get('palBad')
+          and edge['red'] > 0 and edge['bad'] == 0, f'{stats} red={reds} edge={edge}')
     check('7 no freeze in 70 s of street play', alive_fail == 0 and street(), st())
     # 5. pause, with marked goons on screen
     for i in range(900):
@@ -397,6 +626,7 @@ def main(rom, out):
     check('8 no weapon/item sprite outlined (ground and held by a goon)',
           items['red'] == 0 and items['spr'] > 0 and items['heldFrames'] > 0 and items['groundFrames'] > 0,
           f'{items}')
+    carry_check()
     log('DONE fails', len(fails), fails)
     return fails
 

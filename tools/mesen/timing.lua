@@ -14,7 +14,14 @@ run(function()
   if not bootToSettings() then return end
   n = 0 hist = {} late = 0
   while rd(0x64C) ~= 3 do press("right", 6, 20) end
-  for i=1,6 do press("right", 2, 1) end
+  -- RCR_TIMING_SKILL=n measures skill n (3 = Gamer); default: six more steps.
+  local want = tonumber(os.getenv("RCR_TIMING_SKILL") or "")
+  if want then
+    for i=1,16 do if rd(0x64C) == want then break end press("right", 2, 1) end
+  else
+    for i=1,6 do press("right", 2, 1) end
+  end
+  log("timing skill", string.format("sk=%02x", rd(0x64C)))
   step(60)
   dump("settings")
   n = 0 hist = {} late = 0
