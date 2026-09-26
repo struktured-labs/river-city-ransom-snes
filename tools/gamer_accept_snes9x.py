@@ -298,16 +298,20 @@ def main(rom, out):
                 if attr & 4:
                     items['red'] += 1
         # scenario screenshots: a goon holding a weapon, a weapon on the ground
+        # (only when a marked goon and an item tile are both on screen)
+        vis = [i for i in range(64) if r[0x200 + i * 4] < 0xEF]
+        on_screen = (any(r[0x202 + i * 4] & 4 for i in vis)
+                     and any(r[0x201 + i * 4] in ITEM_TILES for i in vis))
         for s in range(2, 8):
             kind, fl, p = r[0xCB + s], r[0x56 + s], r[0x3B7 + s]
             if kind < 8 and fl & 0x40 and p < 8 and 8 <= r[0xCB + p] <= 0x11 and r[0x3B7 + p] == s:
                 items['heldFrames'] += 1
-                if items['heldShots'] < 2 and e.frame % 90 == 0:
+                if on_screen and items['heldShots'] < 2 and e.frame % 90 == 0:
                     items['heldShots'] += 1
                     e.png(f"8-goon-holding-weapon-{items['heldShots']}")
             if 8 <= kind <= 0x11 and not fl & 0x40 and (r[0xD3 + s] & 0x7F) != 0x7F:
                 items['groundFrames'] += 1
-                if items['groundShots'] < 2 and e.frame % 90 == 0:
+                if on_screen and items['groundShots'] < 2 and e.frame % 90 == 0:
                     items['groundShots'] += 1
                     e.png(f"8-weapon-on-ground-{items['groundShots']}")
         hist.insert(0, cur)
