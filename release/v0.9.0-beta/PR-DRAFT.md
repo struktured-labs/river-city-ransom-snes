@@ -1,18 +1,20 @@
 # DRAFT: pull request (not created)
 
 - **Base:** `main` · **Head:** `release-1.0-prep`
-- **Title:** Release prep: v0.9.0 beta (build 4294): player README, patch tooling, screenshots
+- **Title:** Release prep: v0.9.0 beta (build 4295): player README, patch tooling, screenshots
 - **Create as:** draft. Merge only after Carmelo approves the release.
 
 ## Body
 
 Prepares the first public release of the SNES port as **v0.9.0 beta**. The ROM is
-build 4294 (`rumble-wip` 235d561: rumble + Gamer outline + difficulty modes).
+build 4295 (`freeze-fix`: 4294 = `rumble-wip` 235d561 with rumble + Gamer outline +
+difficulty modes, plus the hard-freeze fix and the Gamer stamina bar).
 
 ### What's in this branch
 Everything from `rumble-wip`, which `main` does not have yet:
 - Gamer outline (4276–4292)
 - rumble (4294)
+- hard-freeze fix and Gamer stamina bar (4295, `freeze-fix`, see `docs/FREEZE-FIX.md`)
 - snes9x and Mesen harnesses
 
 Plus:
@@ -31,13 +33,14 @@ Plus:
 
 ### Verification
 - The patch applied to No-Intro `River City Ransom (USA).nes` (CRC32 C3508F7E)
-  reproduces the 4294 SHA-256 `cbe302cf…4fbb` exactly, both with Flips and with the
+  reproduces the 4295 SHA-256 `e1b81f7d…f596` exactly, both with Flips and with the
   independent applier. The headerless variant does the same from CRC32 E9C387EC.
   Applying a patch to the wrong header variant is rejected.
-- `python3 -m unittest tests.test_release_patch tests.test_rumble tests.test_gamer_outline`
+- `python3 -m unittest tests.test_release_patch tests.test_rumble tests.test_gamer_outline tests.test_freeze_fix`
   passes.
-- 4294 passes all Mesen2 and snes9x acceptance checks. It has not been checked on
-  MiSTer or real hardware yet.
+- 4295 passes all Mesen2 and snes9x acceptance checks, and the freeze-reproduction
+  batches show 0 freezes (4294 froze in 1/66 snes9x and 2/60 Mesen2 runs).
+  It has not been checked on MiSTer or real hardware yet.
 
 ### Before merge
 See `release/v0.9.0-beta/CHECKLIST.md`: Memblers' permission, repository or release

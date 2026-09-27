@@ -57,8 +57,8 @@ New in this port:
 - Dedicated jump button (A) alongside the original Y+B.
 
 This is a beta. Known issues: occasional audio pops, some slowdown in busy scenes
-and two-player fights, brief sprite glitches, shop text and colour differences, and
-the Gamer stamina bar looks full above 63. See the readme.
+and two-player fights, brief sprite glitches, and shop text and colour differences.
+See the readme.
 
 Tested in Mesen2 and snes9x. Patch with Flips or Rom Patcher JS. A headered and a
 headerless BPS are both included.

@@ -10,7 +10,7 @@ by **struktured labs**. It is distributed only as a patch for the original US NE
 ![Gamer mode: red gang outline](screenshots/05-gamer-outline.png)
 ![Combat](screenshots/06-combat.png)
 
-*Screenshots: native 256×224, Mesen2, build 4294.*
+*Screenshots: native 256×224, Mesen2, build 4294. Build 4295 looks the same apart from the Gamer stamina bar.*
 
 ## What it is
 
@@ -72,9 +72,9 @@ You need your own copy of the **US NES ROM**. This download does not include it.
 | Patched SNES ROM | |
 |---|---|
 | Size | 2,097,152 bytes (2 MB, no copier header) |
-| CRC32 | `94A48DA1` |
-| SHA-1 | `A4B81DDF57C6BEF50A7EBDEB8E46511AD90581A1` |
-| SHA-256 | `cbe302cffde3dbbf088acca11bd4d1c323cf175583d19e98896a928cb2ab4fbb` |
+| CRC32 | `3AEAFB72` |
+| SHA-1 | `3A4E84EF1CA377F1000CD609EF4D27D32F72E611` |
+| SHA-256 | `e1b81f7df83b74ed7bd17d4d8f3602c489649e44f3d0ca1d72f7947bb1c0f596` |
 
 BPS checks the input and output checksums. If the patcher reports a checksum
 error, the ROM is the wrong one: a different region, a revision, an already-modified
@@ -86,8 +86,8 @@ file, or the wrong header variant for the patch you chose.
 |---|---|
 | Mesen2 2.1.1 | All automated checks pass, including boot, menus, street play, Gamer outline and rumble output. |
 | snes9x (libretro, Sep 2026) | All automated checks pass, including rumble output. |
-| MiSTer SNES core 20260603 | This core version supports the rumble protocol. Earlier builds of this port were played on MiSTer. Build 4294 is still to be confirmed on MiSTer with a rumble pad. |
-| Real SNES / flash cart | Earlier builds were played on an EverDrive. Build 4294 is still to be confirmed on hardware. |
+| MiSTer SNES core 20260603 | This core version supports the rumble protocol. Earlier builds of this port were played on MiSTer. Build 4295 is still to be confirmed on MiSTer with a rumble pad. |
+| Real SNES / flash cart | Earlier builds were played on an EverDrive. Build 4295 is still to be confirmed on hardware. |
 
 The internal cartridge title reads `RCR NATIVE CPU PROOF`. This is expected in
 this beta.
@@ -121,7 +121,6 @@ Player 2 uses controller 2 with the same layout. Rumble works on controller 1 on
   ([#16](https://github.com/struktured-labs/river-city-ransom-snes/issues/16)).
 - **Status screen:** some Present Status values can show blank
   ([#4](https://github.com/struktured-labs/river-city-ransom-snes/issues/4)).
-- **Gamer HUD:** the stamina bar looks full once stamina goes above 63.
 - **Passwords:** the original 33-character NES passwords are unchanged. Stats above
   the NES limits (Gamer or Intermediate) cannot be saved in a password yet. SRAM
   stores the difficulty setting only, not a full save.
@@ -133,7 +132,7 @@ Player 2 uses controller 2 with the same layout. Rumble works on controller 1 on
 - The AI-controlled Player 2 companion from development builds is **not** in this
   release.
 
-Please report bugs with the build number (4294), your emulator or hardware, and
+Please report bugs with the build number (4295), your emulator or hardware, and
 steps to reproduce.
 
 ## Credits
@@ -156,8 +155,11 @@ steps to reproduce.
 
 ## Changelog
 
-- **v0.9.0 beta (build 4294), 2026-09-27**: first public release.
-  - Rumble on controller 1 with the MiSTer SNES core (SNES Rumble protocol).
+- **v0.9.0 beta (build 4295), 2026-09-27**: first public release.
+  - Fix: the game could freeze for good during a room change in the middle of a
+    fight (an interrupt could run with the wrong data bank; 4295).
+  - Gamer mode: the HUD stamina bar now scales over the full 0–255 range (4295).
+  - Rumble on controller 1 with the MiSTer SNES core (SNES Rumble protocol) (4294).
   - Gamer mode: red gang outline around the whole metasprite silhouette (4292).
   - Intermediate and Gamer difficulty levels; the chosen skill is kept in SRAM (4163/4260).
   - struktured labs splash with its own sound (4146).

@@ -20,7 +20,7 @@ from pathlib import Path
 
 NES_HEADERED_SHA1 = 'a8612a36d9d2739d2b321b6ebb97c2757ccca410'
 NES_HEADERLESS_SHA1 = 'ca794e6a2b0ecf69b2be1753d379cce6434c49d7'
-RELEASE_SHA256 = {'v0.9.0-beta': 'cbe302cffde3dbbf088acca11bd4d1c323cf175583d19e98896a928cb2ab4fbb'}
+RELEASE_SHA256 = {'v0.9.0-beta': 'e1b81f7df83b74ed7bd17d4d8f3602c489649e44f3d0ca1d72f7947bb1c0f596'}
 
 
 def _num(p, i):

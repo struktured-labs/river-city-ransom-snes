@@ -12,7 +12,7 @@
    public, still review the `docs/audit` screenshots and the disassembly-derived
    notes and assembly for anything you'd rather keep private.
 4. [ ] Consider adding a LICENSE for the port code. The repo has none today.
-5. [ ] Hardware smoke test of 4294: MiSTer SNES core 20260603 with a rumble pad on
+5. [ ] Hardware smoke test of 4295: MiSTer SNES core 20260603 with a rumble pad on
    port 1 and SNAC off, plus an EverDrive if possible. Boot, menus, one street fight,
    a shop, pause. Update the "Tested on" table.
 6. [ ] Go/no-go on the known issues (#4 #5 #6 #8 #9) for a *beta*.
@@ -24,13 +24,16 @@
 10. [ ] Merge the website draft PR (Vercel deploys `main` to strukturedlabs.com).
 
 ## Verified
-- The BPS patches reproduce 4294 SHA-256 `cbe302cf…4fbb` from the No-Intro ROM,
+- The BPS patches reproduce 4295 SHA-256 `e1b81f7d…f596` from the No-Intro ROM,
   with both Flips and the independent applier.
-- Mesen2 and snes9x acceptance checks pass. Rumble tests pass in both emulators.
+- Mesen2 and snes9x acceptance checks pass (4295: Mesen check 9 passes in its focused
+  run; see `docs/FREEZE-FIX.md`). Rumble tests pass in both emulators.
 - In Mesen2: SNES A jumps, the same as Y+B.
+- Hard freeze on room change mid-fight fixed in 4295: 0 freezes in the 66-run snes9x
+  and 60-run Mesen2 reproduction batches (4294: 1 and 2). See `docs/FREEZE-FIX.md`.
+- [x] Gamer stamina HUD scale (4295): the bar scales over 0–255, checked by a 0–255 sweep.
 
 ## Optional before 1.0
 - Internal header title `RCR NATIVE CPU PROOF`: rename it (this changes the SHA, so
   regenerate the patch).
 - Extended passwords and a full SRAM save (GAMER-MODE spec).
-- Gamer stamina HUD scale.
