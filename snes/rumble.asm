@@ -174,14 +174,14 @@ sp_take:
     sta f:R_RANK
     sta f:R_EVENT
     tyx
-    phb                   ; the tables are in this bank (the helper is in
-    phk                   ; every bank 1-8)
-    plb
-    lda pulse_frames,x
+    ; Long reads (the helper is in every bank 1-8; bank 1's copy is used).
+    ; No PHK/PLB: an NMI with DB on a program bank freezes the game.
+    lda f:$C10000+pulse_frames,x
     sta f:R_TIMER
-    lda pulse_level,x
+    lda f:$C10000+pulse_level,x
     sta f:R_LEVEL
-    plb
+    nop
+    nop
     lda f:R_COUNT
     inc
     sta f:R_COUNT
