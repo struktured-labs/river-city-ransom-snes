@@ -41,6 +41,10 @@ motor, low nibble = small/weak motor, 0-15 each.
   and WRIO is left at `$FF`. A standard pad has no pin-6 line, so on a real
   SNES without a rumble pad the extra writes and `$4016` reads change nothing.
   Always on; no detection or option.
+- DB: the pulse tables are read with long addressing (bank `$C1` copy).
+  Build 4294 used `PHB/PHK/PLB` there; an NMI or raster IRQ inside that
+  window ran with DB on a program bank and froze the game. Fixed in 4295,
+  see `docs/FREEZE-FIX.md`.
 
 ## Checks
 - `tools/mesen/rumble.lua`: bus decoder with MiSTer-core and Mesen2
