@@ -1,6 +1,15 @@
 ; Intermediate ($064C=4, +8) and Gamer ($064C=3, +32, 127/255).
 ; Novice=1 and Advanced=2 keep original table $B946 and 63/127 clamps.
 ; E=1/A8/X8, same bank as $B900 when spawn runs.
+;
+; DB rule: never point DB at a program bank. The NMI handler and the
+; translated game use absolute addressing for WRAM/MMIO and assume DB is a
+; system-area mirror ($80-$88). An NMI landing inside a PHK/PLB window used to
+; run the whole interrupt with DB=$C5, where "LDA $4212" reads ROM and the
+; NMI tail spins forever (the hard freeze). Read helper tables with long
+; addressing instead; the helper is replicated in banks 1-8, bank 1 is used.
+HELPER_BANK = $C10000
+SPAWN_BANK = $C50000     ; NES PRG $12000-$13FFF ($B900 spawn, $B946 table)
 .setcpu "65816"
 .a8
 .i8
@@ -41,14 +50,13 @@ add_skill:
     lda a:$064C
     cmp #4
     beq plus8
-    tay
+    tay                   ; Y = skill on return, as before
+    phx
+    tax
     lda f:TMP
-    phb
-    phk
-    plb
     clc
-    adc $B946,y
-    plb
+    adc f:SPAWN_BANK+$B946,x
+    plx
     rts
 plus8:
     lda f:TMP
@@ -98,10 +106,9 @@ menu_next:
     and #1
     beq menu_skip
     ldx a:$064C
-    phb
-    phk
-    plb
-    lda next_t,x
+    lda f:HELPER_BANK+next_t,x
+    nop
+    nop
     bra menu_apply
 menu_prev:
     php
@@ -110,12 +117,11 @@ menu_prev:
     and #2
     beq menu_skip
     ldx a:$064C
-    phb
-    phk
-    plb
-    lda prev_t,x
+    lda f:HELPER_BANK+prev_t,x
+    nop
+    nop
 menu_apply:
-    plb
+    nop
     sta a:$064C
     jsr paint_skill
     plp
@@ -163,18 +169,17 @@ paint_skill:
     asl a
     asl a
     tay
-    phb
-    phk
-    plb
     ldx #0
 wr:
-    lda names,y
+    phx
+    tyx
+    lda f:HELPER_BANK+names,x
+    plx
     sta f:$7F22AC,x
     iny
     inx
     cpx #8
     bne wr
-    plb
     lda #1
     sta a:$1D15
     sta a:$1D55

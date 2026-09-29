@@ -61,7 +61,7 @@ The pause Password screen accepts **both** encodings. Discriminator is length af
 ## UI / not this spec
 
 - LEVEL menu Right cycles **1 Novice → 4 INTERMED → 2 Advanced → 3 GAMER**. INTERMED/GAMER overwrite the left name; Advanced stays on the right. Intermediate `$064C=4` +8.
-- Stamina HUD currently treats ≥64 as index 63. Gamer bars above 127 need their own scale or they look maxed.
+- Stamina HUD bar (8 cells, 16 ticks): Novice/Intermediate/Advanced keep the original `(stamina + 7) / 8` (full from 121, the original 0–127 range). Gamer uses `ceil(stamina / 16)` over 0–255 (build 4295, `snes/stamina_bar.asm`): empty only at 0, full only from 241, no wrap. Before 4295, Gamer 128–248 drew full and 249–255 drew an empty bar. Check: `python3 -m tools.stamina_bar_sweep`.
 - Present Status already prints hundreds digits.
 
 ## Tests when implemented

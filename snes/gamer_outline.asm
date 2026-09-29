@@ -128,12 +128,13 @@ name_paint:
     tay
     lda #0
     sta f:CHANGED
-    phb
-    phk
-    plb
     ldx #0
 np_wr:
-    lda np_names,y
+    ; No PHK/PLB: DB must stay a system-area mirror for the NMI handler.
+    phx
+    tyx
+    lda f:$C10000+np_names,x
+    plx
     cmp f:$7F22AC,x
     beq np_same
     sta f:$7F22AC,x
@@ -144,7 +145,6 @@ np_same:
     inx
     cpx #8
     bne np_wr
-    plb
     lda f:CHANGED
     beq np_out
     ; Same as dirty_mirrored_row for row $15: OR bit 0, never clear a
