@@ -1,4 +1,5 @@
-"""apply_combat/apply_stam return with the caller's X and Y (issue #27).
+"""apply_combat/apply_stam return with the caller's X and Y (issue #27);
+Gamer stamina saturates at 255 (issue #31).
 
 The spawn loop at $B83E stores each stat with STA $049F,X right after the
 call, so X must still be the actor slot. Runs the assembled helper in a small
@@ -89,6 +90,7 @@ class Cpu:
                 self.c = s > 0xFF; self.a = self.set(s); pc += 2
             elif op == 0x18: self.c = False; pc += 1
             elif op == 0xA8: self.y = self.set(self.a); pc += 1
+            elif op == 0x88: self.y = self.set(self.y - 1); pc += 1
             elif op == 0xAA: self.x = self.set(self.a); pc += 1
             elif op == 0xDA: self.stack.append(('x', self.x)); pc += 1
             elif op == 0xFA:
@@ -106,10 +108,14 @@ class Cpu:
 
 
 def expected(value, skill, klass, cap):
-    """The original $B900/$B923 result, with Intermediate's flat +8."""
+    """The original $B900/$B923 result, with Intermediate's flat +8; Gamer
+    stamina (cap 0x100) saturates at 255 instead (GAMER-MODE.md, #31)."""
     if klass < 9:
         return value
-    v = (value + (8 if skill == 4 else B946[skill])) & 0xFF
+    total = value + (8 if skill == 4 else B946[skill])
+    if skill == 3 and cap == 0x100:
+        return min(total, 0xFF)
+    v = total & 0xFF
     if v == 0 or v & 0x80:
         return 1
     if skill != 3 and v >= cap:
@@ -141,7 +147,14 @@ class KeepsCallerSlot(unittest.TestCase):
         self.check('apply_combat', 0x40)
 
     def test_apply_stam(self):
-        self.check('apply_stam', 0x80)
+        self.check('apply_stam', 0x100)
+
+    def test_gamer_simon_stamina_is_150(self):
+        # GAMER-MODE.md: Simon (template 22, stamina 118) is 150 on Gamer, not 1
+        ram = bytearray(0x2000)
+        ram[0x64C], ram[0x4F7] = 3, 0x16
+        cpu = Cpu(self.code, ram)
+        self.assertEqual(cpu.run(self.names['apply_stam'], 118, 2, 0), 150)
 
 
 if __name__ == '__main__':

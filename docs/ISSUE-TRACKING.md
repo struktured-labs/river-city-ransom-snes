@@ -36,7 +36,7 @@ a pushed build or new hardware verification.
 | [#28](https://github.com/struktured-labs/river-city-ransom-snes/issues/28) | Garbled password glyphs. Likely fixed by #27 (corrupted stats exceeded the encodable range). |
 | [#29](https://github.com/struktured-labs/river-city-ransom-snes/issues/29) | Soft lock (no bosses, can't return). Likely fixed by #27; confirm on 4301 with a savestate. |
 | [#30](https://github.com/struktured-labs/river-city-ransom-snes/issues/30) | **Fixed in 4301, hardware-verified**: MiSTer savestates through a native-vector bridge on the emulation NMI. |
-| [#31](https://github.com/struktured-labs/river-city-ransom-snes/issues/31) | Gamer: five late bosses spawn with 1 stamina (`bmi` before the 255 cap). Balance change; awaiting sign-off. |
+| [#31](https://github.com/struktured-labs/river-city-ransom-snes/issues/31) | **Fixed in 4302**: Gamer stamina saturates at 255 (Simon 150, not 1), per GAMER-MODE.md; Novice/Intermediate/Advanced unchanged. |
 
 The user's progression clarification is part of16/17: defeating gangsters yields
 currency, not experience; improvement comes from purchases and equipment. Repeat
