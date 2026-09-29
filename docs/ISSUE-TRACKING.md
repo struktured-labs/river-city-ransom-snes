@@ -29,10 +29,14 @@ a pushed build or new hardware verification.
 | [#20](https://github.com/struktured-labs/river-city-ransom-snes/issues/20) | Intermediate difficulty (`$064C=4` +8 in 4162; the EverDrive image that includes it is combined 4163, not a standalone 4162 file) |
 | [#21](https://github.com/struktured-labs/river-city-ransom-snes/issues/21) | Gamer Mode (`$064C=3` +32, 127/255; LEVEL GAMER; in 4162 and on the 4163 card image; 44-char encode/decode is still only `tools/rcr_password.py` length classification) |
 | [#22](https://github.com/struktured-labs/river-city-ransom-snes/issues/22) | Simon easier on Advanced? original NES overflow check (ROM: no wrap; Advanced is +16 with 63/127 caps) |
-| [#24](https://github.com/struktured-labs/river-city-ransom-snes/issues/24) | Intermediate feels too easy (first-boss one-shot); double-check the flat +8 intent and the `$04F5,x >= 9` apply gate for bosses. No tuning change until struktured signs off. |
-| [#25](https://github.com/struktured-labs/river-city-ransom-snes/issues/25) | Stamina bar refills/drains oddly: original willpower recovery or port regression? Verify by NES-vs-SNES RAM trace before classifying. |
-| [#26](https://github.com/struktured-labs/river-city-ransom-snes/issues/26) | Transient red ~5-10px flicker strip at right screen edge in the mall (gamer-outline colour suspected; no repro yet) |
-| [#27](https://github.com/struktured-labs/river-city-ransom-snes/issues/27) | Hot Cocoa showed "DEFENSE 93 UP"; determine display-only vs actual stat misapply (could also explain #24/#25) |
+| [#24](https://github.com/struktured-labs/river-city-ransom-snes/issues/24) | Intermediate feels too easy (first-boss one-shot). Most likely a #27 symptom: boss rows stayed all zero on 4299. Re-judge on 4300+; no tuning change. |
+| [#25](https://github.com/struktured-labs/river-city-ransom-snes/issues/25) | Stamina bar refills/drains oddly. Likely fixed by #27 (stray store at `$04C3`); confirm on 4301. |
+| [#26](https://github.com/struktured-labs/river-city-ransom-snes/issues/26) | Red flicker / scroll tear (mall, bridge). Not found in the stream recording (`tools/scan_recording_red.py`); needs a savestate at the moment it happens. |
+| [#27](https://github.com/struktured-labs/river-city-ransom-snes/issues/27) | **Fixed in 4300**: difficulty clamps clobbered X, so boss spawns stored stats into Alex (Intermediate) or the other enemy (Gamer). |
+| [#28](https://github.com/struktured-labs/river-city-ransom-snes/issues/28) | Garbled password glyphs. Likely fixed by #27 (corrupted stats exceeded the encodable range). |
+| [#29](https://github.com/struktured-labs/river-city-ransom-snes/issues/29) | Soft lock (no bosses, can't return). Likely fixed by #27; confirm on 4301 with a savestate. |
+| [#30](https://github.com/struktured-labs/river-city-ransom-snes/issues/30) | **Fixed in 4301, hardware-verified**: MiSTer savestates through a native-vector bridge on the emulation NMI. |
+| [#31](https://github.com/struktured-labs/river-city-ransom-snes/issues/31) | Gamer: five late bosses spawn with 1 stamina (`bmi` before the 255 cap). Balance change; awaiting sign-off. |
 
 The user's progression clarification is part of16/17: defeating gangsters yields
 currency, not experience; improvement comes from purchases and equipment. Repeat
