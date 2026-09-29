@@ -64,12 +64,14 @@ plus8:
     adc #8
     rts
 
+; X is the caller's actor slot (the spawn loop at $B83E stores STA $049F,X
+; after each call), so the clamps test the skill through Y; apply_* restores Y.
 clamp_combat:
     cmp #0
     beq one
     bmi one
-    ldx a:$064C
-    cpx #3
+    ldy a:$064C
+    cpy #3
     beq cap127
     cmp #$40
     bcc okc
@@ -88,8 +90,8 @@ clamp_stam:
     cmp #0
     beq one
     bmi one
-    ldx a:$064C
-    cpx #3
+    ldy a:$064C
+    cpy #3
     beq cap255
     cmp #$80
     bcc oks
