@@ -15,7 +15,8 @@ import time
 
 KEYS = dict(up=103,down=108,left=105,right=106,enter=28,esc=1,f12=88,
             a=30,s=31,d=32,f=33,z=44,x=45,c=46,v=47,space=57,
-            leftctrl=29,leftalt=56,leftshift=42,tab=15)
+            leftctrl=29,leftalt=56,leftshift=42,tab=15,
+            f1=59,f2=60,f3=61,f4=62)  # MiSTer savestates: Alt+F1-F4 save, F1-F4 load
 
 
 def validate(events):

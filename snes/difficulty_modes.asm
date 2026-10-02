@@ -64,12 +64,14 @@ plus8:
     adc #8
     rts
 
+; X is the caller's actor slot (the spawn loop at $B83E stores STA $049F,X
+; after each call), so the clamps test the skill through Y; apply_* restores Y.
 clamp_combat:
     cmp #0
     beq one
     bmi one
-    ldx a:$064C
-    cpx #3
+    ldy a:$064C
+    cpy #3
     beq cap127
     cmp #$40
     bcc okc
@@ -84,19 +86,24 @@ one:
     lda #1
     rts
 
+; C is add_skill's carry. LDY/DEY leave it alone, so Gamer saturates at 255
+; on overflow; without it the sum is at least 32 and kept as is. The other
+; skills keep the original $B923 rule: 0 or bit 7 set becomes 1.
 clamp_stam:
+    ldy a:$064C
+    dey
+    dey
+    dey
+    beq cap255
     cmp #0
     beq one
     bmi one
-    ldx a:$064C
-    cpx #3
-    beq cap255
-    cmp #$80
-    bcc oks
-    lda #$7F
 oks: rts
 cap255:
+    bcc oks
+    lda #$FF
     rts
+    nop                   ; keeps menu_next at $70D0
 
 ; Right 1→4→2→3→1. Left reverse. One rising edge, one step.
 menu_next:
