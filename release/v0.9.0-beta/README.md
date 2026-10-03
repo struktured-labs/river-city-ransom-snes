@@ -44,7 +44,8 @@ still being worked on.
   nothing changes.
 - **MiSTer savestates.** The MiSTer SNES core's save states work with this port.
 - **SPC audio.** The original NES music and sound effects play through the SNES APU
-  using Memblers' 2A03 SPC700 engine.
+  using the 2A03 SPC700 engine by Memblers, in the updated version from
+  Myself086's Project Nested (MIT licence; see Third-party notices).
 - **struktured labs** splash screen at boot, with its own sound.
 
 ## How to patch
@@ -142,9 +143,12 @@ steps to reproduce.
 - **struktured labs** (Carmelo Piccione): port, native CPU translation, difficulty
   modes, Gamer outline, rumble, tools and testing.
 - **Joey Parsell (Memblers)**, with assistance from **Kevin Horton** and others:
-  the 2A03 SPC700 sound engine ("SPC700 APU emulator (c)2001-2003").
-- **Patrick Areny ([upernes](https://github.com/mandraga/upernes))**: the source of
-  the SPC engine binary, and the reference for NES-on-SNES audio delivery.
+  the original 2A03 SPC700 sound engine ("SPC700 APU emulator (c)2001-2003").
+- **Myself086 (Laurent Courville)**, [Project Nested](https://github.com/Myself086/Project-Nested):
+  the updated version of that engine used in this release (MIT licence, revision
+  `cc2c892`).
+- **Patrick Areny ([upernes](https://github.com/mandraga/upernes))**: the
+  reference for NES-on-SNES audio delivery.
 - **Rumbleminze** ([nes-to-snes-template](https://github.com/rumbleminze/nes-to-snes-template)):
   NES-to-SNES porting approach (inspiration; no code used).
 - **infidelity**: porting guidance.
@@ -154,6 +158,32 @@ steps to reproduce.
 - *River City Ransom* © 1989 Technōs Japan. The rights now belong to Arc System Works.
   This is an unofficial, non-commercial fan project with no affiliation, and it
   ships no copyrighted ROM data.
+
+## Third-party notices
+
+The SPC700 sound engine comes from Project Nested
+(https://github.com/Myself086/Project-Nested) and is used under this licence:
+
+```
+Copyright 2020 Laurent Courville
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
 
 ## Changelog
 
