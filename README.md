@@ -146,11 +146,14 @@ Port development and automated validation by **struktured labs**, with thanks to
   [NES-to-SNES porting template](https://github.com/rumbleminze/nes-to-snes-template)
   informs the native CPU and hardware-translation design. Design/source
   inspiration; the template is not vendored here.
-- **Memblers (Joey Parsell)** — author of the **2A03 sound emulator for the
-  SNES SPC700** used by this project, with assistance from Kevin Horton and
-  others. The pinned engine is retrieved through
-  [upernes](https://github.com/mandraga/upernes); our integration and experimental
-  patches do not replace that upstream authorship credit.
+- **Memblers (Joey Parsell)** — author of the original **2A03 sound emulator
+  for the SNES SPC700**, with assistance from Kevin Horton and others. Builds up
+  to 4302 embed the copy retrieved through
+  [upernes](https://github.com/mandraga/upernes).
+- **Myself086 (Laurent Courville)** — the updated version of that engine in
+  [Project Nested](https://github.com/Myself086/Project-Nested) (MIT), which the
+  `nested-audio` trial (4303) assembles from source. Our integration and patches
+  do not replace either upstream authorship credit.
 
 See [third-party provenance](docs/THIRD_PARTY.md) for exact revisions, the sound
 engine hash, and integration limits. These credits acknowledge contributions
