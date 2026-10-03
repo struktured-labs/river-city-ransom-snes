@@ -1,12 +1,13 @@
-# Trial: Project Nested SPC engine (build 4303, branch `nested-audio`)
+# Trial: Project Nested SPC engine (builds 4303 and 4304, branch `nested-audio`)
 
 Goal: replace the Memblers 2A03 SPC700 engine copy taken from upernes (SHA-256
 `4e095134…`, no established licence) with the updated version of the same
 engine in Myself086's Project Nested, which is MIT-licensed.
 
-Status: **trial**. Build 4302 is still the release candidate. 4303 works, but
-stock Project Nested loses the SPC fixes that this project added on top of
-Memblers' engine (see Audio results).
+Status: **trial**. Build 4302 is still the release candidate. 4303 (stock
+Project Nested) works, but it loses the SPC fixes that this project added on
+top of Memblers' engine. 4304 ports those fixes onto the Project Nested engine
+and matches 4302 on the per-voice audio checks (see "Build 4304").
 
 ## Source and licence
 
@@ -122,5 +123,118 @@ The switch is technically workable: the protocol is close to the old one, the
 link is healthy and the sender costs about a third as much. For release audio,
 port this project's own fixes (triangle release, noise clock table, sweep
 driver, restart volume) onto the Project Nested base, then repeat these
-comparisons. Get Memblers' written confirmation that the Project Nested version
-may be used under MIT, and keep it with the release records.
+comparisons (done in 4304, see below).
+
+## Build 4304: Project Nested engine + this project's SPC extensions
+
+### Approach
+
+`tools/build_nested_ext.py` builds the engine. It assembles a patched copy of
+Project Nested `Spc.asm` (pinned revision) together with
+`tools/nested_spc/rcr_ext.asm` (project-owned glue) and the project's own
+4302 driver block. `Dmc.asm` and `Spc.Memory.asm` are not assembled, so 4304
+has no DMC heap, the same as 4302. The 4302 host sender and protocol are
+unchanged. Only the engine image (at ROM `0x120000`), the upload length and
+the checksum differ from 4302.
+
+- **4302 extension block:** `$2F29–$3736` in 4302 is entirely
+  project code, because Memblers' image ends in zero padding at `$2F29`. It
+  holds the timed/staged receiver, the sweep kernel and driver, the publisher
+  (KON staging, startup pitch, restart-volume delay) and the triangle
+  attack/release envelope. The builder decodes it by reachability from its
+  entry points and relocates it to the end of the Project Nested image
+  (`$3050`). It remaps the four Memblers entry points it calls (square0,
+  noise, check_timer3, reset) to the matching Project Nested labels and
+  patches the freqtable immediates.
+- **Hooks in `Spc.asm`:** each is an exact, single-match line-sequence
+  replacement, and the build fails if a hook does not match.
+  - Receiver: no `$BFFF` static read; transfers go through the timed receiver.
+    The wait loop runs check_timer3 and then the staged-frame check.
+  - Pulse: volume writes go to a dummy address because the publisher owns
+    volume. A duty change stages KON through the publisher. The Project Nested
+    pitch path is skipped because the sweep driver and publisher own pitch.
+  - Triangle: silence and timer completion call the 4302 release (pitch 0,
+    GAIN `$9F`). Note-on calls the 4302 attack (GAIN `$DF`). The sample switch
+    no longer forces KON. Volumes are the same as 4302 (`$1F` / `$3F`).
+  - Noise: the 4302 clock table (`3f3f3f3f3f3e3e3d3c3b3a383735322f`).
+  - Timer 0 runs at 2 kHz (`$FA` = 4), as in 4302.
+- **Sample variants (`rcr_ext.asm`):** Project Nested picks a pulse sample
+  length by pitch. 4304 picks one only when a note is keyed on. During a note
+  it holds that sample and rescales only the pitch, stepping down only if
+  the pitch would overflow. Without this rule the title sweeps split into
+  extra glides. Duty comparisons use Project Nested's SRCN layout.
+- The sharper Project Nested pulse samples (closer to the NES square) are kept.
+
+### Audio metrics (solo-voice stems; title / combat / mall)
+
+`tools/audio_fidelity_metrics.py`. Evidence:
+`~/rcr-evidence/nested-audio/metrics-4304-final.json` (stems in `stems/`).
+
+| Metric | NES | 4302 | 4304 | 4303 (stock PN) |
+| --- | --- | --- | --- | --- |
+| Triangle mid-wave cutoffs | 1 / 1 / 1 | 0 / 0 / 0 | **0 / 0 / 0** | 104 / 144 / 382 |
+| Mix-level clicks | 1 / 1 / 1 | 0 / 0 / 0 | **0 / 0 / 0** | 0 / 0 / 3 |
+| Title pulse-1 sweeps matched to NES (median cents error) | 12 | 11 / 12 (1 c) | **11 / 12 (1 c)** | 9 / 12, merged −500 c glide |
+| Title pulse-2 sweeps matched | 9 | 9 / 9 | **9 / 9 (2 c)** | — |
+| Mall extra pulse-2 glides | 0 | 6 | **1** | +327 / −810 c |
+| Noise spectral centroid, Hz | 2415 / 2525 / 2629 | 5705 / 4463 / 4473 | **5702 / 4465 / 4482** | ~5700 |
+| Duty use | ref | matches | matches | matches |
+| Pulse HF ratio >6 kHz (edge sharpness) | 0.023 / 0.016 | 0.0002 | **0.0063 / 0.0159** | sharp |
+| Triangle RMS | ref | ref | = 4302 | — |
+
+Title pulse-1 glides (cents), 4304 against the NES:
+−601/−600, −198·−199/−200·−199, −601/−600, −186·−198/−500, −601/−600,
+−199/−200·−199, −580/−535, −198·−199/−200·−199, −602/−600. The one mismatch
+(NES −500 vs two steps) is the same as 4302.
+
+Caveats:
+- **Noise** equals 4302 but is still about 2× brighter than the NES centroid.
+  The clock table already matches the NES clock rates. The remaining gap is
+  high-frequency sidelobe energy, which the NES reference (fceumm output
+  filter) removes and the SNES DSP does not. Getting closer would need a
+  low-pass filter (for example, echo FIR) or slower clocks, which changes the
+  timbre. This was not done.
+- **Mall pitch alignment** equals 4302 up to the `right_15` step. After that,
+  the gameplay in the capture runs diverges (screenshots differ from
+  `right_16` on, the same as with 4303), so later mall numbers are not
+  comparable. The mall ABC windows start at `right_05`.
+
+### Suite (`~/rcr-evidence/nested-audio/suite-4304/`)
+
+| Check | Result |
+| --- | --- |
+| Mesen spclink | 0 timeouts; 5386/5400 frames with a call, 6030/6030 returns; sender 18–46 scanlines (one outlier at 149; 4302: 135) |
+| Mesen timing (default / Gamer) | max vblank line 257 / 257, 0 batches ending in active display (4302: 257/258) |
+| Mesen rumble, bridge, accept, accept-onlycarry | all pass (fails=0) |
+| Mesen variants | 60/60 NOHANG, 0 bad-DB interrupts |
+| snes9x variants | 66 runs, 0 hangs |
+| snes9x accept (outline) | base: fails 5, 6; var-1: pass; var-2: pass; var-5: fails 4, 5, 6 |
+| snes9x rumble | base and var 0: fail S1, S4 (never reached pause: pauseFrames=0); var 36, 37, 38, 101: pass |
+| Unit tests | 1659 run, 1 known failure (`test_chromatic_wub`), including `test_nested_ext` |
+
+Input-shift tolerance: the snes9x outline and rumble scenarios depend on how
+the fight plays out. With one- to five-frame input shifts, 4302 also fails
+outline tests 4 and 5 (`suite-4302-recheck/`). Each failing check passes on
+at least one shifted variant, and the failures that happen (no fight
+contact, pause never reached) are scenario outcomes, not engine faults.
+
+### ABC WAVs (`~/rcr-evidence/nested-audio/wav-4304/`)
+
+Each file is 20 s each of NES (fceumm), then 4302, then 4304, with 1 s gaps,
+at 48 kHz:
+- `title-music-ABC-NES-then-4302-then-4304.wav`
+- `street-combat-ABC-NES-then-4302-then-4304.wav`
+- `mall-walk-ABC-NES-then-4302-then-4304.wav`
+
+Full captures per build (`*-NES-fceumm.wav`, `*-SNES-4302-memblers.wav`,
+`*-SNES-4304-projectnested-ext.wav`) and solo stems (`solo/`: mall triangle,
+title pulse-1 sweeps, combat noise) are in the same folder.
+
+### Artefacts
+
+- ROM (not tracked): `build/nested-ext-4304/native-cpu.sfc`, SHA-256
+  `369d0066273992a6f2e10bc3d1d32239ceb4e89a87f276a0f5b048404adfe9f0`
+- Engine image: 13405 bytes (Project Nested part 11336, block base `$3050`),
+  SHA-256 `f05ff5d4ec083e8768d82fb56e1946f96fb5d102bb245cd7bab237edf34f9b64`
+  (pinned by `tests/test_nested_ext.py`)
+- Not tested on hardware.

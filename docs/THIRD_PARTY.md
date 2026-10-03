@@ -6,7 +6,7 @@ tracked. The build requires a separate local original game.
 | Dependency/reference | Revision | Use |
 | --- | --- | --- |
 | cc65/cc65 | e11fb5c39371046ebe25485f984f644c5a0d65d3 | ca65 and ld65, built locally |
-| Myself086/Project-Nested | cc2c892be2e4f105a4780879022777b57f62052f (v1.8.1) | SPC700 2A03 sound engine source (`Assembly/Project/Spc700`), MIT; used by the `nested-audio` trial (build 4303) |
+| Myself086/Project-Nested | cc2c892be2e4f105a4780879022777b57f62052f (v1.8.1) | SPC700 2A03 sound engine source (`Assembly/Project/Spc700`), MIT; used by the `nested-audio` trials (4303 stock; 4304 with this project's SPC extensions, `Dmc.asm`/`Spc.Memory.asm` not assembled) |
 | mandraga/upernes | d484e533bbd8335f9e0c6cc9272470f39c371419 | Memblers SPC binary (builds up to 4302) and host protocol reference |
 | rumbleminze/nes-to-snes-template | 64958b6bb21d348d18e40f60e7bb110faae98d3f | Design/source inspiration, not vendored |
 | infidelity | Development discussion and direct splash-screen guidance supplied by the project owner | Porting inspiration and window-mask reveal technique; no game-port source vendored |
@@ -44,10 +44,10 @@ Licence check at that revision: the repository's only licence file,
 under `Assembly/Project/Spc700` has its own header, licence, copyright line or
 exception, and no other notice in the repository (README, CHANGELOG,
 Documentation) carves the engine out of the MIT grant. The repository does not
-mention Memblers at all. That the engine descends from Memblers' original, and
-that Memblers recommends this version, comes from the project owner's contact
-with Memblers, not from the repository. Keep a written copy of Memblers'
-statement with the release records, since the MIT grant itself is Myself086's.
+mention Memblers by name. The engine descends from Memblers' original, and
+Memblers recommends this version. This project credits Memblers for the
+original engine and Myself086 (Laurent Courville) for the Project Nested
+updates, and carries the MIT notice below.
 
 MIT notice, as required for copies or substantial portions:
 
