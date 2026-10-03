@@ -2,17 +2,17 @@
 
 ## Needs Carmelo (approval or accounts)
 1. [ ] Approve the version (0.9.0 beta) and the README wording.
-2. [ ] **Memblers' 2A03 SPC700 engine:** get permission and agree the credit wording.
-   The binary (`Memblers_2a03.bin`, via upernes, GPLv3) is embedded in the ROM and
-   carried as literal bytes in the patch. Its own distribution terms are not
-   established. Contact: nesdev forums / Memblers.
+2. [x] **SPC engine terms:** 4304 uses Myself086's Project Nested version of Memblers'
+   2A03 engine (MIT, revision `cc2c892`) instead of the upernes binary. Carmelo decided
+   that crediting Memblers and Myself086 (Laurent Courville) plus the MIT notice
+   (README and `THIRD-PARTY-NOTICES.txt` in the zip) is enough.
 3. [ ] **Visibility:** make `river-city-ransom-snes` public, or publish the release
    from a new public repo. Checked 2026-09-27: no .nes/.sfc/.smc/.bin/.spc file
    in any branch's history, and `.gitignore` covers them and `build/`. Before going
    public, still review the `docs/audit` screenshots and the disassembly-derived
    notes and assembly for anything you'd rather keep private.
 4. [ ] Consider adding a LICENSE for the port code. The repo has none today.
-5. [ ] Hardware smoke test of 4302: MiSTer SNES core 20260603 with a rumble pad on
+5. [ ] Hardware smoke test of 4304 (copied to rivalmage as `RCR-SNES-4304-nested-audio`): MiSTer SNES core 20260603 with a rumble pad on
    port 1 and SNAC off, plus an EverDrive if possible. Boot, menus, one street fight,
    a shop, pause. Update the "Tested on" table.
 6. [ ] Go/no-go on the known issues (#4 #5 #6 #8 #9) for a *beta*.
@@ -24,8 +24,15 @@
 10. [ ] Merge the website draft PR (Vercel deploys `main` to strukturedlabs.com).
 
 ## Verified
-- The BPS patches reproduce 4302 SHA-256 `3d8b6112…5f16` from the No-Intro ROM,
-  with both Flips and the independent applier.
+- The BPS patches reproduce 4304 SHA-256 `369d0066…f9f0` from the No-Intro ROM
+  (headered and headerless), with both Flips and the independent applier; the wrong
+  header variant is rejected. The 4302 kit is kept in `superseded-4302/`.
+- 4304 (Project Nested engine + port SPC fixes, `docs/NESTED-AUDIO.md`): triangle
+  mid-wave cutoffs 0/0/0, mix clicks 0/0/0, title sweeps 11/12 matched at 1 cent median
+  (same as 4302), noise centroid equal to 4302, crisper pulses. Full suite: Mesen
+  outline 1–9, rumble R0–R6, bridge, timing 257/257, SPC link 0 timeouts; freeze
+  batches 0/66 snes9x and 0/60 Mesen2; snes9x outline and rumble pass with input-shift
+  tolerance; unit tests 1659 with the known `test_chromatic_wub` failure.
 - 4302 passes the full Mesen2 and snes9x suite (`docs/ISSUES-4302-VERIFICATION.md`):
   - Mesen outline checks 1–9 pass in the full run, and check 9 also in the focused run.
   - snes9x outline 9/9.

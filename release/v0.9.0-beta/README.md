@@ -10,7 +10,7 @@ by **struktured labs**. It is distributed only as a patch for the original US NE
 ![Gamer mode: red gang outline](screenshots/05-gamer-outline.png)
 ![Combat](screenshots/06-combat.png)
 
-*Screenshots: native 256×224, Mesen2, build 4294. Build 4302 looks the same apart from the Gamer stamina bar.*
+*Screenshots: native 256×224, Mesen2, build 4294. Build 4304 looks the same apart from the Gamer stamina bar.*
 
 ## What it is
 
@@ -45,7 +45,8 @@ still being worked on.
 - **MiSTer savestates.** The MiSTer SNES core's save states work with this port.
 - **SPC audio.** The original NES music and sound effects play through the SNES APU
   using the 2A03 SPC700 engine by Memblers, in the updated version from
-  Myself086's Project Nested (MIT licence; see Third-party notices).
+  Myself086's Project Nested (MIT licence; see Third-party notices), with this
+  port's own fixes for sweeps, the triangle channel and noise.
 - **struktured labs** splash screen at boot, with its own sound.
 
 ## How to patch
@@ -74,9 +75,9 @@ You need your own copy of the **US NES ROM**. This download does not include it.
 | Patched SNES ROM | |
 |---|---|
 | Size | 2,097,152 bytes (2 MB, no copier header) |
-| CRC32 | `2351783E` |
-| SHA-1 | `778FDB9CF8A8FF4EC572AF2F9F92FD5F9CB932EB` |
-| SHA-256 | `3d8b611292ff615290195ea9d3f79669cafba051cdffd8b0cafab2557cb85f16` |
+| CRC32 | `816D398D` |
+| SHA-1 | `7CF7E984A8165684DBE2CA752CBA23FE92BFCD7B` |
+| SHA-256 | `369d0066273992a6f2e10bc3d1d32239ceb4e89a87f276a0f5b048404adfe9f0` |
 
 BPS checks the input and output checksums. If the patcher reports a checksum
 error, the ROM is the wrong one: a different region, a revision, an already-modified
@@ -87,9 +88,9 @@ file, or the wrong header variant for the patch you chose.
 | Platform | Status |
 |---|---|
 | Mesen2 2.1.1 | All automated checks pass, including boot, menus, street play, Gamer outline and rumble output. |
-| snes9x (libretro, Sep 2026) | All automated checks pass, including rumble output. |
-| MiSTer SNES core 20260603 | This core version supports the rumble protocol. Earlier builds of this port were played on MiSTer. Build 4299 was checked with a Limited Run SNAC controller and build 4301 with savestates. Build 4302 is still to be confirmed on MiSTer with a rumble pad. |
-| Real SNES / flash cart | Earlier builds were played on an EverDrive. Build 4302 is still to be confirmed on hardware. |
+| snes9x (libretro, Sep 2026) | All automated checks pass, including rumble output (fight-dependent checks are judged over several input timings). |
+| MiSTer SNES core 20260603 | This core version supports the rumble protocol. Earlier builds of this port were played on MiSTer. Build 4299 was checked with a Limited Run SNAC controller and build 4301 with savestates. Build 4304 is still to be confirmed on MiSTer with a rumble pad. |
+| Real SNES / flash cart | Earlier builds were played on an EverDrive. Build 4304 is still to be confirmed on hardware. |
 
 The internal cartridge title reads `RCR NATIVE CPU PROOF`. This is expected in
 this beta.
@@ -135,7 +136,7 @@ Player 2 uses controller 2 with the same layout. Rumble works on controller 1 on
 - The AI-controlled Player 2 companion from development builds is **not** in this
   release.
 
-Please report bugs with the build number (4302), your emulator or hardware, and
+Please report bugs with the build number (4304), your emulator or hardware, and
 steps to reproduce.
 
 ## Credits
@@ -187,7 +188,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ## Changelog
 
-- **v0.9.0 beta (build 4302)**: first public release.
+- **v0.9.0 beta (build 4304)**: first public release.
+  - Audio: the SPC700 engine is now the Project Nested version (MIT) of Memblers'
+    2A03 engine, with this port's own fixes carried over: pitch sweeps that match
+    the NES, a triangle attack/release with no mid-wave clicks, NES-rate noise
+    clocks, restart volume and startup pitch. Pulse channels are crisper, closer
+    to the NES square wave (4304).
   - Fix: on Intermediate and Gamer, a boss spawn could write its stats into Alex or
     the other enemy, giving wrong stats, odd stamina-bar behaviour, near-zero boss
     stamina and garbled passwords (#27; 4300).

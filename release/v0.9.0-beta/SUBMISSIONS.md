@@ -1,7 +1,7 @@
 # DRAFT: romhacking site submissions (not submitted)
 
 Upload or link `river-city-ransom-snes-v0.9.0-beta.zip`, which holds both BPS
-patches, README.md and CHECKSUMS.txt. Every site needs Carmelo's own account.
+patches, README.md, CHECKSUMS.txt and THIRD-PARTY-NOTICES.txt. Every site needs Carmelo's own account.
 
 Screenshots (native 256×224 PNG, in `screenshots/`): title shot
 `02-title-mode-select.png`; others `04-street.png`, `05-gamer-outline.png`,
@@ -25,7 +25,8 @@ RHDN hosts nothing itself; it takes a **direct download link**.
 - **Release date:** set on the day it is published
 - **Status:** In progress (beta)
 - **Author / Credits:** struktured labs (port). Memblers (Joey Parsell), with Kevin
-  Horton and others: 2A03 SPC700 sound engine.
+  Horton and others: 2A03 SPC700 sound engine; Myself086 (Laurent Courville):
+  Project Nested version of that engine (MIT).
 - **Download link:** https://github.com/struktured-labs/river-city-ransom-snes/releases/download/v0.9.0-beta/river-city-ransom-snes-v0.9.0-beta.zip
 - **Website:** https://strukturedlabs.com/projects#gaming
 - **ROM / ISO Information** (one per line):
@@ -43,7 +44,8 @@ River City Ransom, ported natively to the Super Nintendo.
 
 The original game code runs directly on the SNES CPU; this is not an emulator
 cartridge. Graphics are converted to SNES tiles and palettes, and the NES music and
-sound effects play on the SNES audio chip through Memblers' 2A03 SPC700 engine. The
+sound effects play on the SNES audio chip through Memblers' 2A03 SPC700 engine, in
+Myself086's Project Nested version with this port's own audio fixes. The
 patch turns the US NES ROM into a 2 MB SNES image that runs on SNES emulators, flash
 carts and the MiSTer SNES core.
 
@@ -76,9 +78,9 @@ ROM to fill in the DAT information.
 - **Tags:** Hack · Gameplay · Graphics · Port. Pick the closest if there is no Port tag.
 - **Version:** 0.9.0 beta · **Status:** Beta / In progress
 - **Authors:** struktured labs. **Additional credits:** Memblers (2A03 SPC700 engine),
-  Kevin Horton and others.
-- **License:** "All rights reserved / patch only". Do not pick an open license until
-  the Memblers engine terms are confirmed.
+  Kevin Horton and others; Myself086 / Laurent Courville (Project Nested engine update, MIT).
+- **License:** "All rights reserved / patch only" for the port. The bundled SPC engine
+  is MIT (Project Nested); its notice is in the zip.
 - **DAT information:** `River City Ransom (USA)`; SHA-1 `A8612A36D9D2739D2B321B6EBB97C2757CCCA410`;
   CRC32 `C3508F7E` (No-Intro, headered file)
 - **File:** river-city-ransom-snes-v0.9.0-beta.zip
