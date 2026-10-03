@@ -30,13 +30,15 @@ for b=0,0xBF do if b < 0x40 or b >= 0x80 then
   emu.addMemoryCallback(onLatch, emu.callbackType.write, b*65536+0x4016, b*65536+0x4016, emu.cpuType.snes, emu.memType.snesMemory)
   emu.addMemoryCallback(onRead, emu.callbackType.read, b*65536+0x4016, b*65536+0x4016, emu.cpuType.snes, emu.memType.snesMemory)
 end end
--- rumble RAM: only the helper ($6B00-$6CFF) may write it
+-- rumble RAM: only the helper ($6B00-$6CFF) may write it, plus autojoy_compat's
+-- rumble_latch ($6E73-$6E9A), which records the sent level in R_SENT since build 4299
 local foreign = {}
 local booted = false   -- the game clears all work RAM at boot (before the title)
 emu.addMemoryCallback(function(addr, v)
   if not booted then return end
   local st = emu.getState() local pc = st["cpu.pc"] or 0
-  if pc < 0x6B00 or pc >= 0x6D00 then if #foreign < 5 then foreign[#foreign+1] = string.format("f%d $%05x<-%02x pc=%02x:%04x", frameNo, addr, v, st["cpu.k"] or 0, pc) end end
+  local latch = (addr & 0xFFFF) == 0xF807 and pc >= 0x6E73 and pc <= 0x6E9A
+  if (pc < 0x6B00 or pc >= 0x6D00) and not latch then if #foreign < 5 then foreign[#foreign+1] = string.format("f%d $%05x<-%02x pc=%02x:%04x", frameNo, addr, v, st["cpu.k"] or 0, pc) end end
 end, emu.callbackType.write, R, R + 7, emu.cpuType.snes, emu.memType.snesWorkRam)
 local function gameplay() return rd(0x3F) == 0 and rd(6) ~= 5 and rd(0xCC) == 0 and (rd(0x100) & 0xC0) == 0xC0 end
 -- independent classifier at the hook sites (bank 5 $8DD5, $8D10)

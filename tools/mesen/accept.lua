@@ -174,8 +174,20 @@ CARRY = {spr=0, unred=0, linkBad=0, after=0, afterUnred=0, slots={}, bad={}, sho
 EDGE = {plain=0, plain5=0, plainBad=0, frames=0, red=0, bad=0, badList={}, tiles=0, tileRed=0, redInside=0, darkEdge=0, darkInside=0, screenInside=0, cEdge=0, cRed=0, cInside=0}
 itemShots = {held=0, ground=0}
 TILES = {item={}, body={}, carried={}, other={}}
-function resetStats() stats = {frames=0, goonSpr=0, goonRed=0, otherSpr=0, otherRed=0, snesMismatch=0, palBad=0, goonPal2=0, bad={}} end
+function resetStats() stats = {lag={}, blank=0, frames=0, goonSpr=0, goonRed=0, otherSpr=0, otherRed=0, snesMismatch=0, palBad=0, goonPal2=0, bad={}} end
+-- A frame the PPU shows black (forced blank, or a fade at brightness 0) has no
+-- visible sprites, so stale OAM in it cannot be seen; such frames are counted
+-- but not audited. Any frame with visible content is audited in full.
+function screenBlank()
+  local st = emu.getState()
+  if st["ppu.forcedBlank"] or st["ppu.screenBrightness"] == 0 then return true end
+  local b = emu.getScreenBuffer()
+  local lit = 0
+  for i=1,#b,61 do if (b[i] & 0xF0F0F0) ~= 0 then lit = lit + 1 if lit >= 8 then return false end end end
+  return true
+end
 function audit(tag)
+  if screenBlank() then stats.blank = stats.blank + 1 return end
   stats.frames = stats.frames + 1
   frameHeldGoon = false frameGround = false frameCarry = false
   local sk = rd(0x64C)
@@ -247,35 +259,41 @@ function audit(tag)
     end
   end
   if sk == 3 and frameNo % 15 == 0 then edgeAudit() compositeAudit() end
-  -- SNES OAM (PPU) palette bit 3 must follow the NES goon bit for visible sprites
-  -- (PPU OAM is uploaded in the vblank after the game writes $0200, so compare
-  -- against both this and the previous frame's NES attributes)
+  -- SNES OAM (PPU) palette bit 3 must follow the NES goon bit for visible sprites.
+  -- PPU OAM shows the game's OAM from some earlier frame: it is uploaded in a
+  -- later vblank, and a busy vblank defers the upload for a few frames. So find
+  -- the single lag (0 = this frame .. 8) that explains the most visible sprites
+  -- and require EVERY visible sprite to match the NES attribute at that one lag.
+  -- A wrong or missing mark on any sprite still fails; a coherent, merely late
+  -- OAM does not. A lag past 8 frames (stale OAM) counts every sprite as wrong.
   local cur = {} for i=0,63 do cur[i] = rd(0x202+i*4) end
-  for i=0,63 do
-    local sy = emu.read(i*4+1, OAMT)
-    if sy < 0xE0 then
-      local sattr = emu.read(i*4+3, OAMT)
-      local ok = false
-      local cands = {cur[i]}
-      for k=1,#nesHist do cands[#cands+1] = nesHist[k][i] end
-      for _,nattr in ipairs(cands) do
-        local want = (nattr & 0xC0) | ((nattr & 3) << 1) | (((nattr & 0x20) ~= 0) and 0 or 0x30) | ((((nattr & 4) ~= 0) and (nattr & 3) ~= 2) and 8 or 0)
-        if (sattr & 0xFE) == want then ok = true end
-      end
-      if not ok then
-        stats.snesMismatch = stats.snesMismatch + 1
-        if stats.snesMismatch <= 5 then local h = {} for _,c in ipairs(cands) do h[#h+1] = string.format("%02x", c) end log(string.format("snes mismatch %s spr%d sattr=%02x nes(cur,prev..)=%s sy=%d", tag, i, sattr, table.concat(h, ","), sy)) end
-      end
+  local frames = {cur} for k=1,#nesHist do frames[#frames+1] = nesHist[k] end
+  local vis = {}
+  for i=0,63 do local sy = emu.read(i*4+1, OAMT) if sy < 0xE0 then vis[#vis+1] = {i=i, sy=sy, a=emu.read(i*4+3, OAMT) & 0xFE} end end
+  local function want(nattr) return (nattr & 0xC0) | ((nattr & 3) << 1) | (((nattr & 0x20) ~= 0) and 0 or 0x30) | ((((nattr & 4) ~= 0) and (nattr & 3) ~= 2) and 8 or 0) end
+  local bestL, bestN = 0, -1
+  for L=1,#frames do
+    local n = 0
+    for _,v in ipairs(vis) do if v.a == want(frames[L][v.i]) then n = n + 1 end end
+    if n > bestN then bestL, bestN = L, n end
+  end
+  if #vis > 0 then stats.lag[bestL - 1] = (stats.lag[bestL - 1] or 0) + 1 end
+  for _,v in ipairs(vis) do
+    if v.a ~= want(frames[bestL][v.i]) then
+      stats.snesMismatch = stats.snesMismatch + 1
+      if stats.snesMismatch <= 5 then local h = {} for _,f in ipairs(frames) do h[#h+1] = string.format("%02x", f[v.i]) end log(string.format("snes mismatch %s spr%d sattr=%02x lag=%d nes(lag0..)=%s sy=%d", tag, v.i, v.a, bestL - 1, table.concat(h, ","), v.sy)) end
     end
   end
 end
 nesHist = {}
--- PPU OAM may trail the game's OAM by up to 3 frames when a vblank has no room for the OAM DMA
-function auditEnd() local t = {} for i=0,63 do t[i] = rd(0x202+i*4) end table.insert(nesHist, 1, t) if #nesHist > 3 then table.remove(nesHist) end end
+-- NES OAM history for the lag search above (8 earlier frames)
+function auditEnd() local t = {} for i=0,63 do t[i] = rd(0x202+i*4) end table.insert(nesHist, 1, t) if #nesHist > 8 then table.remove(nesHist) end end
 function report(tag, needGoons)
-  log(string.format("%s frames=%d goonSpr=%d goonRed=%d otherSpr=%d otherRed=%d snesMismatch=%d palBad=%d goonNesPal2=%d %s", tag, stats.frames, stats.goonSpr, stats.goonRed, stats.otherSpr, stats.otherRed, stats.snesMismatch, stats.palBad, stats.goonPal2, table.concat(stats.bad, "; ")))
+  log(string.format("%s blankFramesSkipped=%d frames=%d goonSpr=%d goonRed=%d otherSpr=%d otherRed=%d snesMismatch=%d palBad=%d goonNesPal2=%d %s", tag, stats.blank, stats.frames, stats.goonSpr, stats.goonRed, stats.otherSpr, stats.otherRed, stats.snesMismatch, stats.palBad, stats.goonPal2, table.concat(stats.bad, "; ")))
   log(string.format("%s plain-sprite tiles=%d color5px=%d badTiles=%d (color 5 = color 1 in palettes 0-3: palBad above)", tag, EDGE.plain, EDGE.plain5, EDGE.plainBad))
   log(string.format("%s composed silhouette: edgeOutlinePx=%d red=%d coverage=%.1f%% redInsideComposedBody=%d | in-tile (reported): redTiles=%d tileRedPx=%d redNoInTileTransparent=%d darkNextToInTileTransparent=%d interiorDark=%d | screen redPx=%d screenRedSurrounded(reported)=%d %s", tag, EDGE.cEdge, EDGE.cRed, 100 * coverage(), EDGE.cInside, EDGE.tiles, EDGE.tileRed, EDGE.redInside, EDGE.darkEdge, EDGE.darkInside, EDGE.red, EDGE.screenInside, table.concat(EDGE.badList, " ")))
+  local lg = {} for k=0,8 do if stats.lag[k] then lg[#lg+1] = k .. ":" .. stats.lag[k] end end
+  log(tag .. " PPU OAM lag (frames:count) " .. table.concat(lg, " "))
   local ok = stats.otherRed == 0 and stats.goonRed == stats.goonSpr and stats.palBad == 0 and stats.snesMismatch == 0 and EDGE.bad == 0
   if needGoons then ok = ok and stats.goonSpr > 0 end
   return ok
@@ -388,6 +406,11 @@ function carryCheck()
     while rd(0x64C) ~= 3 do press("right", 6, 20) end
     step(w)
     if not settingsToStreet() then check("9 reached the street after reset", false) return end
+    -- each attempt is judged on its own counters (an attempt without a carry
+    -- does not decide the check, so its counts must not leak into the next)
+    if EDGE.bad > 0 or CARRY.spr > 0 then log("carry: previous attempt counters (not deciding)", "edgeBad=" .. EDGE.bad, table.concat(EDGE.badList, " ")) end
+    CARRY = {spr=0, unred=0, linkBad=0, after=0, afterUnred=0, slots={}, bad={}, shots=CARRY.shots, lastShot=CARRY.lastShot}
+    EDGE = {plain=0, plain5=0, plainBad=0, frames=0, red=0, bad=0, badList={}, tiles=0, tileRed=0, redInside=0, darkEdge=0, darkInside=0, screenInside=0, cEdge=0, cRed=0, cInside=0}
     ok, detail = carryPhase()
     log("carry attempt", w, tostring(ok), detail)
     if CARRY.spr > 0 then break end
@@ -473,6 +496,21 @@ run(function()
   local hist = {} for k,v in pairs(slotHist) do hist[#hist+1] = string.format("%d:%d", k, v) end table.sort(hist)
   log("metasprite slots", table.concat(hist, " "))
   check("7 no freeze/black in "..secs.."s of street play incl. fighting", (not dead) and fights > 0, state().." fights="..fights)
+  -- 5/6 need goons on screen. Walk and fight (no audit) until a marked goon
+  -- sprite is visible, and keep goons standing through checks 5 and 6
+  -- (stamina floor, test only) so they cannot be cleared off the screen.
+  local function goonsVisible() local n = 0 for i=0,63 do if emu.read(i*4+1, OAMT) < 0xE0 and (emu.read(i*4+3, OAMT) & 8) ~= 0 then n = n + 1 end end return n end
+  local function keepGoons() for s=2,7 do if rd(0xCB+s) < 8 and rd(0x4F5+s) < 0x19 and rd(0x4BF+s) < 0x20 then emu.write(0x4BF+s, 0x20, W) end end end
+  local gf = 0
+  while goonsVisible() == 0 and gf < 3600 do
+    gf = gf + 1
+    held = {} held.right = (gf % 200) < 150 held.left = (gf % 200) >= 180
+    if (gf % 40) == 20 then held.b = true end
+    writer = {} heldW = {} heldA = {} heldH = {} step() auditEnd()
+  end
+  held = {}
+  for i=1,30 do keepGoons() writer = {} heldW = {} heldA = {} heldH = {} step() auditEnd() end
+  log("goons on screen before check 5:", goonsVisible(), "after", gf, "search frames")
   -- 5. pause / unpause
   local before = {} for i=0x80,0xBF do before[i] = cg(i) end
   shot("5-before-pause")
@@ -495,13 +533,13 @@ run(function()
   shot("5-after-unpause")
   local palSame = true for i=0x80,0xBF do if cg(i) ~= before[i] then palSame = false end end
   resetStats()
-  for i=1,240 do held.right = (i % 60) < 30 writer = {} heldW = {} heldA = {} heldH = {} step() audit("after-pause") auditEnd() end
+  for i=1,240 do keepGoons() held.right = (i % 60) < 30 writer = {} heldW = {} heldA = {} heldH = {} step() audit("after-pause") auditEnd() end
   held = {}
   local afterOk = report("after-pause", true)
   check("5 pause/unpause: marks + palettes intact", sawPause and pauseOk and afterOk and palSame, string.format("sawPause=%s palSame=%s", tostring(sawPause), tostring(palSame)))
   -- 6. low stamina (forced), outline must persist
   resetStats()
-  for i=1,240 do emu.write(0x4BF, 2, W) held.right = (i % 40) < 20 held.y = (i % 20) == 5 writer = {} heldW = {} heldA = {} heldH = {} step() audit("lowstam") auditEnd() end
+  for i=1,240 do keepGoons() emu.write(0x4BF, 2, W) held.right = (i % 40) < 20 held.y = (i % 20) == 5 writer = {} heldW = {} heldA = {} heldH = {} step() audit("lowstam") auditEnd() end
   held = {}
   shot("6-low-stamina")
   check("6 outline persists at low stamina (stam forced to 2)", report("lowstam", true), state())
