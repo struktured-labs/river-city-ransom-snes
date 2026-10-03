@@ -98,6 +98,8 @@ def main(rom, out):
                 for s in range(2, 8):
                     if r(0xCB + s) < 8 and r(0x4F5 + s) < 9:
                         e.wr(0x4F5 + s, 9)
+                    if r(0xCB + s) < 8 and r(0x4BF + s) < 0x20:
+                        e.wr(0x4BF + s, 0x40)   # keep forced bosses in the fight
             best, bd = None, 1e9
             for s in range(2, 8):
                 if r(0xCB + s) < 8 and (r(0xD3 + s) & 0x7F) != 0x7F and px(s) > 0:
@@ -184,7 +186,15 @@ def main(rom, out):
                     pause_bad += 1
         e.png(f'R-paused-{k + 1}')
         press(START, 3, 60, 'unpause')
-    fight(1500, 'boss', 'boss')
+    # boss rule: goon classes forced to a boss class (test only). Fight until the
+    # phase has produced BOSS pulses (or time runs out), so the result does not
+    # depend on whether this trajectory happens to meet a boss.
+    boss0 = S['events'].get('BOSS', 0)
+    for _ in range(8):
+        fight(750, 'boss', 'boss')
+        if S['events'].get('BOSS', 0) - boss0 >= 3:
+            break
+    boss_phase = S['events'].get('BOSS', 0) - boss0
     press(START, 3, 0, 'endpause')
     step(60, 'endpause')
     e.png('R-end-paused')
@@ -194,7 +204,7 @@ def main(rom, out):
         f"menuStarts={menu_starts} menuActive={menu_active} pauseFrames={saw_pause} pauseBad={pause_bad} end={end} {S['bad']}")
     check('S1 pulses on landed hits, hits taken and knockdowns',
           ev.get('LAND', 0) > 0 and ev.get('TAKE', 0) + ev.get('KNOCKDOWN', 0) > 0
-          and ev.get('LAND_KO', 0) + ev.get('KNOCKDOWN', 0) > 0 and ev.get('BOSS', 0) > 0, f'{ev}')
+          and ev.get('LAND_KO', 0) + ev.get('KNOCKDOWN', 0) > 0 and boss_phase > 0, f'{ev} bossPhase={boss_phase}')
     check('S2 level and length always from the pulse table', S['badLevel'] == 0 and S['longPulse'] == 0,
           f"badLevel={S['badLevel']} longPulse={S['longPulse']}")
     check('S3 every pulse ends with an off packet (timer 0, last level sent 0)',

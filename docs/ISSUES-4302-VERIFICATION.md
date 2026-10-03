@@ -40,6 +40,44 @@ Why the failures are not 4302 regressions:
   carry-phase OAM-lag mismatches. The carried-goon metrics are clean:
   carriedSpr=408, unred=0, linkBad=0, afterUnred=0.
 
+## Check fixes (branch `checks-4302`) and re-run on 4302
+
+The checks were fixed to test what they target, not loosened. Each one was then run
+against a deliberately broken copy of 4302 to show it still catches its bug. The
+broken copies are made in /tmp and never committed:
+
+- `noboss`: `is_boss` returns no boss (`sec` changed to `clc`).
+- `nomark`: `goon_sta` stores the attribute without the goon mark.
+- `hang`: an endless loop at the C5 spawn routine `$B7FD`.
+
+| Check | Change | 4302 | Broken build |
+| --- | --- | --- | --- |
+| snes9x rumble S1 | The forced-boss phase keeps forced bosses standing and fights until it has 3 BOSS pulses (at most 6000 frames). The BOSS pulse must come from that phase. | pass on the base run and 8 input offsets (bossPhase=3) | `noboss`: FAIL (bossPhase=0) |
+| Mesen rumble R1 | Allows `rumble_latch` (4299), the only new writer of `R_SENT` | R0–R6 pass | n/a |
+| Mesen outline 4/5/6/9: blank frames | Frames with forced blank, brightness 0 or a black picture are counted (`blankFramesSkipped`) but not audited | 4: pass | `nomark`: 4 FAIL |
+| Mesen outline: OAM vs NES | Before: any of the last 3 NES frames, per sprite. Now: one coherent lag (0–8 frames) chosen for the whole OAM, and **every** visible sprite must match at that lag. The lag histogram is logged. | 0 mismatches | (a wrong mark fails at every lag) |
+| Mesen outline 5/6 | Walk until a marked goon is on screen (up to 3600 frames); goon stamina floor during 5/6 (test only) | 5, 6: pass (8 goons on screen) | `nomark`: 5, 6 FAIL |
+| Mesen outline 9 | Carry and outline counters reset per attempt; an earlier attempt's counts are logged but do not decide the check | pass in the full run and the focused run | `nomark`: 9 FAIL (unred=408) |
+| Mesen bridge liveness | Replaces "screen keeps changing" with: joypad polled in every 1 s window and never black for 5 s. A static screen is fine. | pass (0 s without poll, 2 s longest black) | `hang`: FAIL (90 s without poll) |
+
+The OAM lag histogram also shows that sprites are usually 0–3 frames late, and on rare
+frames 4–6 (for example `3:143 4:2 5:1 6:1` in the focused carry run). This is a
+known deferral and is now visible in the log.
+
+Re-run on 4302 after the fixes:
+
+- snes9x freeze batch: 66 runs, 0 hangs.
+- snes9x outline: 9/9.
+- snes9x rumble: S0–S4 pass.
+- Mesen outline full run: 0 fails. Focused carry run: 0 fails.
+- Mesen rumble: R0–R6 pass.
+- Mesen timing: lines 257 and 258, nothing ends in active display.
+- Mesen bridge: pass.
+- Unit tests: 1644 run, 1 pre-existing failure.
+
+The 60-run Mesen freeze batch and the stamina sweeps were not re-run. The ROM and
+those scripts are unchanged since the earlier 4302 runs (60/60, 0 hangs).
+
 ## Issues
 
 - **#24 / #27:** Forced boss spawns (types 9/11/13/16/19, `tools/mesen/bossforce.lua`
