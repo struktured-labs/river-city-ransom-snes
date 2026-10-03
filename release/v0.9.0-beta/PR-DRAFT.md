@@ -1,20 +1,23 @@
 # DRAFT: pull request (not created)
 
 - **Base:** `main` · **Head:** `release-1.0-prep`
-- **Title:** Release prep: v0.9.0 beta (build 4295): player README, patch tooling, screenshots
+- **Title:** Release prep: v0.9.0 beta (build 4302): player README, patch tooling, screenshots
 - **Create as:** draft. Merge only after Carmelo approves the release.
 
 ## Body
 
 Prepares the first public release of the SNES port as **v0.9.0 beta**. The ROM is
-build 4295 (`freeze-fix`: 4294 = `rumble-wip` 235d561 with rumble + Gamer outline +
-difficulty modes, plus the hard-freeze fix and the Gamer stamina bar).
+build 4302 (tag `build-4302`, `fix-difficulty-x-clobber`: 4295 = 4294 + the hard-freeze
+fix and the Gamer stamina bar; then the SNAC fix 4299, the #27 stat fix 4300, MiSTer
+savestates 4301 and Gamer stamina saturation 4302).
 
 ### What's in this branch
 Everything from `rumble-wip`, which `main` does not have yet:
 - Gamer outline (4276–4292)
 - rumble (4294)
 - hard-freeze fix and Gamer stamina bar (4295, `freeze-fix`, see `docs/FREEZE-FIX.md`)
+- Limited Run SNAC fix (4299), boss-spawn stat fix #27 (4300), MiSTer savestates #30 (4301),
+  Gamer stamina saturates at 255 #31 (4302)
 - snes9x and Mesen harnesses
 
 Plus:
@@ -33,14 +36,19 @@ Plus:
 
 ### Verification
 - The patch applied to No-Intro `River City Ransom (USA).nes` (CRC32 C3508F7E)
-  reproduces the 4295 SHA-256 `e1b81f7d…f596` exactly, both with Flips and with the
+  reproduces the 4302 SHA-256 `3d8b6112…5f16` exactly, both with Flips and with the
   independent applier. The headerless variant does the same from CRC32 E9C387EC.
   Applying a patch to the wrong header variant is rejected.
 - `python3 -m unittest tests.test_release_patch tests.test_rumble tests.test_gamer_outline tests.test_freeze_fix`
   passes.
-- 4295 passes all Mesen2 and snes9x acceptance checks, and the freeze-reproduction
-  batches show 0 freezes (4294 froze in 1/66 snes9x and 2/60 Mesen2 runs).
-  It has not been checked on MiSTer or real hardware yet.
+- 4302 passes the full Mesen2 and snes9x suite: outline checks, rumble, timing,
+  savestate bridge, and the freeze batches (0/66 snes9x and 0/60 Mesen2 hangs; 4294
+  froze in 1/66 and 2/60). Several checks were made to test what they target, and
+  each still fails on a deliberately broken build (`docs/ISSUES-4302-VERIFICATION.md`).
+- Forced boss spawns match the NES byte for byte on Novice and Advanced. Intermediate
+  is Novice + 8 and Gamer is Novice + 32. Spawns no longer write into Alex's stats
+  (#27).
+- 4302 itself has not been checked on MiSTer or real hardware yet (4299 and 4301 were).
 
 ### Before merge
 See `release/v0.9.0-beta/CHECKLIST.md`: Memblers' permission, repository or release

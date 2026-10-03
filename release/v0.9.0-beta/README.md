@@ -10,7 +10,7 @@ by **struktured labs**. It is distributed only as a patch for the original US NE
 ![Gamer mode: red gang outline](screenshots/05-gamer-outline.png)
 ![Combat](screenshots/06-combat.png)
 
-*Screenshots: native 256×224, Mesen2, build 4294. Build 4295 looks the same apart from the Gamer stamina bar.*
+*Screenshots: native 256×224, Mesen2, build 4294. Build 4302 looks the same apart from the Gamer stamina bar.*
 
 ## What it is
 
@@ -42,6 +42,7 @@ still being worked on.
   core (20260603 or newer, SNAC off), using the SNES Rumble protocol. Landing or
   blocking a hit, and hitting a downed enemy, each give a short pulse. Without a rumble pad,
   nothing changes.
+- **MiSTer savestates.** The MiSTer SNES core's save states work with this port.
 - **SPC audio.** The original NES music and sound effects play through the SNES APU
   using Memblers' 2A03 SPC700 engine.
 - **struktured labs** splash screen at boot, with its own sound.
@@ -72,9 +73,9 @@ You need your own copy of the **US NES ROM**. This download does not include it.
 | Patched SNES ROM | |
 |---|---|
 | Size | 2,097,152 bytes (2 MB, no copier header) |
-| CRC32 | `3AEAFB72` |
-| SHA-1 | `3A4E84EF1CA377F1000CD609EF4D27D32F72E611` |
-| SHA-256 | `e1b81f7df83b74ed7bd17d4d8f3602c489649e44f3d0ca1d72f7947bb1c0f596` |
+| CRC32 | `2351783E` |
+| SHA-1 | `778FDB9CF8A8FF4EC572AF2F9F92FD5F9CB932EB` |
+| SHA-256 | `3d8b611292ff615290195ea9d3f79669cafba051cdffd8b0cafab2557cb85f16` |
 
 BPS checks the input and output checksums. If the patcher reports a checksum
 error, the ROM is the wrong one: a different region, a revision, an already-modified
@@ -86,8 +87,8 @@ file, or the wrong header variant for the patch you chose.
 |---|---|
 | Mesen2 2.1.1 | All automated checks pass, including boot, menus, street play, Gamer outline and rumble output. |
 | snes9x (libretro, Sep 2026) | All automated checks pass, including rumble output. |
-| MiSTer SNES core 20260603 | This core version supports the rumble protocol. Earlier builds of this port were played on MiSTer. Build 4295 is still to be confirmed on MiSTer with a rumble pad. |
-| Real SNES / flash cart | Earlier builds were played on an EverDrive. Build 4295 is still to be confirmed on hardware. |
+| MiSTer SNES core 20260603 | This core version supports the rumble protocol. Earlier builds of this port were played on MiSTer. Build 4299 was checked with a Limited Run SNAC controller and build 4301 with savestates. Build 4302 is still to be confirmed on MiSTer with a rumble pad. |
+| Real SNES / flash cart | Earlier builds were played on an EverDrive. Build 4302 is still to be confirmed on hardware. |
 
 The internal cartridge title reads `RCR NATIVE CPU PROOF`. This is expected in
 this beta.
@@ -126,13 +127,14 @@ Player 2 uses controller 2 with the same layout. Rumble works on controller 1 on
   stores the difficulty setting only, not a full save.
 - **Controls:** there is no controller-preset menu yet
   ([#12](https://github.com/struktured-labs/river-city-ransom-snes/issues/12)), and
-  SNAC controllers are not qualified
+  the Limited Run SNAC controller is confirmed working on MiSTer (4299); other SNAC
+  controllers are untested
   ([#11](https://github.com/struktured-labs/river-city-ransom-snes/issues/11)).
 - **Rumble:** port 1 only; it needs the MiSTer SNES core with SNAC off.
 - The AI-controlled Player 2 companion from development builds is **not** in this
   release.
 
-Please report bugs with the build number (4295), your emulator or hardware, and
+Please report bugs with the build number (4302), your emulator or hardware, and
 steps to reproduce.
 
 ## Credits
@@ -155,7 +157,14 @@ steps to reproduce.
 
 ## Changelog
 
-- **v0.9.0 beta (build 4295), 2026-09-27**: first public release.
+- **v0.9.0 beta (build 4302)**: first public release.
+  - Fix: on Intermediate and Gamer, a boss spawn could write its stats into Alex or
+    the other enemy, giving wrong stats, odd stamina-bar behaviour, near-zero boss
+    stamina and garbled passwords (#27; 4300).
+  - Gamer mode: late bosses no longer spawn with 1 stamina; boosted stamina stops at
+    255 (#31; 4302).
+  - MiSTer: save states with the MiSTer SNES core now work (#30; 4301).
+  - MiSTer: the Limited Run SNAC controller now works (4299).
   - Fix: the game could freeze for good during a room change in the middle of a
     fight (an interrupt could run with the wrong data bank; 4295).
   - Gamer mode: the HUD stamina bar now scales over the full 0–255 range (4295).
