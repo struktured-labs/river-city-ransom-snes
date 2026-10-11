@@ -38,7 +38,8 @@ def evaluate(rows,states,equipment=False,disabled=False,seed=None):
     if not equipment:
         rr=samples('ai_follow')
         checks['p2_follow_moves']=bool(rr) and rr[-1][0][0x389]+256*rr[-1][0][0x391]>rr[0][0][0x389]+256*rr[0][0][0x391]
-        checks['hud_name_is_ai']=bool(rr) and all(r[0x677:0x67b]==AI_TILES for r,s in rr)
+        checks['hud_companion_keeps_name']=bool(rr) and all(
+            r[0x677:0x67b]!=AI_TILES and r[0x677]>=0xC0 for r,s in rr)
         rr=samples('ai_encounter')
         checks['p2_attacks_autonomously']=bool(rr) and any(r[0xf1]&0x80 for r,s in rr)
         checks['ai_never_start_select']=all(r[0xf1]&0x30==0 for name in ('ai_follow','ai_encounter','ai_resume') for r,s in samples(name))

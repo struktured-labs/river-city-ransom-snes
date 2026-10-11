@@ -1,14 +1,25 @@
 ; Intermediate ($064C=4, +8) and Gamer ($064C=3, +32, 127/255).
 ; Novice=1 and Advanced=2 keep original table $B946 and 63/127 clamps.
 ; E=1/A8/X8, same bank as $B900 when spawn runs.
+;
+; DB rule: never point DB at a program bank. The NMI handler and the
+; translated game use absolute addressing for WRAM/MMIO and assume DB is a
+; system-area mirror ($80-$88). An NMI landing inside a PHK/PLB window used to
+; run the whole interrupt with DB=$C5, where "LDA $4212" reads ROM and the
+; NMI tail spins forever (the hard freeze). Read helper tables with long
+; addressing instead; the helper is replicated in banks 1-8, bank 1 is used.
+HELPER_BANK = $C10000
+SPAWN_BANK = $C50000     ; NES PRG $12000-$13FFF ($B900 spawn, $B946 table)
 .setcpu "65816"
 .a8
 .i8
 .segment "CODE"
 .export apply_combat, apply_stam, add_skill, menu_next, menu_prev
-.export extra_level, load_agility, load_sram
+.export extra_level, load_agility, load_sram, skill_gate
 
 TMP = $7FF020
+SKILL_PREV = $7FF018
+SKILL_EDGE = $7FF019
 MAGIC = $206000
 SAVE_SKILL = $206004
 
@@ -39,14 +50,13 @@ add_skill:
     lda a:$064C
     cmp #4
     beq plus8
-    tay
+    tay                   ; Y = skill on return, as before
+    phx
+    tax
     lda f:TMP
-    phb
-    phk
-    plb
     clc
-    adc $B946,y
-    plb
+    adc f:SPAWN_BANK+$B946,x
+    plx
     rts
 plus8:
     lda f:TMP
@@ -54,12 +64,14 @@ plus8:
     adc #8
     rts
 
+; X is the caller's actor slot (the spawn loop at $B83E stores STA $049F,X
+; after each call), so the clamps test the skill through Y; apply_* restores Y.
 clamp_combat:
     cmp #0
     beq one
     bmi one
-    ldx a:$064C
-    cpx #3
+    ldy a:$064C
+    cpy #3
     beq cap127
     cmp #$40
     bcc okc
@@ -74,50 +86,88 @@ one:
     lda #1
     rts
 
+; C is add_skill's carry. LDY/DEY leave it alone, so Gamer saturates at 255
+; on overflow; without it the sum is at least 32 and kept as is. The other
+; skills keep the original $B923 rule: 0 or bit 7 set becomes 1.
 clamp_stam:
+    ldy a:$064C
+    dey
+    dey
+    dey
+    beq cap255
     cmp #0
     beq one
     bmi one
-    ldx a:$064C
-    cpx #3
-    beq cap255
-    cmp #$80
-    bcc oks
-    lda #$7F
 oks: rts
 cap255:
+    bcc oks
+    lda #$FF
     rts
+    nop                   ; keeps menu_next at $70D0
 
-; Right 1→4→2→3→1. Left reverse.
+; Right 1→4→2→3→1. Left reverse. One rising edge, one step.
 menu_next:
     php
     sep #$30
+    lda f:SKILL_EDGE
+    and #1
+    beq menu_skip
     ldx a:$064C
-    phb
-    phk
-    plb
-    lda next_t,x
-    plb
-    sta a:$064C
-    plp
-    jmp $BB7B
-
+    lda f:HELPER_BANK+next_t,x
+    nop
+    nop
+    bra menu_apply
 menu_prev:
     php
     sep #$30
+    lda f:SKILL_EDGE
+    and #2
+    beq menu_skip
     ldx a:$064C
-    phb
-    phk
-    plb
-    lda prev_t,x
-    plb
+    lda f:HELPER_BANK+prev_t,x
+    nop
+    nop
+menu_apply:
+    nop
     sta a:$064C
+    jsr paint_skill
     plp
+    jsr $BB7B
+    jmp one_cursor
+menu_skip:
+    plp
+    rts
+
+; Called every LEVEL frame, before the original level-triggered handler.
+; Rising bits of Right/Left ($EE|$EF bits 0 and 1) are the only steps.
+skill_gate:
+    lda $EE
+    ora $EF
+    and #$03
+    pha
+    eor f:SKILL_PREV
+    sta f:SKILL_EDGE
+    pla
+    sta f:SKILL_PREV
+    and f:SKILL_EDGE
+    sta f:SKILL_EDGE
+    jmp $BB3D
+
+; $BB7B plants a second arrow at $0133,Y. Skill 2 lands on the old
+; Advanced slot, and 3/4 land past it. The name is always the left one.
+one_cursor:
+    lda #0
+    sta $0135
+    sta $0136
+    sta $0137
+    lda #$BB
+    sta $0134
     rts
 
 extra_level:
     jsr save_sram
     jsr $E2C0
+paint_skill:
     php
     sep #$30
     lda a:$064C
@@ -125,44 +175,22 @@ extra_level:
     asl a
     asl a
     asl a
-    sta f:TMP
-    phb
-    phk
-    plb
-    ldx #0
-copy_n:
-    txa
-    clc
-    adc f:TMP
     tay
-    lda names,y
-    sta f:$7FF030,x
-    inx
-    cpx #8
-    bne copy_n
-    plb
-    lda #0
-    ldx #27
-blank_r:
-    sta f:$7F22A2,x
-    dex
-    bpl blank_r
-    lda #$BB
-    sta f:$7F22AB
     ldx #0
 wr:
-    lda f:$7FF030,x
+    phx
+    tyx
+    lda f:HELPER_BANK+names,x
+    plx
     sta f:$7F22AC,x
+    iny
     inx
     cpx #8
     bne wr
-    lda f:$7FF000
-    beq no_ai
-    lda #$C0
-    sta f:$7F22B6
-    lda #$C8
-    sta f:$7F22B7
-no_ai:
+    lda #1
+    sta a:$1D15
+    sta a:$1D55
+    sta a:$1C85
     plp
     rts
 

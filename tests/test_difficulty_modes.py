@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 
 from tools.build_difficulty_modes import SLOT, SIZE, snes_unique
-from tools.nes_difficulty import planned_skill_levels
+from tools.nes_difficulty import SKILL_NAME, planned_skill_levels, skill_menu_step
 
 PARENT = Path('build/chromatic-wub-game-4146/native-cpu.sfc')
 
@@ -34,6 +34,28 @@ class DifficultyPatchLayoutTests(unittest.TestCase):
         data = rom.read_bytes()
         self.assertEqual(data[snes_unique(0x13946):snes_unique(0x13946) + 4], bytes.fromhex('f0001020'))
         self.assertEqual(data[snes_unique(0x13900)], 0x4c)
+
+    def test_one_right_from_advanced_is_gamer_not_novice(self):
+        skill, prev = skill_menu_step(2, 0, held=1, direction=1)
+        self.assertEqual((skill, SKILL_NAME[skill]), (3, 'GAMER'))
+        skill, prev = skill_menu_step(skill, prev, held=1, direction=1)
+        self.assertEqual(SKILL_NAME[skill], 'GAMER')
+        skill, prev = skill_menu_step(skill, prev, held=0, direction=0)
+        skill, prev = skill_menu_step(skill, prev, held=1, direction=1)
+        self.assertEqual(SKILL_NAME[skill], 'NOVICE')
+
+    def test_second_press_after_release_moves_one_not_two(self):
+        skill, prev = 1, 0
+        skill, prev = skill_menu_step(skill, prev, held=1, direction=1)
+        self.assertEqual(SKILL_NAME[skill], 'INTERMED')
+        skill, prev = skill_menu_step(skill, prev, held=1, direction=1)
+        self.assertEqual(SKILL_NAME[skill], 'INTERMED')
+        skill, prev = skill_menu_step(skill, prev, held=0, direction=0)
+        skill, prev = skill_menu_step(skill, prev, held=1, direction=1)
+        self.assertEqual(SKILL_NAME[skill], 'ADVANCED')
+        skill, prev = skill_menu_step(skill, prev, held=0, direction=0)
+        skill, prev = skill_menu_step(skill, prev, held=1, direction=1)
+        self.assertEqual(SKILL_NAME[skill], 'GAMER')
 
     def test_planned_ram_does_not_steal_novice_or_advanced(self):
         by_name = {row['name']: row for row in planned_skill_levels()}

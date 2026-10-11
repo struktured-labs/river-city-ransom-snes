@@ -94,6 +94,29 @@ def wrap_hypothesis(novice_stamina=118):
     return dict(doubled=doubled, wrapped8=doubled & 0xFF, masked7=doubled & 0x7F)
 
 
+# Right: Novice → Intermediate → Advanced → Gamer → Novice.
+SKILL_NEXT = {0: 1, 1: 4, 2: 3, 3: 1, 4: 2}
+SKILL_PREV = {0: 1, 1: 3, 2: 4, 3: 2, 4: 1}
+SKILL_NAME = {1: 'NOVICE', 2: 'ADVANCED', 3: 'GAMER', 4: 'INTERMED'}
+
+
+def skill_menu_step(skill, prev, held, direction):
+    """One LEVEL frame. direction is 1 right, 2 left, 3 both, or 0.
+
+    prev is the previous frame's direction bits. A step happens only on a
+    rising edge, so a held button does not repeat. held is ignored.
+    """
+    del held
+    direction &= 3
+    prev &= 3
+    rising = direction & (direction ^ prev)
+    if rising & 1:
+        skill = SKILL_NEXT[skill]
+    elif rising & 2:
+        skill = SKILL_PREV[skill]
+    return skill, direction
+
+
 def planned_skill_levels():
     """Hook map for #20/#21. Original $064C=1/2 must stay Novice/Advanced.
 

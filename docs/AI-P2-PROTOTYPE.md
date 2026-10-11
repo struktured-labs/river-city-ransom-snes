@@ -16,21 +16,24 @@ camera) without publishing a new ROM hash in this file. Those edits are source
 on `main`, not a named cartridge.
 
 Branch `ai-p2-4225` is parked on purpose and is **not** merged into `main`.
-Its candidate is `build/ai-p2-4225/native-cpu.sfc`, SHA-256
+Its pushed candidate is `build/ai-p2-4225/native-cpu.sfc`, SHA-256
 `23fad860cce1660252d1dc61ee9afdeda0116f87020f9feae5ba1ead83808477`.
 That branch labels the companion with the P2 name plus **AI** (`RYAN AI` or
-`ALEX AI`). Do not treat 4225 as the `main` build.
+`ALEX AI`, from P2's 4-letter name). The original font has no parentheses.
+HUD keeps the real name and tags **AI** after P2's bar. LEVEL shows only the
+skill name, not an AI tag. Do not treat 4225 as the `main` build.
 
 The named card image **4163** (`build/ai-p2-4163`, SHA-256
 `bd62a39387e2281ffb9ab3038ab531a4bfbf6cf1aa9bcea1754146f16cd00ba0`) is 4162
 difficulty plus the AI stacked at `e4849b2`. Rebuild it with `make playable`
 (see the README). 4166 and 4225 are later than that recipe.
 
+The last local companion cartridge, not pushed, is `build/ai-p2-4236/native-cpu.sfc`,
+SHA-256 `a5e3165d50a1af4dc18e123febc3eb9e4f3fd15afee7130383095fcf1f3df7c5`.
 Builds **4236** and **gamer-eyes-4239**, and a separate `snes/gamer_eyes.asm`,
-are not in this repository and are not on any pushed branch. They are local
-inputs only. `make playable` does not produce them. `main` does contain an
-inline `gamer_eyes` routine in `snes/ai_p2.asm`; that routine is not those
-cartridges.
+are not on any pushed branch. `make playable` does not produce them. `main`
+does contain an inline `gamer_eyes` routine in `snes/ai_p2.asm`; that routine
+is not those cartridges.
 
 Review: <http://127.0.0.1:8766/ai-p2-review-02/>.
 
@@ -108,8 +111,11 @@ slots 2/3, not object slots 4..7; follows P1 when separated; steers using origin
 world coordinates, whose ground Y increases toward screen-up. No navigation
 search or network/model calls run on the console.
 
-Friendly-fire avoidance, shopping AI, death/revival policy and human P2
-takeover still need work. Manual management still requires holding L.
+Combat targeting skips P1's nearest live goon (actor slots 2/3, DX<80 DY<40)
+so P2 punches someone else. If that is the only live enemy, P2 follows P1 and
+does not punch. Companion never walks against P1's held left/right (so 2P
+camera can leave a room). Shopping AI and death/revival policy still need work. Manual
+management still requires holding L.
 
 Earlier numbered prototype/capture attempts are retained as failed iterations;
 their source hashes can differ from the finalized tools. The captures in this
