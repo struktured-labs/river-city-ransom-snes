@@ -9,6 +9,7 @@
 - **Assets:**
   - `river-city-ransom-snes-v0.9.0-beta.zip` (the two patches, README.md, CHECKSUMS.txt, THIRD-PARTY-NOTICES.txt)
   - `river-city-ransom-snes-v0.9.0-beta.bps` (178,550 bytes; also attached on its own)
+  - `river-city-ransom-snes-v0.9.0-beta-headerless.bps` (178,441 bytes; also attached on its own)
   - Never attach a ROM (.nes or .sfc).
 - **Visibility:** the repository is currently **private**. Release assets are public
   only if the repository is made public, or if the release is published from a public
