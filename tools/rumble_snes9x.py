@@ -145,6 +145,27 @@ def main(rom, out):
         e.held = {}
         step(off, tag)
 
+    def set_pause(wanted, tag):
+        # Poll state, not a lucky three-frame input offset. A hit animation can
+        # defer pause eligibility; retain every failed attempt in the log.
+        for attempt in range(4):
+            e.held = {}
+            step(12, tag + '-release')
+            if bool(r(0x3F) & 0x20) == wanted:
+                return True
+            e.held = {START: 1}
+            # Let the game's menu-entry/exit coroutine finish consuming the
+            # press; $3F can change before that coroutine has reached its wait.
+            step(12, tag)
+            e.held = {}
+            step(20, tag + '-settle')
+            if bool(r(0x3F) & 0x20) == wanted:
+                log(tag, 'accepted', 'attempt', attempt + 1)
+                return True
+            log(tag, 'not accepted', 'attempt', attempt + 1, 'state', r(0x4F))
+        check(tag + ' accepted within bounded input window', False)
+        return False
+
     # title and settings
     for _ in range(2400):
         if title():
@@ -156,8 +177,11 @@ def main(rom, out):
     for _ in range(60):
         step(1, 'settings')
         menu_active += rr(TIMER) != 0 or rr(SENT) != 0
-    while r(0x64C) != 3:
+    for _ in range(8):
+        if r(0x64C) == 3:
+            break
         press(RIGHT, 6, 20, 'settings')
+    check('S0 Gamer selected', r(0x64C) == 3)
     press(START, 12, 18, 'settings')
     for _ in range(60):
         if street():
@@ -177,15 +201,16 @@ def main(rom, out):
             fight(1, 'fight')
             if rr(COUNT) != c:
                 break
-        press(START, 3, 0, 'pause')
+        set_pause(True, 'pause')
         for i in range(90):
             step(1, 'pause')
-            if r(0x3F) != 0:
+            if r(0x3F) & 0x20:
                 saw_pause += 1
                 if i > 8 and (rr(TIMER) != 0 or rr(OFF) != 0 or rr(SENT) != 0):
                     pause_bad += 1
         e.png(f'R-paused-{k + 1}')
-        press(START, 3, 60, 'unpause')
+        set_pause(False, 'unpause')
+        step(60, 'unpause-settle')
     # boss rule: goon classes forced to a boss class (test only). Fight until the
     # phase has produced BOSS pulses (or time runs out), so the result does not
     # depend on whether this trajectory happens to meet a boss.
@@ -195,7 +220,7 @@ def main(rom, out):
         if S['events'].get('BOSS', 0) - boss0 >= 3:
             break
     boss_phase = S['events'].get('BOSS', 0) - boss0
-    press(START, 3, 0, 'endpause')
+    set_pause(True, 'endpause')
     step(60, 'endpause')
     e.png('R-end-paused')
     end = dict(timer=rr(TIMER), off=rr(OFF), sent=rr(SENT))
