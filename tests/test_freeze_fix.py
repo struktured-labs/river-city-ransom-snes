@@ -10,6 +10,8 @@ from tools import stamina_bar_sweep as sweep
 
 ROOT = Path(__file__).resolve().parent.parent
 CA65 = ROOT / '.deps/cc65/bin/ca65'
+# The freeze fix itself (build 4295); later features may move helper labels.
+FIX_COMMIT = '2957b74'
 SOURCES = ('difficulty_modes', 'gamer_outline', 'rumble', 'stamina_bar')
 
 
@@ -63,8 +65,14 @@ class NoProgramBankDB(unittest.TestCase):
                                      check=True, capture_output=True, text=True).stdout
             except (subprocess.CalledProcessError, FileNotFoundError):
                 self.skipTest('parent commit not available')
-            a, na = assemble(name, old)
-            b, nb = assemble(name)
+            fixed = subprocess.run(['git', 'show', f'{FIX_COMMIT}:snes/{name}.asm'], cwd=ROOT,
+                                   check=True, capture_output=True, text=True).stdout
+            with tempfile.TemporaryDirectory() as d:
+                cfg = Path(d) / f'{name}.cfg'
+                cfg.write_bytes(subprocess.run(['git', 'show', f'{FIX_COMMIT}:snes/{name}.cfg'], cwd=ROOT,
+                                               check=True, capture_output=True).stdout)
+                b, nb = ff.assemble(fixed, str(cfg), Path(d), name)
+                a, na = ff.assemble(old, str(cfg), Path(d), name)
             self.assertEqual(na, nb, name)
             self.assertEqual((len(a), len(b)), (size, size), name)
 

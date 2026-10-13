@@ -16,6 +16,11 @@ ASM = Path(__file__).resolve().parent.parent / 'snes' / 'rumble.asm'
 SENTRY = 0x72
 MAX_FRAMES = 60
 OFF_PACKETS = 2
+WEAPONS = ('FISTS', 'STICK', 'PIPE', 'CHAIN', 'KNUCKLES', 'ROCK', 'TIRE', 'BOX', 'CAN')
+ENVS = ('FLAT', 'DECAY', 'RATTLE')
+# object kind $CB -> weapon (kinds $08-$11; others are fists)
+KINDS = {0x08: 'ROCK', 0x09: 'KNUCKLES', 0x0A: 'STICK', 0x0B: 'PIPE', 0x0C: 'CHAIN',
+         0x0D: 'TIRE', 0x0E: 'BOX', 0x0F: 'CAN'}
 EVENTS = ('NONE', 'BLOCK', 'LAND', 'OBJECT', 'TAKE', 'LAND_KO', 'BOSS', 'KNOCKDOWN')
 
 
@@ -43,6 +48,72 @@ def pulse_table(text=None):
     return out
 
 
+def _const(text, name):
+    return int(re.search(rf'^{name}\s*=\s*(\d+)', text, re.M).group(1))
+
+
+def weapon_consts(text=None):
+    text = ASM.read_text() if text is None else text
+    return {n: _const(text, n) for n in ('RATTLE_LOW', 'DMG_CAP', 'TAKE_BONUS', 'KO_BONUS', 'KO_MIN_FRAMES')}
+
+
+def weapon_table(text=None):
+    """[(weapon, strong, weak, ticks, envelope)] from the WPN lines, checked
+    against the assembled byte rows and the kind_class row."""
+    text = ASM.read_text() if text is None else text
+    rows = re.findall(r'^\s*WPN\s+(\d+),\s*(\d+),\s*(\d+),\s*ENV_(\w+)\s*;\s*WC_(\w+)', text, re.M)
+    if [r[4] for r in rows] != list(WEAPONS):
+        raise ValueError('WPN lines are not in WEAPONS order')
+    out = [(w, int(s), int(k), int(f), e) for s, k, f, e, w in rows]
+    for label, col in (('wpn_weak', 2), ('wpn_frames', 3)):
+        m = re.search(rf'^{label}:\s*\n\s*\.byte\s+([^\n;]+)', text, re.M)
+        if [int(v) for v in m.group(1).split(',')] != [r[col] for r in out]:
+            raise ValueError(f'{label} differs from the WPN lines')
+    m = re.search(r'^wpn_env:\s*\n\s*\.byte\s+([^\n;]+)', text, re.M)
+    if [int(v) for v in m.group(1).split(',')] != [ENVS.index(r[4]) for r in out]:
+        raise ValueError('wpn_env differs from the WPN lines')
+    m = re.search(r'^kind_class:.*\n\s*\.byte\s+([^\n;]+)\n\s*\.byte\s+([^\n;]+)', text, re.M)
+    cls = [v.strip()[3:] for v in (m.group(1) + ',' + m.group(2)).split(',')]
+    if cls[:8] != [KINDS[k] for k in range(8, 16)]:
+        raise ValueError('kind_class differs from KINDS')
+    for w, s, k, f, e in out:
+        if not (0 <= s <= 15 and 0 <= k <= 15 and 0 < f and f + 12 <= MAX_FRAMES):
+            raise ValueError(f'WC_{w} out of range')
+    return out
+
+
+def weapon_pulse(weapon, event, damage, table=None, consts=None):
+    """(level byte, ticks, envelope) that start_weapon sets."""
+    table = table or weapon_table()
+    c = consts or weapon_consts()
+    w, s, k, f, env = table[WEAPONS.index(weapon)]
+    bonus = min(damage, c['DMG_CAP']) // 4
+    ticks = f + 2 * bonus
+    strong = s + bonus
+    if event == 'LAND_KO':
+        strong += c['KO_BONUS']
+        ticks = max(ticks, c['KO_MIN_FRAMES'])
+    elif event != 'LAND':
+        strong += c['TAKE_BONUS']
+    return level(min(strong, 15), min(k + bonus // 2, 15)), ticks, env
+
+
+def envelope(lvl, ticks, env, rattle_low=None):
+    """Level bytes sent on each tick of a pulse (env_level)."""
+    low = weapon_consts()['RATTLE_LOW'] if rattle_low is None else rattle_low
+    out = []
+    for t in range(ticks - 1, -1, -1):        # timer after the decrement
+        if env == 'DECAY':
+            out.append(lvl)
+            if lvl >= 0x30:
+                lvl -= 0x10
+        elif env == 'RATTLE' and t & 1:
+            out.append((lvl & 0x0F) | (low << 4))
+        else:
+            out.append(lvl)
+    return out
+
+
 def level(strong, weak):
     return (strong << 4) | weak
 
@@ -59,6 +130,16 @@ class Pulse:
     def __init__(self, table=None):
         self.table = table or pulse_table()
         self.timer = self.level = self.rank = self.off = 0
+        self.env = 'FLAT'
+        self.wt, self.wc = weapon_table(), weapon_consts()
+
+    def start_weapon(self, event, weapon, damage):
+        ev = EVENTS.index(event)
+        if self.timer and self.timer <= MAX_FRAMES and ev < self.rank:
+            return False
+        self.level, self.timer, self.env = weapon_pulse(weapon, event, damage, self.wt, self.wc)
+        self.rank = ev
+        return True
 
     def start(self, event):
         ev = EVENTS.index(event) if isinstance(event, str) else event
@@ -68,6 +149,7 @@ class Pulse:
             return False
         _, s, w, f = self.table[ev]
         self.rank, self.timer, self.level = ev, f, level(s, w)
+        self.env = 'FLAT'
         return True
 
     def frame(self, gameplay=True):
@@ -77,7 +159,12 @@ class Pulse:
         elif self.timer:
             self.timer -= 1
             self.off = OFF_PACKETS
-            return self.level if self.level else None
+            lvl = self.level
+            if self.env == 'DECAY' and self.level >= 0x30:
+                self.level -= 0x10
+            elif self.env == 'RATTLE' and self.timer & 1:
+                lvl = (lvl & 0x0F) | (self.wc['RATTLE_LOW'] << 4)
+            return lvl if lvl else None
         if self.off:
             if self.off > OFF_PACKETS:
                 self.off = 0

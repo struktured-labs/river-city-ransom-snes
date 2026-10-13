@@ -16,9 +16,13 @@ import tempfile
 
 from tools.benchmark_report import sha
 from tools.build_inline_pitch_trial import checksum
-from tools.rumble_pulses import pulse_table
+from tools.rumble_pulses import pulse_table, weapon_table
 
 SLOT, SIZE = 0x6B00, 0x200
+# Weapon profiles (snes/rumble.cfg TAB and WPN areas), free $FF in banks 1-8.
+AREAS = ((0x6B00, 0x200), (0x6D24, 0xDC), (0x6F08, 0xF8))
+LATCH = 0x8CF4
+OLD_LATCH = bytes.fromhex('38e507')             # sec / sbc $07 (stamina - damage)
 JOY_DONE = 0x244C
 OLD_JOY_DONE = bytes.fromhex('4cd62a')          # jmp done ($2AD6)
 HIT_BANK = 5
@@ -64,6 +68,69 @@ def helper_checks(helper, names):
         raise ValueError('Assembled pulse levels differ from the table')
     if helper[at('pulse_frames'):at('pulse_frames') + len(fr)] != fr:
         raise ValueError('Assembled pulse frames differ from the table')
+    for n in ('dmg_latch', 'weapon_of', 'start_weapon', 'env_level', 'wpn_strong', 'kind_class'):
+        if n not in names:
+            raise ValueError(f'{n} is missing from the helper')
+    if names['dmg_latch'] < 0x6D24:
+        raise ValueError('Weapon areas not linked')
+
+
+def assemble(work):
+    """Assemble snes/rumble.asm into work/. Returns (main slot bytes,
+    [(addr, bytes)] for every area, labels)."""
+    subprocess.run(['.deps/cc65/bin/ca65', '-o', str(work / 'rumble.o'), 'snes/rumble.asm'], check=True)
+    subprocess.run(['.deps/cc65/bin/ld65', '-C', 'snes/rumble.cfg', '-Ln', str(work / 'rumble.lbl'),
+                    '-o', str(work / 'rumble.bin'), str(work / 'rumble.o')], check=True)
+    blob = (work / 'rumble.bin').read_bytes()
+    if len(blob) != sum(n for _, n in AREAS):
+        raise ValueError(f'Helper is {len(blob)} bytes, areas hold {sum(n for _, n in AREAS)}')
+    parts, i = [], 0
+    for at, n in AREAS:
+        parts.append((at, blob[i:i + n]))
+        i += n
+    names = {}
+    for line in (work / 'rumble.lbl').read_text().splitlines():
+        f = line.split()
+        if len(f) >= 3 and f[2].startswith('.'):
+            names[f[2][1:]] = int(f[1], 16)
+    helper_checks(parts[0][1], names)
+    return parts[0][1], parts, names
+
+
+def patch_image(image, parts, names, replace=None):
+    """Write the helper areas into banks 1-8 and point the hooks at them.
+    replace=None: the areas must be free ($FF) and the hooks original.
+    replace=old labels: the parent already has an older rumble helper at
+    SLOT; its hooks must point at the old labels (the TAB/WPN areas and the
+    damage latch must still be free / original). Returns the changed offsets."""
+    allowed = set(range(0xffdc, 0xffe0))
+    jmp = lambda n, src: b'\x4c' + src[n].to_bytes(2, 'little')
+    jsr = lambda n, src: b'\x20' + src[n].to_bytes(2, 'little') + b'\xea\xea'
+    for bank in range(1, 9):
+        base = bank * 65536
+        for at, data in parts:
+            old = image[base + at:base + at + len(data)]
+            if old != b'\xff' * len(data) and not (replace and at == SLOT):
+                raise ValueError(f'Occupied rumble area ${at:04X} in bank {bank}')
+            image[base + at:base + at + len(data)] = data
+            allowed.update(range(base + at, base + at + len(data)))
+        want = jmp('rumble_frame', replace) if replace else OLD_JOY_DONE
+        if image[base + JOY_DONE:base + JOY_DONE + 3] != want:
+            raise ValueError(f'@joy_done moved in bank {bank}')
+        image[base + JOY_DONE:base + JOY_DONE + 3] = jmp('rumble_frame', names)
+        allowed.update(range(base + JOY_DONE, base + JOY_DONE + 3))
+    base = HIT_BANK * 65536
+    for at, old, name in ((HIT, OLD_HIT, 'rumble_hit'), (DOWN, OLD_DOWN, 'rumble_down')):
+        want = jsr(name, replace) if replace else old
+        if image[base + at:base + at + 5] != want:
+            raise ValueError(f'Damage routine moved at bank {HIT_BANK} ${at:04X}')
+        image[base + at:base + at + 5] = jsr(name, names)
+        allowed.update(range(base + at, base + at + 5))
+    if image[base + LATCH:base + LATCH + 3] != OLD_LATCH:
+        raise ValueError(f'Stamina subtraction moved at bank {HIT_BANK} ${LATCH:04X}')
+    image[base + LATCH:base + LATCH + 3] = b'\x20' + names['dmg_latch'].to_bytes(2, 'little')
+    allowed.update(range(base + LATCH, base + LATCH + 3))
+    return allowed
 
 
 def build(parent, out):
@@ -76,36 +143,9 @@ def build(parent, out):
     if meta.get('experimental_rumble'):
         raise ValueError('Parent already has rumble')
     final, work = out, Path(tempfile.mkdtemp(prefix='rumble-'))
-    subprocess.run(['.deps/cc65/bin/ca65', '-o', str(work / 'rumble.o'), 'snes/rumble.asm'], check=True)
-    subprocess.run(['.deps/cc65/bin/ld65', '-C', 'snes/rumble.cfg', '-Ln', str(work / 'rumble.lbl'),
-                    '-o', str(work / 'rumble.bin'), str(work / 'rumble.o')], check=True)
-    helper = (work / 'rumble.bin').read_bytes()
-    if len(helper) != SIZE:
-        raise ValueError(f'Helper is {len(helper)} bytes, slot is {SIZE}')
-    names = {}
-    for line in (work / 'rumble.lbl').read_text().splitlines():
-        parts = line.split()
-        if len(parts) >= 3 and parts[2].startswith('.'):
-            names[parts[2][1:]] = int(parts[1], 16)
-    helper_checks(helper, names)
+    helper, parts_, names = assemble(work)
     image = bytearray(rom.read_bytes())
-    allowed = set(range(0xffdc, 0xffe0))
-    for bank in range(1, 9):
-        base = bank * 65536
-        if image[base + SLOT:base + SLOT + SIZE] != b'\xff' * SIZE:
-            raise ValueError(f'Occupied rumble slot in bank {bank}')
-        if image[base + JOY_DONE:base + JOY_DONE + 3] != OLD_JOY_DONE:
-            raise ValueError(f'@joy_done moved in bank {bank}')
-        image[base + SLOT:base + SLOT + SIZE] = helper
-        image[base + JOY_DONE:base + JOY_DONE + 3] = b'\x4c' + names['rumble_frame'].to_bytes(2, 'little')
-        allowed.update(range(base + SLOT, base + SLOT + SIZE))
-        allowed.update(range(base + JOY_DONE, base + JOY_DONE + 3))
-    base = HIT_BANK * 65536
-    for at, old, name in ((HIT, OLD_HIT, 'rumble_hit'), (DOWN, OLD_DOWN, 'rumble_down')):
-        if image[base + at:base + at + 5] != old:
-            raise ValueError(f'Damage routine moved at bank {HIT_BANK} ${at:04X}')
-        image[base + at:base + at + 5] = b'\x20' + names[name].to_bytes(2, 'little') + b'\xea\xea'
-        allowed.update(range(base + at, base + at + 5))
+    allowed = patch_image(image, parts_, names)
     checksum(image)
     if any(i not in allowed for i, (a, b) in enumerate(zip(rom.read_bytes(), image)) if a != b):
         raise ValueError('Unrelated ROM mutation')
@@ -120,9 +160,10 @@ def build(parent, out):
     meta.update(rom_sha256=sha(final / 'native-cpu.sfc'), experimental_rumble=dict(
         parent=str(parent), parent_rom_sha256=sha(rom), helper=SLOT, size=SIZE,
         hooks={'joy_done': f'banks 1-8 ${JOY_DONE:04X}', 'hit': f'bank {HIT_BANK} ${HIT:04X}',
-               'down': f'bank {HIT_BANK} ${DOWN:04X}'},
-        ram='$7EF800-$7EF807', protocol='LRG SNES Rumble: $72 + level on port-1 IOBit (WRIO bit 6), clocked by $4016 reads',
+               'down': f'bank {HIT_BANK} ${DOWN:04X}', 'damage_latch': f'bank {HIT_BANK} ${LATCH:04X}'},
+        ram='$7EF800-$7EF80D', protocol='LRG SNES Rumble: $72 + level on port-1 IOBit (WRIO bit 6), clocked by $4016 reads',
         pulses=[dict(event=e, strong=s, weak=w, frames=f) for e, s, w, f in pulse_table()],
+        weapons=[dict(zip(('weapon', 'strong', 'weak', 'frames', 'envelope'), r)) for r in weapon_table()],
         sources={str(p): sha(p) for p in (Path('snes/rumble.asm'), Path('snes/rumble.cfg'),
                                           Path(__file__), Path('tools/rumble_pulses.py'))}))
     (final / 'manifest.json').write_text(json.dumps(meta, indent=2) + '\n')

@@ -124,24 +124,116 @@ class Timer(unittest.TestCase):
         self.assertIsNone(p.frame(True))
 
 
+class Weapons(unittest.TestCase):
+    def setUp(self):
+        self.table = rp.weapon_table()
+
+    def test_all_weapons_and_kinds(self):
+        self.assertEqual([w for w, *_ in self.table], list(rp.WEAPONS))
+        self.assertEqual(sorted(rp.KINDS), list(range(8, 16)))
+        self.assertEqual(set(rp.KINDS.values()), set(rp.WEAPONS) - {'FISTS'})
+
+    def test_requested_character(self):
+        t = {w: (s, k, f, e) for w, s, k, f, e in self.table}
+        self.assertEqual(t['PIPE'][3], 'DECAY')               # sharp hit, then fade
+        self.assertEqual(t['CHAIN'][3], 'RATTLE')
+        self.assertEqual(t['ROCK'][3], 'FLAT')                # single thud: strong and short
+        self.assertGreaterEqual(t['ROCK'][0], 12)
+        self.assertLessEqual(t['ROCK'][2], 6)
+        self.assertEqual(max(f for *_, f, _ in t.values()), t['TIRE'][2])   # longest ...
+        self.assertLessEqual(t['TIRE'][0], 6)                 # ... and soft
+        self.assertEqual(min(s for s, *_ in t.values()), t['FISTS'][0])     # light tap
+        for w, (s, k, *_ ) in t.items():
+            self.assertGreaterEqual(s, k, f'{w}: intensity belongs on the strong motor (DS3 weak is on/off)')
+
+    def test_damage_scales_strength_and_length(self):
+        for w in rp.WEAPONS:
+            prev = None
+            for d in range(0, 40):
+                lvl, n, _ = rp.weapon_pulse(w, 'LAND', d)
+                cur = (lvl >> 4, n)
+                if prev:
+                    self.assertGreaterEqual(cur[0], prev[0])
+                    self.assertGreaterEqual(cur[1], prev[1])
+                prev = cur
+                self.assertLessEqual(n, rp.MAX_FRAMES)
+            self.assertGreater(rp.weapon_pulse(w, 'LAND', 24)[1], rp.weapon_pulse(w, 'LAND', 0)[1])
+            self.assertEqual(rp.weapon_pulse(w, 'LAND', 24), rp.weapon_pulse(w, 'LAND', 99))   # capped
+
+    def test_hits_taken_get_two_more_strong(self):
+        for w in rp.WEAPONS:
+            for ev in ('TAKE', 'OBJECT'):
+                land = rp.weapon_pulse(w, 'LAND', 4)[0] >> 4
+                self.assertEqual(rp.weapon_pulse(w, ev, 4)[0] >> 4, min(land + 2, 15))
+
+    def test_knockdown_and_boss_stay_on_top(self):
+        p = rp.Pulse()
+        p.start('KNOCKDOWN')
+        p.frame()
+        for ev in ('LAND', 'OBJECT', 'TAKE', 'LAND_KO'):
+            self.assertFalse(p.start_weapon(ev, 'PIPE', 99))
+        p = rp.Pulse()
+        p.start('BOSS')
+        self.assertFalse(p.start_weapon('LAND_KO', 'ROCK', 99))
+        p = rp.Pulse()
+        self.assertTrue(p.start_weapon('LAND', 'TIRE', 0))
+        self.assertTrue(p.start('BLOCK') is False)
+        self.assertTrue(p.start('KNOCKDOWN'))
+        self.assertEqual(p.env, 'FLAT')
+
+    def test_envelopes(self):
+        p = rp.Pulse()
+        p.start_weapon('LAND', 'PIPE', 0)
+        lvl, n, _ = rp.weapon_pulse('PIPE', 'LAND', 0)
+        sent = [p.frame() for _ in range(n + 3)]
+        strong = [v >> 4 for v in sent[:n]]
+        self.assertEqual(strong[0], lvl >> 4)
+        self.assertEqual(strong, sorted(strong, reverse=True))
+        self.assertLess(strong[-1], strong[0])
+        self.assertEqual(sent[n:], [0, 0, None])
+        self.assertEqual(sent[:n], rp.envelope(lvl, n, 'DECAY'))
+        p = rp.Pulse()
+        p.start_weapon('LAND', 'CHAIN', 0)
+        lvl, n, _ = rp.weapon_pulse('CHAIN', 'LAND', 0)
+        sent = [p.frame() for _ in range(n)]
+        self.assertEqual(sent, rp.envelope(lvl, n, 'RATTLE'))
+        self.assertGreaterEqual(len({v >> 4 for v in sent}), 2)
+        self.assertTrue(all(v & 15 == lvl & 15 for v in sent))
+
+    def test_bad_weapon_table_rejected(self):
+        text = rp.ASM.read_text()
+        with self.assertRaises(ValueError):
+            rp.weapon_table(text.replace('WPN 12, 4,  9, ENV_DECAY', 'WPN 12, 4,  9, ENV_FLAT'))
+        with self.assertRaises(ValueError):
+            rp.weapon_table(text.replace('.byte WC_ROCK, WC_KNUCKLES', '.byte WC_KNUCKLES, WC_ROCK'))
+
+    def test_no_program_bank_db_in_helpers(self):
+        code = '\n'.join(l.split(';')[0] for l in rp.ASM.read_text().splitlines()).lower()
+        for op in ('phk', 'plb', 'phb'):
+            self.assertNotRegex(code, rf'\b{op}\b')
+
+
 class Helper(unittest.TestCase):
     def test_assembled_helper_passes_the_builder_checks(self):
-        ca65, ld65 = ROOT / '.deps/cc65/bin/ca65', ROOT / '.deps/cc65/bin/ld65'
-        if not ca65.exists():
+        if not (ROOT / '.deps/cc65/bin/ca65').exists():
             self.skipTest('cc65 not installed')
+        import os
         with tempfile.TemporaryDirectory() as d:
-            d = Path(d)
-            subprocess.run([str(ca65), '-o', str(d / 'r.o'), str(ROOT / 'snes/rumble.asm')], check=True)
-            subprocess.run([str(ld65), '-C', str(ROOT / 'snes/rumble.cfg'), '-Ln', str(d / 'r.lbl'),
-                            '-o', str(d / 'r.bin'), str(d / 'r.o')], check=True)
-            helper = (d / 'r.bin').read_bytes()
-            names = {}
-            for line in (d / 'r.lbl').read_text().splitlines():
-                parts = line.split()
-                if len(parts) >= 3 and parts[2].startswith('.'):
-                    names[parts[2][1:]] = int(parts[1], 16)
+            cwd = os.getcwd()
+            os.chdir(ROOT)
+            try:
+                helper, parts, names = br.assemble(Path(d))
+            finally:
+                os.chdir(cwd)
         self.assertEqual(len(helper), br.SIZE)
-        br.helper_checks(helper, names)
+        self.assertEqual([(a, len(b)) for a, b in parts], list(br.AREAS))
+        # weapon tables assembled as the WPN lines say
+        tab = dict(parts)[0x6D24]
+        at = lambda n: names[n] - 0x6D24
+        for i, (w, s, k, f, e) in enumerate(rp.weapon_table()):
+            self.assertEqual((tab[at('wpn_strong') + i], tab[at('wpn_weak') + i], tab[at('wpn_frames') + i],
+                              tab[at('wpn_env') + i]), (s, k, f, rp.ENVS.index(e)), w)
+        self.assertEqual(tab[at('dmg_latch'):at('dmg_latch') + 12].hex(), '48a5078f08f87e6838e50760')
         bad = bytearray(helper)
         i = bad.find(br.WRIO_STORE)
         bad[i - 1] = 0x40                         # a WRIO write with bit 7 low

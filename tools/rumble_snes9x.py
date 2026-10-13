@@ -14,10 +14,13 @@ import sys
 from pathlib import Path
 
 from tools.gamer_accept_snes9x import Emu, B, Y, START, UP, DOWN, LEFT, RIGHT, A
-from tools.rumble_pulses import pulse_table, EVENTS, MAX_FRAMES
+import json
+
+from tools.rumble_pulses import pulse_table, EVENTS, MAX_FRAMES, WEAPONS, weapon_pulse, KINDS
 
 R = 0xF800
-LAST, TIMER, LEVEL, RANK, OFF, EVENT, COUNT, SENT = range(8)
+LAST, TIMER, LEVEL, RANK, OFF, EVENT, COUNT, SENT, DMG, ENV, WEAP, DMGU = range(12)
+WEAPON_EVENTS = ('LAND', 'OBJECT', 'TAKE', 'LAND_KO')
 
 
 def main(rom, out):
@@ -50,7 +53,10 @@ def main(rom, out):
     def street():
         return (r(0x100) & 0xC0) == 0xC0 and r(6) != 5 and r(0x1CA0) == 0
 
-    S = dict(events={}, starts=0, badLevel=0, longPulse=0, menuActive=0, pauseActive=0, notOff=0, bad=[])
+    pulses = []           # one row per pulse start
+    ticks = open(out / 'motor.csv', 'w')
+    ticks.write('frame,phase,event,weapon,damage,timer,sent,strong,weak\n')
+    S = dict(weapons={}, events={}, starts=0, badLevel=0, longPulse=0, menuActive=0, pauseActive=0, notOff=0, bad=[])
     track = dict(count=None, active=0)
 
     def observe(tag):
@@ -59,11 +65,35 @@ def main(rom, out):
             S['starts'] += (c - track['count']) & 0xFF
             ev = rr(EVENT)
             S['events'][EVENTS[ev] if ev < len(EVENTS) else ev] = S['events'].get(EVENTS[ev] if ev < len(EVENTS) else ev, 0) + 1
+        started = track['count'] is not None and c != track['count']
         track['count'] = c
         t = rr(TIMER)
+        if started:
+            ev = EVENTS[rr(EVENT)] if rr(EVENT) < len(EVENTS) else '?'
+            row = dict(frame=e.frame, phase=tag, event=ev, timer=t, level=rr(LEVEL), env=rr(ENV))
+            if ev in WEAPON_EVENTS:
+                w = WEAPONS[rr(WEAP)] if rr(WEAP) < len(WEAPONS) else '?'
+                row.update(weapon=w, damage=rr(DMGU))
+                key = f'{ev}/{w}'
+                S['weapons'][key] = S['weapons'].get(key, 0) + 1
+                lvl, n, env = weapon_pulse(w, ev, rr(DMGU)) if w != '?' else (None, None, None)
+                # the first tick may already have run (decay lowers LEVEL, timer -1)
+                okl = rr(LEVEL) in (lvl, (lvl or 0) - 0x10) and t in (n, (n or 0) - 1)
+                row['expected'] = dict(level=lvl, ticks=n, env=env)
+                if not okl:
+                    S['badLevel'] += 1
+                    if len(S['bad']) < 5:
+                        S['bad'].append(row)
+            pulses.append(row)
+        if t:
+            snt = rr(SENT)
+            ticks.write(f"{e.frame},{tag},{EVENTS[rr(RANK)] if rr(RANK) < len(EVENTS) else '?'},"
+                        f"{WEAPONS[rr(WEAP)] if rr(WEAP) < len(WEAPONS) else ''},{rr(DMGU)},{t},{snt},{snt >> 4},{snt & 15}\n")
         if t:
             rank = rr(RANK)
-            if rank >= len(table) or rr(LEVEL) != (table[rank][1] << 4 | table[rank][2]) or t > table[rank][3]:
+            if rank >= len(table) or EVENTS[rank] in WEAPON_EVENTS:
+                pass
+            elif rr(LEVEL) != (table[rank][1] << 4 | table[rank][2]) or t > table[rank][3]:
                 S['badLevel'] += 1
                 if len(S['bad']) < 5:
                     S['bad'].append(f'{tag} f{e.frame} t={t} rank={rank} lvl={rr(LEVEL):02x}')
@@ -94,6 +124,19 @@ def main(rom, out):
                 for s in range(2, 8):
                     if r(0x497 + s) > 4:
                         e.wr(0x497 + s, 4)
+            if force and force.startswith('kind'):
+                k = int(force[4:], 16)
+                for s2 in range(4, 8):
+                    if r(0x56 + s2) & 0x40 or r(0xCB + s2) >= 8:
+                        if 8 <= r(0xCB + s2) < 0x10 and r(0xCB + s2) != k:
+                            e.wr(0xCB + s2, k)
+                # Alex "holds" the first weapon object in play (the object's
+                # holder fields only; the game's own state for Alex is left alone)
+                for s2 in range(4, 8):
+                    if 8 <= r(0xCB + s2) < 0x10:
+                        e.wr(0x56 + s2, r(0x56 + s2) | 0x40)
+                        e.wr(0x3B7 + s2, 0)
+                        break
             if force == 'boss':
                 for s in range(2, 8):
                     if r(0xCB + s) < 8 and r(0x4F5 + s) < 9:
@@ -191,6 +234,10 @@ def main(rom, out):
     check('S0 reached the street', street(), f'mode={r(6):02x}')
     fight(1200, 'take', 'take')
     fight(3000, 'fight')
+    # weapon phase (test only): every weapon object in play is re-kinded to one
+    # weapon at a time, so goon hits / throws on Alex use each profile
+    for k in sorted(KINDS):
+        fight(1000, f'kind{k:02x}', f'kind{k:02x}')
     fight(1500, 'ko', 'ko')
     # pause right after a pulse starts
     pause_bad = 0
@@ -237,6 +284,12 @@ def main(rom, out):
     check('S4 nothing on title/settings or in pause', menu_starts == 0 and menu_active == 0
           and saw_pause > 0 and pause_bad == 0,
           f'menuStarts={menu_starts} menuActive={menu_active} pauseFrames={saw_pause} pauseBad={pause_bad}')
+    seen = {k.split('/')[1] for k in S['weapons']}
+    log('weapon pulses', S['weapons'])
+    check('S5 weapon profiles: pulses with several weapons, levels from the weapon table',
+          len(seen) >= 4 and S['badLevel'] == 0, f'weapons={sorted(seen)}')
+    ticks.close()
+    (out / 'pulses.json').write_text(json.dumps(pulses, indent=1))
     log('DONE fails', len(fails), fails)
     return fails
 

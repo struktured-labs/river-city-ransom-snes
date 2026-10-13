@@ -12,6 +12,28 @@ PULSE = {}
 local R = 0xF800    -- $7EF800 in work RAM
 local function rr(o) return emu.read(R + o, W) end
 -- read the table from the ROM helper ($C1:6B00 pulse_level, $6B08 pulse_frames)
+-- weapon profiles (build 4305d+): labels from the build's rumble.lbl
+-- (RCR_RUMBLE_LBL), tables read from the ROM; the kind -> weapon map and the
+-- damage scaling are restated here, independently of the helper code
+LBL = {}
+do local f = io.open(os.getenv("RCR_RUMBLE_LBL") or "rumble.lbl", "r")
+  if f then for line in f:lines() do local a, n = line:match("^al%s+(%x+)%s+%.(%S+)") if a then LBL[n] = tonumber(a, 16) end end f:close() end end
+WEAPONS = {[0]="FISTS", "STICK", "PIPE", "CHAIN", "KNUCKLES", "ROCK", "TIRE", "BOX", "CAN"}
+KIND = {[0x08]=5, [0x09]=4, [0x0A]=1, [0x0B]=2, [0x0C]=3, [0x0D]=6, [0x0E]=7, [0x0F]=8}
+local function romb(lbl, i) return emu.read(0xC10000 + LBL[lbl] + i, emu.memType.snesMemory) end
+local function kindWeapon(k) return KIND[k] or 0 end
+function weaponOf(x)
+  if rd(0xCB + x) >= 8 then return kindWeapon(rd(0xCB + x)) end
+  for s=4,7 do if (rd(0x56 + s) & 0x40) ~= 0 and rd(0x3B7 + s) == x and rd(0xCB + s) >= 8 then return kindWeapon(rd(0xCB + s)) end end
+  return 0
+end
+function weaponPulse(w, ev, dmg)   -- -> level, ticks, env
+  local bonus = math.min(dmg, 24) // 4
+  local s, k, f = romb("wpn_strong", w) + bonus, romb("wpn_weak", w), romb("wpn_frames", w) + 2 * bonus
+  if ev == 5 then s = s + 3 if f < 14 then f = 14 end elseif ev ~= 2 then s = s + 2 end
+  return (math.min(s, 15) << 4) | math.min(k + bonus // 2, 15), f, romb("wpn_env", w)
+end
+DMG = 0
 local function tbl() for i=1,7 do local l = emu.read(0xC16B00 + i, emu.memType.snesMemory) PULSE[i] = {s = l >> 4, w = l & 15, f = emu.read(0xC16B08 + i, emu.memType.snesMemory), lvl = l} end end
 -- bus decoder
 local wrio, latch, shift, mister, mes, mesen = 0xFF, 0, 0, 0, 0, 0
@@ -30,7 +52,8 @@ for b=0,0xBF do if b < 0x40 or b >= 0x80 then
   emu.addMemoryCallback(onLatch, emu.callbackType.write, b*65536+0x4016, b*65536+0x4016, emu.cpuType.snes, emu.memType.snesMemory)
   emu.addMemoryCallback(onRead, emu.callbackType.read, b*65536+0x4016, b*65536+0x4016, emu.cpuType.snes, emu.memType.snesMemory)
 end end
--- rumble RAM: only the helper ($6B00-$6CFF) may write it, plus autojoy_compat's
+-- rumble RAM: only the helper ($6B00-$6CFF, weapon areas $6D24-$6DFF and
+-- $6F08-$6FFF) may write it, plus autojoy_compat's
 -- rumble_latch ($6E73-$6E9A), which records the sent level in R_SENT since build 4299
 local foreign = {}
 local booted = false   -- the game clears all work RAM at boot (before the title)
@@ -38,8 +61,9 @@ emu.addMemoryCallback(function(addr, v)
   if not booted then return end
   local st = emu.getState() local pc = st["cpu.pc"] or 0
   local latch = (addr & 0xFFFF) == 0xF807 and pc >= 0x6E73 and pc <= 0x6E9A
-  if (pc < 0x6B00 or pc >= 0x6D00) and not latch then if #foreign < 5 then foreign[#foreign+1] = string.format("f%d $%05x<-%02x pc=%02x:%04x", frameNo, addr, v, st["cpu.k"] or 0, pc) end end
-end, emu.callbackType.write, R, R + 7, emu.cpuType.snes, emu.memType.snesWorkRam)
+  local helper = (pc >= 0x6B00 and pc < 0x6D00) or (pc >= 0x6D24 and pc < 0x6E00) or (pc >= 0x6F08 and pc < 0x7000)
+  if not helper and not latch then if #foreign < 5 then foreign[#foreign+1] = string.format("f%d $%05x<-%02x pc=%02x:%04x", frameNo, addr, v, st["cpu.k"] or 0, pc) end end
+end, emu.callbackType.write, R, R + 13, emu.cpuType.snes, emu.memType.snesWorkRam)
 local function gameplay() return rd(0x3F) == 0 and rd(6) ~= 5 and rd(0xCC) == 0 and (rd(0x100) & 0xC0) == 0xC0 end
 -- independent classifier at the hook sites (bank 5 $8DD5, $8D10)
 local function isBoss(x) if x < 2 or x > 7 or rd(0xCB + x) >= 8 then return false end local c = rd(0x4F5 + x) return c >= 9 and c <= 0x18 end
@@ -66,7 +90,10 @@ HITS = {n=0, byEv={}, mismatch=0, bad={}, started=0}
 local pend = nil
 local function hookEnter(site)
   local ev = classify(site)
-  pend = {ev=ev, site=site, timer=rr(1), rank=rr(3), count=rr(6), v=rd(4), a=rd(5)}
+  local w = 0
+  if ev == 2 or ev == 5 then w = weaponOf(0) elseif ev == 3 or ev == 4 then w = weaponOf(rd(5)) end
+  pend = {ev=ev, site=site, timer=rr(1), rank=rr(3), count=rr(6), v=rd(4), a=rd(5), w=w, dmg=DMG}
+  DMG = 0
 end
 local function hookLeave()
   if not pend then return end
@@ -80,21 +107,31 @@ local function hookLeave()
   if started then
     HITS.started = HITS.started + 1
     local pl = PULSE[ev]
-    ok = ok and rr(5) == ev and rr(2) == pl.lvl and rr(1) == pl.f and rr(3) == ev
+    local plf = pl.f
+    if ev >= 2 and ev <= 5 and LBL.wpn_strong then
+      local lvl, f = weaponPulse(p.w, ev, p.dmg)
+      plf = f
+      ok = ok and rr(5) == ev and rr(2) == lvl and rr(1) == f and rr(3) == ev and rr(10) == p.w and rr(11) == p.dmg
+      WP = WP or {} local key = EV[ev] .. "/" .. WEAPONS[p.w] WP[key] = (WP[key] or 0) + 1
+    else
+      ok = ok and rr(5) == ev and rr(2) == pl.lvl and rr(1) == pl.f and rr(3) == ev
+    end
     lastStart = {frame=frameNo, ev=ev}
     -- durations count game ticks (pad reads; RCR runs its game loop every
     -- second NMI on the street, so a tick is 1/30 s there)
-    pulseEnd = math.max(pulseEnd or 0, strobeNo + PULSE[ev].f + 1)
+    pulseEnd = math.max(pulseEnd or 0, strobeNo + plf + 1)
     -- a hit the game processes while its pause flag is still set (the tick
     -- that unpauses) is dropped on purpose at the next pad read
     local gpNow = gameplay()
     if not gpNow then HITS.dropped = (HITS.dropped or 0) + 1 end
-    starts[#starts+1] = {strobe=strobeNo, lvl=PULSE[ev].lvl, seen=not gpNow}
+    starts[#starts+1] = {strobe=strobeNo, lvl=rr(2), seen=not gpNow}
   end
   if ev > 0 then HITS.byEv[ev] = (HITS.byEv[ev] or 0) + 1 end
   if not ok then HITS.mismatch = HITS.mismatch + 1 if #HITS.bad < 6 then HITS.bad[#HITS.bad+1] = string.format("f%d %s v%d a%d want=%s(%s) started=%s event=%d lvl=%02x t=%d", frameNo, p.site, p.v, p.a, tostring(want), EV[ev] or "none", tostring(started), rr(5), rr(2), rr(1)) end end
 end
 for _, b in ipairs({0xC5, 0x85}) do
+  -- damage of the hit in progress: $07 at the stamina subtraction (bank 5 $8CF4)
+  emu.addMemoryCallback(function() DMG = rd(7) end, emu.callbackType.exec, b*65536+0x8CF4, b*65536+0x8CF4, emu.cpuType.snes, emu.memType.snesMemory)
   emu.addMemoryCallback(function() hookEnter("hit") end, emu.callbackType.exec, b*65536+0x8DD5, b*65536+0x8DD5, emu.cpuType.snes, emu.memType.snesMemory)
   emu.addMemoryCallback(function() hookLeave() end, emu.callbackType.exec, b*65536+0x8DDA, b*65536+0x8DDA, emu.cpuType.snes, emu.memType.snesMemory)
   emu.addMemoryCallback(function() hookEnter("down") end, emu.callbackType.exec, b*65536+0x8D10, b*65536+0x8D10, emu.cpuType.snes, emu.memType.snesMemory)
@@ -118,7 +155,7 @@ function frameCheck(tag)
   if not gp and (mister ~= 0 or mesen ~= 0) then if strobeNo <= lastGpStrobe + 1 then FR.edge = (FR.edge or 0) + 1 else FR.menuPackets = FR.menuPackets + 1 if #FR.menuBad < 5 then FR.menuBad[#FR.menuBad+1] = string.format("%s f%d level %02x", tag, frameNo, mister) end end end
   prevGp = gp
   -- held without a pad read: the core keeps the level until the next latch
-  if strobeNo ~= lastFrameStrobe then holdNoRead = 0 elseif mister ~= 0 then holdNoRead = (holdNoRead or 0) + 1 if holdNoRead > (FR.maxHold or 0) then FR.maxHold = holdNoRead end end
+  if strobeNo ~= lastFrameStrobe then holdNoRead = 0 elseif mister ~= 0 then holdNoRead = (holdNoRead or 0) + 1 if holdNoRead > (FR.maxHold or 0) then FR.maxHold = holdNoRead FR.maxHoldAt = string.format('%s f%d level %02x', tag, frameNo, mister) end end
   lastFrameStrobe = strobeNo
   if mister ~= 0 then
     FR.run = FR.run + 1 FR.pulseFrames = FR.pulseFrames + 1 FR.levels[mister] = (FR.levels[mister] or 0) + 1
@@ -152,6 +189,13 @@ function fight(frames, tag, forceBoss, force)
     if force == "take" then emu.write(0x497, 0x30, W) end               -- Alex's hit gauge high: hits stagger him
     if force == "ko" then for s=2,7 do if rd(0x497+s) > 4 then emu.write(0x497+s, 4, W) end end end   -- goon gauges low: the next hit knocks down
     if forceBoss then for s=2,7 do if rd(0xCB+s) < 8 and rd(0x4F5+s) < 9 then emu.write(0x4F5+s, 9, W) end end end
+    if type(force) == "number" then   -- weapon phase (test only): re-kind weapon objects, Alex "holds" the first
+      local first = true
+      for s=4,7 do local k = rd(0xCB+s) if k >= 8 and k < 0x10 then
+        if k ~= force then emu.write(0xCB+s, force, W) end
+        if first then emu.write(0x56+s, rd(0x56+s) | 0x40, W) emu.write(0x3B7+s, 0, W) first = false end
+      end end
+    end
     emu.write(0x4BF, 0x3F, W)   -- keep Alex alive
     local best, bd = nil, 1e9
     for s=2,7 do if rd(0xCB+s) < 8 and (rd(0xD3+s) & 0x7F) ~= 0x7F and px(s) > 0 then local d = math.abs(px(s)-px(0)) if d < bd then bd, best = d, s end end end
@@ -223,6 +267,7 @@ run(function()
   end
   held = {}
   fight(600, "fight2")
+  for k=8,15 do fight(800, string.format("kind%02x", k), false, k) end
   -- boss rule: goon classes forced to a boss class (test only)
   local b0 = HITS.byEv[6] or 0
   fight(1500, "boss", true)
@@ -239,7 +284,10 @@ run(function()
   check("R1 rumble RAM written only by the helper; WRIO bit 7 always 1 and WRIO $FF at every pad latch", #foreign == 0 and wrioBad == 0 and (wrioOpen or 0) == 0, string.format("foreign=%d wrioBad=%d wrioNotFF=%d", #foreign, wrioBad, (wrioOpen or 0)))
   check("R2 every hit classified as the check expects (event, level, frames, priority)", HITS.n > 0 and HITS.mismatch == 0, string.format("hooks=%d mismatch=%d", HITS.n, HITS.mismatch))
   check("R3 pulses on landed hits, hits taken and knockdowns, sent at the next pad read", (HITS.byEv[2] or 0) > 0 and (HITS.byEv[4] or 0) > 0 and ((HITS.byEv[5] or 0) + (HITS.byEv[7] or 0)) > 0 and FR.seenOnAfterStart == FR.startsChecked and FR.startsChecked > 0, string.format("land=%d take=%d landKO=%d knockdown=%d object=%d block=%d starts=%d seenNextFrame=%d (started while paused, dropped: %d)", HITS.byEv[2] or 0, HITS.byEv[4] or 0, HITS.byEv[5] or 0, HITS.byEv[7] or 0, HITS.byEv[3] or 0, HITS.byEv[1] or 0, FR.startsChecked, FR.seenOnAfterStart, HITS.dropped or 0))
-  check("R4 rumble always returns to 0 (core: no packet = 0; Mesen: $7200 sent), never longer than the pulses started", mister == 0 and mesen == 0 and FR.runBad == 0 and FR.mesenAfter == 0 and (FR.maxHold or 0) <= 4, string.format("maxRun=%d frames, longest hold without a pad read=%d frames, runNoEvent=%d mesenStuck=%d end core=%02x mesen=%02x", FR.maxRun, FR.maxHold or 0, FR.runBad, FR.mesenAfter, mister, mesen))
+  check("R4 rumble always returns to 0 (core: no packet = 0; Mesen: $7200 sent), never longer than the pulses started", mister == 0 and mesen == 0 and FR.runBad == 0 and FR.mesenAfter == 0 and (FR.maxHold or 0) <= 4, string.format("maxRun=%d frames, longest hold without a pad read=%d frames (%s), runNoEvent=%d mesenStuck=%d end core=%02x mesen=%02x", FR.maxRun, FR.maxHold or 0, FR.maxHoldAt or "-", FR.runBad, FR.mesenAfter, mister, mesen))
   check("R5 nothing on title/settings or while paused", menuPackets == 0 and FR.menuPackets == 0 and pauseOk, string.format("titleSettingsPackets=%d nonGameplayNonzero=%d (first frame of pause/screen change, allowed: %d) pauseOk=%s %s", menuPackets, FR.menuPackets, FR.edge or 0, tostring(pauseOk), table.concat(FR.menuBad, " ")))
+  local wl = {} for k,v in pairs(WP or {}) do wl[#wl+1] = k .. ":" .. v end table.sort(wl)
+  log("weapon pulses", table.concat(wl, " "))
+  check("R7 weapon pulses (labels loaded, levels from the weapon table and damage)", LBL.wpn_strong ~= nil and #wl > 0, table.concat(wl, " "))
   check("R6 boss hits rumble (goon classes forced to a boss class)", bossHits > 0, "bossHits=" .. bossHits)
 end)
