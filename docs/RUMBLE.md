@@ -52,3 +52,20 @@ motor, low nibble = small/weak motor, 0-15 each.
 - `python3 -m tools.rumble_snes9x ROM OUT`: RAM-state check S1-S4.
 - `python3 -m unittest tests.test_rumble`: table and timer model
   (`tools/rumble_pulses.py`).
+
+## Per-weapon, damage-scaled pulses (trial 4305d)
+Build: `python3 -m tools.build_weapon_rumble --parent build/trial-gamer-downshift-4305c/native-cpu.sfc --out build/trial-weapon-rumble-4305d`.
+- Weapon of a hit: thrown object = its kind; otherwise the object slot 4-7
+  held by the fighter (`$56` bit 6, `$03B7` = holder); otherwise fists.
+  Kinds (room lists bank 13 `$B757`, gang weapon table bank 4 `$BF3E`, held
+  weapons drawn per kind): `$08` rock, `$09` brass knuckles, `$0A` stick,
+  `$0B` pipe, `$0C` chain, `$0D` tire, `$0E` box, `$0F` trash can.
+- Damage: `$07`, latched at bank 5 `$8CF4` (`sec / sbc $07` -> `jsr dmg_latch`).
+  bonus = min(damage, 24) / 4: strong += bonus, weak += bonus / 2, ticks += 2 * bonus.
+- LAND, LAND_KO (+3 strong, at least 14 ticks), TAKE and OBJECT (+2 strong)
+  use the weapon profile; BLOCK, BOSS and KNOCKDOWN keep the fixed table and
+  the same priority order. Intensity is on the strong motor (DS3 weak is on/off).
+- Envelopes: FLAT, DECAY (strong -1 per tick, floor 2), RATTLE (strong
+  alternates with 2 every tick). Table: `WPN` lines in `snes/rumble.asm`.
+- New RAM `$7EF808-$7EF80D`. Code: `$6B00` (481/512 bytes), `$6D24`
+  (110/220), `$6F08` (237/248), banks 1-8.

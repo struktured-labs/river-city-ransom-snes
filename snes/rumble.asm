@@ -27,6 +27,7 @@
 .i8
 .segment "CODE"
 .export rumble_frame, rumble_hit, rumble_down, pulse_level, pulse_frames
+.export dmg_latch, weapon_of, start_weapon, env_level, wpn_strong, wpn_weak, wpn_frames, wpn_env, kind_class
 
 DONE     = $2AD6         ; console_write's common exit (register restore)
 WRIO     = $004201
@@ -43,6 +44,12 @@ R_OFF    = $7EF804       ; off packets still to send
 R_EVENT  = $7EF805       ; last event started (tests)
 R_COUNT  = $7EF806       ; pulses started, mod 256 (tests)
 R_SENT   = $7EF807       ; level of the last packet sent (tests)
+R_DMG    = $7EF808       ; damage latched at $8CF4 for the hit in progress
+R_ENV    = $7EF809       ; envelope of the current pulse (ENV_*)
+R_WEAP   = $7EF80A       ; weapon class of the last weapon pulse (tests)
+R_DMGU   = $7EF80B       ; damage used by the last hit (tests)
+R_TMP    = $7EF80C       ; scratch
+R_TMP2   = $7EF80D       ; scratch
 MAX_FRAMES = 60
 OFF_PACKETS = 2
 
@@ -111,7 +118,7 @@ rumble_frame:
     sta f:R_TIMER
     lda #OFF_PACKETS
     sta f:R_OFF
-    lda f:R_LEVEL
+    jsr env_level
     bne rf_send
     bra rf_out
 rf_silence:
@@ -180,8 +187,8 @@ sp_take:
     sta f:R_TIMER
     lda f:$C10000+pulse_level,x
     sta f:R_LEVEL
-    nop
-    nop
+    lda #ENV_FLAT
+    sta f:R_ENV
     lda f:R_COUNT
     inc
     sta f:R_COUNT
@@ -244,6 +251,10 @@ rumble_hit:
     pha
     phx
     phy
+    lda f:R_DMG
+    sta f:R_DMGU
+    lda #0
+    sta f:R_DMG
     ldy #EV_NONE
     ldx a:$0004
     bne rh_attacker
@@ -263,12 +274,14 @@ rumble_hit:
     jsr is_boss
     ldy #EV_BOSS
     bcs rh_go
+    jsr weapon_of         ; attacker: thrown object or what it holds
+    ldx a:$0005
     lda a:$00CB,x
     ldy #EV_TAKE
     cmp #8
-    bcc rh_go
+    bcc rh_wpn
     ldy #EV_OBJECT
-    bra rh_go
+    bra rh_wpn
 rh_attacker:
     lda a:$0005
     bne rh_go             ; neither side is Alex
@@ -281,10 +294,16 @@ rh_attacker:
     bcs rh_go
     jsr is_down
     ldy #EV_LAND_KO
-    bcs rh_go
+    bcs :+
     ldy #EV_LAND
+:   ldx #0
+    jsr weapon_of
+rh_wpn:
+    jsr start_weapon
+    bra rh_end
 rh_go:
     jsr start_pulse
+rh_end:
     ply
     plx
     pla
@@ -301,15 +320,225 @@ rumble_down:
     pha
     phx
     phy
-    ldy #EV_NONE
+    lda f:R_DMG
+    sta f:R_DMGU
+    lda #0
+    sta f:R_DMG
     lda a:$0005
     bne :+
     ldy #EV_LAND
-:   jsr start_pulse
-    ply
+    ldx #0
+    jsr weapon_of
+    jsr start_weapon
+:   ply
     plx
     pla
     plp
     lda #$12
     sta a:$004F,x
     rts
+
+; ============ Weapon profiles (second and third free areas) ============
+.segment "WTAB"
+; Weapon classes. kind_class maps object kind $CB $08-$11 (mapped in FCEUX /
+; snes9x: ground spawns from the bank 13 room lists, held weapons from the
+; gang table at bank 4 $BF3E) to a class; anything else is FISTS.
+WC_FISTS = 0
+WC_STICK = 1
+WC_PIPE  = 2
+WC_CHAIN = 3
+WC_KNUCKLES = 4
+WC_ROCK  = 5
+WC_TIRE  = 6
+WC_BOX   = 7
+WC_CAN   = 8
+WC_COUNT = 9
+ENV_FLAT   = 0           ; level held for the whole pulse
+ENV_DECAY  = 1           ; strong motor -1 per tick down to 2 (sharp hit, fade)
+ENV_RATTLE = 2           ; strong motor alternates full / RATTLE_LOW per tick
+RATTLE_LOW = 2
+DMG_CAP    = 24          ; damage above this scales no further
+TAKE_BONUS = 2           ; hits taken by Alex: +2 on the strong motor
+KO_BONUS   = 3           ; Alex knocks a goon down: +3 strong ...
+KO_MIN_FRAMES = 14       ; ... and at least 14 ticks
+kind_class:              ; kinds $08-$11
+    .byte WC_ROCK, WC_KNUCKLES, WC_STICK, WC_PIPE, WC_CHAIN, WC_TIRE, WC_BOX, WC_CAN
+    .byte WC_FISTS, WC_FISTS
+; ---- WEAPON TABLE: tune here (base at damage 0; strong 0-15, weak 0-15, ticks, envelope) ----
+; Per hit: bonus = min(damage, DMG_CAP) / 4; strong += bonus, weak += bonus / 2,
+; ticks += 2 * bonus. (A game tick is 2 video frames on the street.)
+.macro WPN strong, weak, frames, env
+    .byte strong
+.endmacro
+wpn_strong:
+    WPN  3, 2,  3, ENV_FLAT    ; WC_FISTS    light tap
+    WPN  6, 3,  5, ENV_FLAT    ; WC_STICK    solid knock
+    WPN 12, 4,  9, ENV_DECAY   ; WC_PIPE     sharp hit, then fade
+    WPN  9, 5, 11, ENV_RATTLE  ; WC_CHAIN    rattle
+    WPN  7, 3,  4, ENV_DECAY   ; WC_KNUCKLES hard short tap
+    WPN 13, 6,  5, ENV_FLAT    ; WC_ROCK     single thud
+    WPN  5, 2, 22, ENV_FLAT    ; WC_TIRE     long soft rumble
+    WPN 10, 6,  9, ENV_DECAY   ; WC_BOX      crunch, fade
+    WPN  9, 5,  8, ENV_RATTLE  ; WC_CAN      clatter
+wpn_weak:
+    .byte  2,  3,  4,  5,  3,  6,  2,  6,  5
+wpn_frames:
+    .byte  3,  5,  9, 11,  4,  5, 22,  9,  8
+wpn_env:
+    .byte  0,  0,  1,  2,  1,  0,  0,  1,  2
+; ------------------------------------------------------------------------------
+
+; Replaces "sec / sbc $07" (38 E5 07) at bank 5 $8CF4: the stamina
+; subtraction every hit that deals damage runs. A = victim's stamina.
+dmg_latch:
+    pha
+    lda $07
+    sta f:R_DMG
+    pla
+    sec
+    sbc $07
+    rts
+
+; A = level to send this tick (Z clear unless it is 0), per R_ENV.
+env_level:
+    lda f:R_ENV
+    cmp #ENV_DECAY
+    bne el_rattle
+    lda f:R_LEVEL
+    pha
+    cmp #$30
+    bcc :+
+    sec
+    sbc #$10
+    sta f:R_LEVEL
+:   pla
+    rts
+el_rattle:
+    cmp #ENV_RATTLE
+    bne el_flat
+    lda f:R_TIMER
+    and #1
+    beq el_flat
+    lda f:R_LEVEL
+    and #$0F
+    ora #RATTLE_LOW << 4
+    rts
+el_flat:
+    lda f:R_LEVEL
+    rts
+
+.segment "WPN"
+; X = attacker slot. A = its weapon class: the object's own kind when the
+; attacker is a thrown object (kind >= 8), else the object slot 4-7 it holds
+; ($56 bit 6 set and $03B7 = holder), else WC_FISTS. Stored in R_WEAP.
+weapon_of:
+    lda a:$00CB,x
+    cmp #8
+    bcs wo_kind
+    txa
+    sta f:R_TMP
+    ldx #4
+wo_scan:
+    lda a:$0056,x
+    and #$40
+    beq wo_next
+    lda a:$03B7,x
+    cmp f:R_TMP
+    bne wo_next
+    lda a:$00CB,x
+    cmp #8
+    bcs wo_kind
+wo_next:
+    inx
+    cpx #8
+    bcc wo_scan
+    bra wo_fist
+wo_kind:
+    cmp #$12
+    bcs wo_fist
+    sec
+    sbc #8
+    tax
+    lda f:$C10000+kind_class,x
+    bra wo_out
+wo_fist:
+    lda #WC_FISTS
+wo_out:
+    sta f:R_WEAP
+    rts
+
+; Y = event (LAND, OBJECT, TAKE, LAND_KO), R_WEAP = class, R_DMGU = damage.
+; Same priority rule as start_pulse.
+start_weapon:
+    lda f:R_TIMER
+    beq sw_take
+    cmp #MAX_FRAMES+1
+    bcs sw_take
+    tya
+    cmp f:R_RANK
+    bcs sw_take
+    rts
+sw_take:
+    tya
+    sta f:R_RANK
+    sta f:R_EVENT
+    lda f:R_DMGU
+    cmp #DMG_CAP
+    bcc :+
+    lda #DMG_CAP
+:   lsr
+    lsr
+    sta f:R_TMP           ; bonus 0-6
+    lda f:R_WEAP
+    tax
+    lda f:$C10000+wpn_frames,x
+    clc
+    adc f:R_TMP
+    adc f:R_TMP
+    sta f:R_TIMER
+    lda f:$C10000+wpn_strong,x
+    clc
+    adc f:R_TMP
+    cpy #EV_LAND_KO
+    bne sw_notko
+    clc
+    adc #KO_BONUS
+    sta f:R_TMP2
+    lda f:R_TIMER
+    cmp #KO_MIN_FRAMES
+    bcs sw_cap
+    lda #KO_MIN_FRAMES
+    sta f:R_TIMER
+    bra sw_cap
+sw_notko:
+    cpy #EV_LAND
+    beq :+
+    clc
+    adc #TAKE_BONUS       ; OBJECT / TAKE: Alex was hit
+:   sta f:R_TMP2
+sw_cap:
+    lda f:R_TMP2
+    cmp #16
+    bcc :+
+    lda #15
+:   asl
+    asl
+    asl
+    asl
+    sta f:R_TMP2
+    lda f:R_TMP
+    lsr
+    clc
+    adc f:$C10000+wpn_weak,x
+    cmp #16
+    bcc :+
+    lda #15
+:   ora f:R_TMP2
+    sta f:R_LEVEL
+    lda f:$C10000+wpn_env,x
+    sta f:R_ENV
+    lda f:R_COUNT
+    inc
+    sta f:R_COUNT
+    rts
+
