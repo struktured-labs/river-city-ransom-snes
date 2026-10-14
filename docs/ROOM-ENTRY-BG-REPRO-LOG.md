@@ -56,4 +56,15 @@ bsnes menu-load stress on 4305e (`room_bg_loads.lua`, pause submenus + LEVEL ski
 changes + street play, 3 seeds): 901 loads, 866 post-load full-row checks,
 **0 stale rows, 0 persistent invariant violations**; avg 19.2-19.7 blank frames/load.
 
-## 4305f regression on bsnes (checkpoint 5): running /tmp/bx-f
+## 4305f regression on bsnes (checkpoint 5, done ~14:05 ET)
+Same `room_bg_late.lua` setup as checkpoint 4, cut to 3 runs (P1-s1, P2-s2, P3-s1)
+because blackmage load was ~36; the other 3 were stopped early.
+**0 row hits, 0 CHR hits, 0 persistent invariant violations**: 17/17/23 area
+loads, 5/5/8 I->G->I switches, ~9.7-9.8k settled checks per run.
+Blank frames per street-area load (mean of the logged loads after boot):
+4305e 23.2/23.2/24.9, 4305f 28.5/27.8/29.8 (about +5 frames, same as on Mesen).
+Note: 4305f logs "repaired row N after 5783 frames". These are rows that already
+differed at frame 0 (random power-on VRAM, before the checker was gated off)
+and were first re-checked once checking resumed. Not a violation.
+Conclusion: 4305f is clean wherever 4305e is clean. 4305e itself has not
+reproduced #8 on Mesen2 or bsnes, so this is a regression check only, not proof of a fix.
