@@ -68,3 +68,59 @@ differed at frame 0 (random power-on VRAM, before the checker was gated off)
 and were first re-checked once checking resumed. Not a violation.
 Conclusion: 4305f is clean wherever 4305e is clean. 4305e itself has not
 reproduced #8 on Mesen2 or bsnes, so this is a regression check only, not proof of a fix.
+
+## Area coverage (checkpoint 6, started ~14:30 ET)
+- NES area tracker is `$0042` (FCEUX RAM map: 00 Cross Town ... 04 Sherman Park ...
+  0x1B Burb Village, 0x1C+ River City High). Teleport = hold `$0042` at the target
+  only while the game's own area load runs (`$1CA0 != 0`); the game's load routine then
+  builds the target area normally (verified: Sherman Park restroom backdrop with goons).
+  Writing `$0042` before the transition (what the RAM map warns about) gives broken BG, so not used.
+- `tools/mesen/room_bg_tour.lua`: legs = teleport-load into target, fight 300-900
+  frames, I->G->I mid-fight (60% of legs), fight, then a NATURAL exit + fight in the
+  neighbour. Default targets: 04 04 06 07 09 0a 0d 0f 10 11 13 14 18 1a 1b 04.
+- Smoke (Mesen, 3 legs): reached 04 park, 06, natural loads into 03/05/07; 0 hits.
+- 14:34 ET: Carmelo approved. Closed the other SNES game; loaded 4305e MGL. P1 SNAC set Yes->No in OSD (Input Options) so USB pad injection reaches the game; MUST restore to Yes at end.
+- Hardware driver: `tools/mister_rcr_hw.py` (pad chunks via run_mister_keys --pad, OBS
+  screenshots, password typing) and `tools/mister_rcr_hw_loop.py` (CT <-> Sticksville
+  transitions with goon fights, I->G->I via LEVEL every 2 transitions, pause-repair
+  delta per arrival: paused shot P1, unpause/re-pause, P2, backdrop diff).
+  Endgame password typed and accepted on hardware. Walking out of Sticksville to the
+  park was not achieved by blind input (exit ramp + goons; Alex died twice -> CT respawn).
+- HW run e3 (4305e, ~15:10 ET): 16 CT<->Sticksville transitions with goons, 8 I->G->I
+  switches (LEVEL screens verified in shots), Alex near death several times.
+  Pause-repair delta: backdrop diff 0.0 on all 16 (11 pairs proven valid by sprite
+  motion between P1 and P2; 5 pairs identical = re-pause missed). All 16 arrival
+  backdrops visually correct. **No repro on hardware so far.**
+- bsnes tour e2 one VC-HIT: row 72 in Waterfront Mall (06) was *pending* (state 1/3,
+  being rewritten while scrolling) for 180 frames, not a clean stale row; the screenshot
+  is correct. Treated as checker noise for pending rows, not #8.
+
+## Checkpoint 7 (~15:25 ET)
+- HW run e4 (4305e): 16 more CT<->Sticksville transitions before the walker got stuck
+  in Cross Town and its blind inputs ended on the password screen (nothing submitted).
+  Stopped at 15:18.
+- **SNAC restored** to Yes in OSD > Input Options (screenshot `hw/snac1.png`), OSD closed.
+  `SNES.CFG` sha256 `066fa49a...d933` is unchanged from before the session. 4305e MGL
+  reloaded to a clean boot; CORENAME=SNES (RCR 4305e).
+- Extra park-route HW run **not done**: in Mesen, 12k frames of 6 movement patterns at
+  the end of Sticksville (01) never reached Grotto Mall (02), so there is no known
+  input route to the park. Passwords always restart at Cross Town. A blind HW attempt
+  would need SNAC off again for little expected gain.
+- bsnes tour e2 (Ivan pw, 32 legs) done: 147 loads, 15 I->G->I, 58.6k settled checks,
+  visited 00 03 04x6 05 06 07 09 0a 0c 0d 0e 0f 10 11 12 13 14 18 19 1a 1b.
+  0 CHR hits, 0 persistent invariant violations; 1 pending-row hit (see above, not #8).
+- bsnes tour e1 (endgame pw, 32 legs) done: 171 loads, 24 I->G->I, 73.4k checks, **0 hits**. Mesen tours mtour-e1 (default targets) and mtour-e2 (late targets 10-1b, 0b, 08) running.
+- Mesen tour mtour-e1 (Ivan pw, default targets, 32 legs) done: 177 loads, 16 I->G->I,
+  51.8k checks, visited 00 03 04x6 05 06 07 09 0a 0c 0d 0e 0f 10 11 12 13 14 15 19 1a 1b: **0 hits**.
+- Mesen tour mtour-e2 (endgame pw, late targets) stopped at leg 20 (walker stuck after
+  area 17): 111 loads, 13 I->G->I, 52.5k checks, visited 0e-17 incl. 11/12 x16: **0 hits**.
+
+## Summary at ~16:15 ET
+Issue #8 has **not reproduced on 4305e** in any of these:
+- Mesen2: 12 late-password runs, 1 park/late tour, 900+ menu loads.
+- bsnes accuracy core: 6 late-password runs, 2 tours of all areas, 901 menu loads.
+- Hardware: about 34 transitions with I->G->I switches and goon fights; every arrival backdrop was correct.
+Since 4305e never failed, there was nothing to rerun on 4305f under identical inputs.
+4305f's own regressions (bsnes checkpoint 5, Mesen 2.5k loads) are clean.
+Not covered: the park on hardware (no input route found) and a
+real long play session (several hours, with save/continue).
