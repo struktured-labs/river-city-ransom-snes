@@ -11,8 +11,8 @@ ROM=$(readlink -f "$1"); SCRIPT=$(readlink -f "$2")
 export RCR_OUT=$(mkdir -p "$3" && readlink -f "$3")
 export RCR_LIB="$HERE/lib.lua"
 H=$(mktemp -d /tmp/mesenhome.XXXXXX); mkdir -p "$H/.config/Mesen2"
-cat > "$H/.config/Mesen2/settings.json" <<'JSON'
-{"Debug": {"ScriptWindow": {"AllowIoOsAccess": true}}, "Snes": {"Port1": {"Type": "SnesController"}, "Port2": {"Type": "SnesController"}}}
+cat > "$H/.config/Mesen2/settings.json" <<JSON
+{"Debug": {"ScriptWindow": {"AllowIoOsAccess": true}}, "Snes": {"Port1": {"Type": "SnesController"}, "Port2": {"Type": "SnesController"}${MESEN_SNES_EXTRA:+, $MESEN_SNES_EXTRA}}}
 JSON
-HOME=$H timeout $(( ${4:-300} + 30 )) xvfb-run -a "$MESEN" --testrunner "$ROM" "$SCRIPT" --timeout=${4:-300} > "$RCR_OUT/log.txt" 2>&1
+HOME=$H timeout $(( ${4:-300} + 30 )) env -u WAYLAND_DISPLAY xvfb-run -a "$MESEN" --testrunner "$ROM" "$SCRIPT" --timeout=${4:-300} > "$RCR_OUT/log.txt" 2>&1
 rc=$?; echo "exit=$rc" >> "$RCR_OUT/log.txt"; rm -rf "$H"; exit $rc
