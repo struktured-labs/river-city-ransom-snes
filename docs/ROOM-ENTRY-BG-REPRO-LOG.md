@@ -124,3 +124,19 @@ Since 4305e never failed, there was nothing to rerun on 4305f under identical in
 4305f's own regressions (bsnes checkpoint 5, Mesen 2.5k loads) are clean.
 Not covered: the park on hardware (no input route found) and a
 real long play session (several hours, with save/continue).
+
+## Checkpoint 8: long sessions (started 2026-10-14 ~23:20 ET)
+- `tools/mesen/room_bg_long.lua`: one power-on, no resets, Intermediate start, random
+  segments (teleport legs, natural exits, goon fights, forced deaths + respawns, pause menus
+  incl. PASSWORD view, quick I->G->I, long Gamer stretches, Up-into-door + A/B mashing).
+  vis_check with `VC_SKIP_PENDING=1` (rows with `$1D00` != 0 skipped), per-frame row invariant,
+  10-emu-minute CK lines with row-state histogram + `$1C00-$1CBF` bookkeeping hex.
+  Inputs RLE-logged (`inputs.txt`); bsnes host gained `emu.saveStateFile/loadStateFile`
+  (retro_serialize), savestate every 18000 frames (last 3 kept), WRAM+shadow dump + state on hit.
+- Smoke (bsnes, endgame pw, 32k frames): 15 loads, 0 hits; states + inputs written.
+- Runs: bsnes seed 11 `/tmp/long-b11`, Mesen2 seed 21 `/tmp/long-m21`, 864k frames (4 emu h) each.
+- Not covered: 2P (no second-pad driving yet), real shop purchases (door attempts only).
+- 2026-10-14 23:59 ET: runs survived the interruption (b11 0.55 emu h, m21 2.34 emu h, 0 hits),
+  reniced to 15. Detached finishers (`tools/longsession_finish.sh`) copy each run into
+  `build/longsession/<id>/` and append a line here on exit; m21's finisher then starts Mesen
+  seed 22 (`tools/longsession_run.sh m22 mesen 22`). Status: `tools/longsession_status.sh`.

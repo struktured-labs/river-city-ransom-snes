@@ -44,6 +44,7 @@ local function hit(kind, key, seen, detail)
     VC.log = VC.log + 1
     if VC.log <= 40 then log("VC-HIT", kind, key, "since f"..seen[key].f, seen[key].d, "now", detail, state(), "skill", rd(0x64C)) end
     if VC.log <= 8 then shot(string.format("vchit%02d", VC.log)) end
+    if VC_ON_HIT then VC_ON_HIT(kind, key) end
   end
 end
 function visCheck()
@@ -51,7 +52,8 @@ function visCheck()
   VC.checks = VC.checks + 1
   for x = 0, 127 do
     if (x & 31) < 30 then
-      local n, first = rowDiff(x)
+      local n, first = 0, nil
+      if not (VC_SKIP_PENDING and rd(0x1D00 + x) ~= 0) then n, first = rowDiff(x) end
       if n > 0 then hit("ROW", x, VC.rowSeen, string.format("tiles %d %s st %d", n, first, rd(0x1D00 + x)))
       else VC.rowSeen[x] = nil end
     end
@@ -64,3 +66,4 @@ function visCheck()
   end
 end
 VC_ACTIVE = true
+VC_SKIP_PENDING = os.getenv("VC_SKIP_PENDING") == "1"

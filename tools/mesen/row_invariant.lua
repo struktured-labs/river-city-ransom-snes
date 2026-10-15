@@ -49,6 +49,7 @@ function invariantCheck(tag)
           if INV.plog < 60 then INV.plog = INV.plog + 1
             log("PERSISTENT", PERSIST, "frames; began f" .. INV.rowsSeen[x], INV.first[x], "now tiles", n, state())
             if INV.plog <= 8 then shot(string.format("persist%02d", INV.plog)) end end
+          if INV_ON_HIT then INV_ON_HIT(x) end
         end
       elseif INV.rowsSeen[x] then
         if frameNo - INV.rowsSeen[x] > PERSIST then log("repaired row", x, "after", frameNo - INV.rowsSeen[x], "frames") end

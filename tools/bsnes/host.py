@@ -93,6 +93,16 @@ def png():
     if f['buf'] is None: return b''
     im = Image.frombuffer('RGBX', (f['w'], f['h']), f['buf'], 'raw', 'BGRX', f['pitch'], 1).convert('RGB')
     b = io.BytesIO(); im.save(b, 'PNG'); return b.getvalue()
+core.retro_serialize_size.restype = C.c_size_t
+def save_state(path):
+    # host extension: writes the libretro serialized state to `path`
+    n = core.retro_serialize_size(); buf = C.create_string_buffer(n)
+    ok = bool(core.retro_serialize(buf, C.c_size_t(n)))
+    if ok: open(path, 'wb').write(buf.raw)
+    return ok
+def load_state(path):
+    b = open(path, 'rb').read(); buf = C.create_string_buffer(b, len(b))
+    return bool(core.retro_unserialize(buf, C.c_size_t(len(b))))
 def stop(code=0): state['stop'] = int(code)
 def screen_buffer():
     f = frame
@@ -102,7 +112,7 @@ def screen_buffer():
 emu = lua.table_from({
     'read': mem_read, 'write': mem_write, 'addEventCallback': add_cb, 'setInput': set_input,
     'takeScreenshot': png, 'stop': stop, 'getScreenBuffer': screen_buffer,
-    'getState': lambda: lua.table_from({}),
+    'getState': lambda: lua.table_from({}), 'saveStateFile': save_state, 'loadStateFile': load_state,
     'memType': lua.table_from({'snesWorkRam': 0, 'snesVideoRam': 1, 'snesCgRam': 2, 'snesSpriteRam': 3, 'snesPrgRom': 4}),
     'eventType': lua.table_from({'startFrame': 0, 'inputPolled': 1, 'endFrame': 2}),
 })
