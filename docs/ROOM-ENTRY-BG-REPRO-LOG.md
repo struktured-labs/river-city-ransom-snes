@@ -140,3 +140,7 @@ real long play session (several hours, with save/continue).
   reniced to 15. Detached finishers (`tools/longsession_finish.sh`) copy each run into
   `build/longsession/<id>/` and append a line here on exit; m21's finisher then starts Mesen
   seed 22 (`tools/longsession_run.sh m22 mesen 22`). Status: `tools/longsession_status.sh`.
+- long-session m21 ended 2026-10-15 00:20 EDT: HIT lines 0; last: `[f865796] SUMMARY loads 395 segs 314 VC 214182 row 0 chr 0 invP 0 hits 0`
+- long-session m22 ended 2026-10-15 01:12 EDT: HIT lines 0; last: `[f871176] SUMMARY loads 623 segs 354 VC 214355 row 0 chr 0 invP 0 hits 0`
+- long-session b11 ended 2026-10-15 02:22 EDT: HIT lines 0; last: `[f868252] SUMMARY loads 923 segs 399 VC 211939 row 0 chr 0 invP 0 hits 0`
+- long-session shopsmoke ended 2026-10-21 15:36 EDT: HIT lines 0; last: `[f048605] SUMMARY loads 26 segs 16 VC 11658 row 0 chr 0 invP 0 hits 0`

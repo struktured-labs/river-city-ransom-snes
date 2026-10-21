@@ -94,9 +94,35 @@ local function door()
   for f = 1, math.random(120, 400) do held.up = true held.right = (f % 120) < 30 tick() end clear()
   for f = 1, math.random(200, 600) do held.a = (f % 20) < 3 held.b = (f % 97) < 3 held.down = (f % 150) > 140 tick() end clear()
 end
+-- SHOP=1: wallet changes + shop purchases. P1 money $04C7-$04C9 (BCD); $00CC != 0 while a shop
+-- (or other interior dialogue) is drawn. Wallet is randomly set (rich / broke / random)
+-- before entering, then menus are mashed (Up/Down + A to buy, B to leave).
+local SHOP = os.getenv("SHOP") == "1"
+local function money() return rd(0x4C7) | (rd(0x4C8) << 8) | (rd(0x4C9) << 16) end
+local function wallet()
+  local r = math.random()
+  local v = r < 0.6 and {0x99, 0x99, 0x09} or (r < 0.8 and {0, 0, 0} or {math.random(0, 9) * 16 + math.random(0, 9), math.random(0, 9) * 16, 0})
+  for i = 0, 2 do emu.write(0x4C7 + i, v[i + 1], W) end
+end
+local function shop()
+  wallet()
+  local m0, inShop = money(), false
+  for f = 1, math.random(200, 500) do held.up = true held.right = (f % 160) < 25 held.left = (f % 160) > 135 tick() if rd(0xCC) ~= 0 then inShop = true break end end clear()
+  local bought = 0
+  for f = 1, math.random(600, 1800) do
+    if rd(0xCC) ~= 0 then inShop = true end
+    held.down = (f % 50) < 3 and math.random() < 0.5 held.up = (f % 50) >= 25 and (f % 50) < 28 and math.random() < 0.3
+    held.a = (f % 16) < 3 held.b = (f % 400) > 394
+    tick()
+  end
+  clear()
+  for f = 1, 300 do held.b = (f % 20) < 3 held.down = f > 200 tick() end clear()
+  local m1 = money() if m1 ~= m0 then bought = 1 end
+  return inShop, bought, m0, m1
+end
 local gamer = false
 local function setG(on) inMenu = true local ok = setSkill(on and 3 or 4) inMenu = false gamer = on and ok or false return ok end
-local seg, stats = 0, {tele=0, nat=0, menu=0, igi=0, gstretch=0, death=0, door=0}
+local seg, stats = 0, {tele=0, nat=0, menu=0, igi=0, gstretch=0, death=0, door=0, shop=0, inshop=0, buy=0}
 run(function()
   VC_ACTIVE, INV_ACTIVE = false, false
   if not bootToSettings() then return end
@@ -116,6 +142,7 @@ run(function()
     elseif r < 0.70 then if gamer then setG(false) else setG(true) fight(math.random(60, 400)) setG(false) end stats.igi = stats.igi + 1
     elseif r < 0.76 then setG(true) stats.gstretch = stats.gstretch + 1          -- long Gamer stretch until a later switch
     elseif r < 0.82 then alive = false emu.write(0x4BF, 1, W) fight(1500) alive = true stats.death = stats.death + 1
+    elseif SHOP and r < 0.90 and math.random() < 0.6 then local i, b = shop() stats.shop = stats.shop + 1 if i then stats.inshop = stats.inshop + 1 end stats.buy = stats.buy + b
     elseif r < 0.90 then door() stats.door = stats.door + 1
     else fight(math.random(300, 1200)) end
     if frameNo >= nextCk then
@@ -123,7 +150,7 @@ run(function()
       local v = {} for a, n in pairs(visited) do v[#v+1] = string.format("%02x:%d", a, n) end table.sort(v)
       local st = {0, 0, 0, 0} for x = 0, 127 do local q = rd(0x1D00 + x) if q <= 3 then st[q+1] = st[q+1] + 1 end end
       log(string.format("CK emu %.2fh", (frameNo - f0) / 216000), "loads", loads, "maxBlank", maxBlank, "segs", seg,
-          "tele", stats.tele, "nat", stats.nat, "menu", stats.menu, "igi", stats.igi, "gstr", stats.gstretch, "death", stats.death, "door", stats.door,
+          "tele", stats.tele, "nat", stats.nat, "menu", stats.menu, "igi", stats.igi, "gstr", stats.gstretch, "death", stats.death, "door", stats.door, "shop", stats.shop, "inshop", stats.inshop, "buy", stats.buy, "money", string.format("%06x", money()),
           "skill", rd(0x64C), "VC", VC.checks, "row", VC.rowHits, "chr", VC.chrHits, "invP", INV.persist, "hits", hits,
           "rowstates", table.concat(st, "/"), "bk1C00", hex(0x1C00, 0xC0), "visited", table.concat(v, " "))
       inlog:flush()

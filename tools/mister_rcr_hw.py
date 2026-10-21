@@ -4,10 +4,18 @@ import json, os, sys, time
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.run_mister_keys import run as _run
-from tools.obs_hardware_probe import OBS
+try:
+    from tools.obs_hardware_probe import OBS
+except ImportError:          # mister-native capture needs no OBS
+    OBS = None
 OUT = Path(os.environ.get('HW_OUT', str(Path.home() / 'rcr-work/hw')))
 OUT.mkdir(parents=True, exist_ok=True)
 _n = [0]
+HOST = os.environ.get('HW_HOST', 'rivalmage')      # ssh alias of the MiSTer driven
+SHOT = os.environ.get('HW_SHOT', 'obs')             # 'obs' (capture card) or 'mister' (native /dev/MiSTer_cmd screenshot)
+# native->OBS-frame mapping so the loop's 3840x2160 pixel coords keep working
+MX0, MSX = float(os.environ.get('HW_MX0', '640')), float(os.environ.get('HW_MSX', '10'))
+MY0, MYH = int(os.environ.get('HW_MY0', '0')), int(os.environ.get('HW_MYH', '0'))  # native row crop (0 = all)
 def pad(events):
     """events: list of (keys, seconds); split into <=55 s / <=200 step chunks."""
     chunk, tot = [], 0
@@ -15,7 +23,7 @@ def pad(events):
         if chunk:
             _n[0] += 1
             import contextlib, io
-            with contextlib.redirect_stdout(io.StringIO()): _run('rivalmage', list(chunk), OUT / f'pad{_n[0]:04d}-{time.time():.0f}.json', pad=True)
+            with contextlib.redirect_stdout(io.StringIO()): _run(HOST, list(chunk), OUT / f'pad{_n[0]:04d}-{time.time():.0f}.json', pad=True)
             chunk.clear()
     for keys, sec in events:
         if len(chunk) >= 190 or tot + sec > 50: flush(); tot = 0
@@ -26,7 +34,24 @@ def taps(seq, on=0.1, off=0.15):
     ev = []
     for k in seq: ev += tap(k, on, off)
     return ev
+def shot_mister(name):
+    import subprocess, io
+    from PIL import Image
+    cmd = ('d=/media/fat/screenshots/SNES; b=$(ls -t $d | head -1); echo screenshot > /dev/MiSTer_cmd; '
+           'for i in $(seq 40); do sleep 0.1; n=$(ls -t $d | head -1); [ "$n" != "$b" ] && break; done; sleep 0.3; '
+           'cat "$d/$n"; rm -f "$d/$n"')
+    png = subprocess.run(['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', HOST, cmd],
+                         check=True, capture_output=True, timeout=30).stdout
+    im = Image.open(io.BytesIO(png)).convert('RGB')
+    (OUT / 'native').mkdir(exist_ok=True); im.save(OUT / 'native' / f'{name}.png')
+    w, h = im.size
+    if MYH: im = im.crop((0, MY0, w, MY0 + MYH))
+    W = Image.new('RGB', (3840, 2160))
+    W.paste(im.resize((int(w * MSX), 2160), Image.NEAREST), (int(MX0), 0))
+    p = OUT / f'{name}.png'; W.save(p)
+    return p
 def shot(name):
+    if SHOT == 'mister': return shot_mister(name)
     o = OBS()
     try:
         p = OUT / f'{name}.png'
@@ -42,7 +67,7 @@ def kb(seq, on=0.12, off=0.25):
     for k in seq: ev += [dict(keys=[k], seconds=on), dict(keys=[], seconds=off)]
     _n[0] += 1
     with contextlib.redirect_stdout(io.StringIO()):
-        _run('rivalmage', ev, OUT / f'kb{_n[0]:04d}-{time.time():.0f}.json')
+        _run(HOST, ev, OUT / f'kb{_n[0]:04d}-{time.time():.0f}.json')
 def cell(ch):
     if ch == 'Z': return 0, 10
     if ch == 'z': return 0, 11
