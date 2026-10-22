@@ -10,7 +10,7 @@ playfield change vs the previous shot = room transition -> arrival check:
 Every SWITCH transitions: I->G->I via pause > LEVEL. Every PW_EVERY iterations: open the
 PASSWORD screen and back out; every PW_SUBMIT iterations re-submit the endgame password
 (resets to Cross Town with all late areas open). Deaths happen naturally (goons).
-usage: HW_HOST=bluemage HW_SHOT=mister HW_PADDEV=kbd python3 tools/mister_rcr_blue_loop.py N TAG"""
+usage: [GRIND=1 REDO=1 WEAP=1 COMBO=1 NEWP=0.3] HW_HOST=bluemage HW_SHOT=mister HW_PADDEV=kbd python3 tools/mister_rcr_blue_loop.py N TAG"""
 import json, os, random, subprocess, sys, time
 from pathlib import Path
 import numpy as np
@@ -106,16 +106,68 @@ def walk(want):
         elif r < 0.3: ev += [([want, random.choice(['up', 'down'])], 0.6)]
         ev += [([want], 0.5), ([want, 'y'], 0.08), ([want], 0.3), (['b'], 0.08)]
     pad(ev)
+# Opt-in #8 segments (env, default off; same names as tools/mesen/room_bg_long.lua):
+#   GRIND=1 long brawls in one area, mostly in Gamer (no RAM pokes on hardware: stats only rise
+#           from fights/shop food, so the caps are approached, not forced)
+#   REDO=1  after a death (HUD HP bar empty) keep the same heading and re-walk to the room/door
+#           the death happened in (counted by transitions since the respawn), then door-mash
+#   WEAP=1  weapon handling: mash B/Y near objects to pick up, carry through a room walk, throw
+#   COMBO=1 LEVEL switch in the middle of a brawl; stand still with a weapon until death
+#   NEWP    share of iterations given to a new segment (default 0.3)
+MODES = [m for m in ('GRIND', 'REDO', 'WEAP', 'COMBO') if os.environ.get(m) == '1']
+NEWP = float(os.environ.get('NEWP', '0.3'))
+seg = dict(grind=0, redo=0, redo_back=0, weap=0, combo=0, cswitch=0, cwdeath=0, deaths=0)
+G = {'gamer': False, 'death_trans': None, 'redo_left': 0}
+def toggle_level(name):
+    ok = set_level(name, 2)
+    if ok: G['gamer'] = not G['gamer']
+    return ok
+def grind(want):
+    if not G['gamer']: toggle_level(f'{TAG}_k{k}_gr_G')
+    for i in range(random.randint(4, 10)): brawl(random.uniform(15, 40), random.choice([want, 'left', 'right']))
+    if random.random() < 0.5: toggle_level(f'{TAG}_k{k}_gr_I')
+def weapon_ev(want, secs):
+    ev, t = [], 0.0
+    while t < secs:
+        d = random.choice([want, 'left', 'right', 'up', 'down'])
+        ev += [([d], random.uniform(0.1, 0.5)), (['b'], 0.1), ([], 0.1), ([d, 'b'], 0.1), ([], 0.15)]
+        t += 1.2
+    return ev
+def weapon(want, then_die=False):
+    pad(weapon_ev(want, random.uniform(8, 20)))                         # pick-up attempts
+    pad([([want], 0.5), ([want, 'b'], 0.05)] * random.randint(6, 20))     # carry (possibly through a load)
+    if then_die:
+        pad([(['b'], 0.1), ([], 2.0)] * 20)                                 # stand and take hits
+        return
+    pad([([want], 0.2), (['y'], 0.1), ([], 0.3), ([want, 'y'], 0.1), ([], 0.3)])   # throw
+def combo(want):
+    if random.random() < 0.5:
+        brawl(random.uniform(5, 15), want); a = toggle_level(f'{TAG}_k{k}_cb'); brawl(random.uniform(5, 15), want)
+        seg['cswitch'] += 1; return a
+    weapon(want, True); seg['cwdeath'] += 1
+def new_segment(want):
+    m = random.choice(MODES)
+    if m == 'GRIND': grind(want); seg['grind'] += 1
+    elif m == 'WEAP': weapon(want); seg['weap'] += 1
+    elif m == 'COMBO': combo(want); seg['combo'] += 1
+    else:                                                                # REDO: provoke a death
+        brawl(random.uniform(20, 45), want); seg['redo'] += 1
+    rec(ev='seg', mode=m, k=k, **seg)
 prev = snap(f'{TAG}_start'); want, trans, k = 'right', 0, 0
-rec(ev='start', host=HOST, n=N)
+rec(ev='start', host=HOST, n=N, modes=MODES, newp=NEWP)
 lv = 'I'
 while k < N and not STOP.exists():
     k += 1
     try:
-        if random.random() < 0.08: want = 'left' if want == 'right' else 'right'
+        if random.random() < 0.08 and G['redo_left'] <= 0: want = 'left' if want == 'right' else 'right'
         walk(want)
+        if G['redo_left'] > 0:
+            G['redo_left'] -= 1; pad([(['up'], 0.4), (['up', 'a'], 0.1), ([], 0.2)] * 2)   # same heading + door mash
         if random.random() < 0.2: brawl(3, want)
+        if MODES and random.random() < NEWP: new_segment(want)
         cur = snap(f'{TAG}_w')
+        if 'REDO' in MODES and not dark(cur) and menu_state(cur) is None and hp(cur) == 0 and G['redo_left'] <= 0:
+            seg['deaths'] += 1; G['redo_left'] = random.randint(4, 10); rec(ev='death_redo', k=k, want=want, trans=trans, n=seg['deaths'])
         if menu_state(cur) is not None: close_pause(f'{TAG}_k{k}'); cur = snap(f'{TAG}_w')
         if not dark(cur) and diff(prev, cur) > 0.5:
             trans += 1
@@ -128,7 +180,7 @@ while k < N and not STOP.exists():
         if k % PW_SUBMIT == 0: rec(ev='password', k=k, submit=True, ok=password(f'{TAG}_k{k}_pw', True)); cur = snap(f'{TAG}_w')
         elif k % PW_EVERY == 0: rec(ev='password', k=k, submit=False, ok=password(f'{TAG}_k{k}_pv', False)); cur = snap(f'{TAG}_w')
         prev = cur
-        if k % 50 == 0: rec(ev='alive', k=k, trans=trans)
+        if k % 50 == 0: rec(ev='alive', k=k, trans=trans, **seg)
     except Exception as e:
         rec(ev='error', k=k, err=repr(e)[:300]); time.sleep(10)
 rec(ev='done', k=k, trans=trans)

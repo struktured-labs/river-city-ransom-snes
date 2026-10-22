@@ -122,7 +122,113 @@ local function shop()
 end
 local gamer = false
 local function setG(on) inMenu = true local ok = setSkill(on and 3 or 4) inMenu = false gamer = on and ok or false return ok end
-local seg, stats = 0, {tele=0, nat=0, menu=0, igi=0, gstretch=0, death=0, door=0, shop=0, inshop=0, buy=0}
+local seg, stats = 0, {tele=0, nat=0, menu=0, igi=0, gstretch=0, death=0, door=0, shop=0, inshop=0, buy=0,
+  grind=0, redo=0, redoOk=0, weap=0, wpick=0, wcarry=0, wkept=0, wthrow=0, wdeath=0, wpoke=0, wkinds={}, combo=0, cswitch=0, cwdeath=0}
+-- Opt-in #8 segments (env, any combination; all off = previous behaviour):
+--   GRIND=1  long fights in one area, stats pushed toward the caps in Gamer mode
+--   REDO=1   after each death go back to the room the death happened in ($0042 forced on the next load)
+--   WEAP=1   pick up / carry through room loads / throw, cycling weapon kinds $08-$0F
+--            (WPOKE=1: retag the nearest lying object to the wanted kind before pickup)
+--   COMBO=1  Gamer<->Intermediate switch mid-fight; death while holding a weapon
+--   NEWP=0.35 share of segments drawn from the enabled new modes
+-- RAM (docs/SHOP-QOL-MECHANICS.md, tools/capture_shop_qol_mechanics.py, tools/build_gamer_item_caps.py,
+-- docs/RUMBLE.md): stat i of player p at $049F + 4*i + p, i = punch kick weapon throw agility
+-- defense strength will stamina($04BF) maxpower($04C3); caps 63 (stats 0-7; Gamer item caps 127),
+-- max power 127. Password stat slots $058E-$0595. No XP in RCR (money $04C7-$04C9 BCD).
+-- Objects: slot s (0-1 players, 2-3 goons, 4-7 objects) kind $00CB+s ($08 rock, $09 knuckles,
+-- $0A stick, $0B pipe, $0C chain, $0D tire, $0E box, $0F can); $0056+s bit 6 = held,
+-- $03B7+s = holder; x = $008C+s (hi) $0083+s (lo).
+local MODES = {}
+for _, k in ipairs({"GRIND", "REDO", "WEAP", "COMBO"}) do if os.getenv(k) == "1" then MODES[#MODES+1] = k end end
+local NEWP = tonumber(os.getenv("NEWP") or "0.35")
+local WPOKE = os.getenv("WPOKE") == "1"
+local STATN = {"punch", "kick", "weapon", "throw", "agility", "defense", "strength", "will"}
+local function statStr() local t = {} for i = 0, 9 do t[#t+1] = rd(0x49F + 4*i) end return table.concat(t, ",") end
+local function objX(s) return rd(0x8C + s) * 256 + rd(0x83 + s) end
+local function heldBy(s) return (rd(0x56 + s) & 0x40) ~= 0 and rd(0x3B7 + s) == 0 end
+local function holding() for s = 4, 7 do local k = rd(0xCB + s) if k >= 8 and k <= 0x0F and heldBy(s) then return s, k end end end
+local function lying() local best, bd for s = 4, 7 do local k = rd(0xCB + s) if k >= 8 and k <= 0x0F and not heldBy(s) and (rd(0xD3 + s) & 0x7F) ~= 0x7F then local d = math.abs(objX(s) - objX(0)) if not bd or d < bd then best, bd = s, d end end end return best end
+local function grind()
+  local wasG = gamer
+  if not gamer then setG(true) end
+  local cap = gamer and 127 or 63
+  for i = 0, 7 do local v = rd(0x49F + 4*i) if math.random() < 0.5 then v = math.random(cap - 6, cap) end emu.write(0x49F + 4*i, v, W) end
+  if math.random() < 0.3 then emu.write(0x4C3, math.random(118, 127), W) end
+  local n = math.random(3000, 9000)
+  local t0 = frameNo
+  while frameNo - t0 < n do
+    fight(math.random(300, 900))
+    if math.random() < 0.15 then menus() end
+  end
+  stats.grindStats = statStr()
+  if not wasG and math.random() < 0.5 then setG(false) end
+end
+local deathRoom
+local function die(n)
+  deathRoom = rd(0x42)
+  alive = false emu.write(0x4BF, 1, W) fight(n or 1500) alive = true stats.death = stats.death + 1
+end
+local function redo()
+  local tries = 0
+  repeat
+    die(1500)
+    force = deathRoom local ok = walkUntilLoad(6300) force = nil
+    if ok and rd(0x42) == deathRoom then stats.redoOk = stats.redoOk + 1 end
+    stats.redo = stats.redo + 1
+    if math.random() < 0.6 then for f = 1, math.random(120, 400) do held.up = true tick() end clear() end   -- same door
+    fight(math.random(200, 700))
+    tries = tries + 1
+  until tries >= math.random(1, 4)
+end
+local wantKind = 8
+local function pickup(maxf)
+  for f = 1, maxf do
+    if holding() then clear() return true end
+    local s = lying()
+    if not s then fight(math.min(60, maxf - f + 1)) else
+      if WPOKE and rd(0xCB + s) ~= wantKind and f == 1 then emu.write(0xCB + s, wantKind, W) stats.wpoke = stats.wpoke + 1 end
+      local dx = objX(s) - objX(0)
+      held.right = dx > 6 held.left = dx < -6 held.up = false held.down = false
+      held.b = math.abs(dx) <= 10 and (f % 8) < 3 held.y = false
+      tick()
+    end
+  end
+  clear() return holding() ~= nil
+end
+local function weapon(thenDie)
+  local got = pickup(math.random(900, 2400))
+  local s, k = holding()
+  if got then stats.wpick = stats.wpick + 1 stats.wkinds[k] = (stats.wkinds[k] or 0) + 1 end
+  if got and not thenDie and math.random() < 0.4 then   -- throw in place (weapons are dropped on room loads)
+    for f = 1, 90 do held.y = f < 6 held.right = f > 6 and f < 40 tick() end clear() stats.wthrow = stats.wthrow + 1
+  end
+  if holding() and math.random() < 0.6 then
+    local r = math.random()
+    if r < 0.5 then force = TARGETS[math.random(#TARGETS)] end
+    walkUntilLoad(6300) force = nil stats.wcarry = stats.wcarry + 1
+    if holding() then stats.wkept = stats.wkept + 1 end
+  end
+  if thenDie then die(1500) stats.wdeath = stats.wdeath + 1 return end
+  if holding() then for f = 1, 90 do held.y = f < 6 held.right = f > 6 and f < 40 tick() end clear() stats.wthrow = stats.wthrow + 1 end
+  fight(math.random(200, 600))
+  wantKind = wantKind == 0x0F and 8 or wantKind + 1
+end
+local function combo()
+  if math.random() < 0.5 then
+    fight(math.random(100, 500)) setG(not gamer) fight(math.random(100, 500))
+    if math.random() < 0.5 then setG(not gamer) fight(math.random(60, 300)) end
+    stats.cswitch = stats.cswitch + 1
+  else weapon(true) stats.cwdeath = stats.cwdeath + 1 end
+end
+local function newSeg()
+  local m = MODES[math.random(#MODES)]
+  if m == "GRIND" then grind() stats.grind = stats.grind + 1
+  elseif m == "REDO" then redo()
+  elseif m == "WEAP" then weapon(false) stats.weap = stats.weap + 1
+  else combo() stats.combo = stats.combo + 1 end
+  local hs, hk = holding()
+  log("seg", m, "room", string.format("%02x", rd(0x42)), "skill", rd(0x64C), "hold", hk and string.format("%02x", hk) or "-", "redo", stats.redoOk .. "/" .. stats.redo, "pick", stats.wpick, "kept", stats.wkept .. "/" .. stats.wcarry, "stats", statStr())
+end
 run(function()
   VC_ACTIVE, INV_ACTIVE = false, false
   if not bootToSettings() then return end
@@ -131,12 +237,14 @@ run(function()
   inMenu = true
   if os.getenv("PW") then log("password", enterPassword(os.getenv("PW")), state()) end
   log("skill->4", setSkill(4)) inMenu = false
+  log("modes", table.concat(MODES, ","), "newp", NEWP, "wpoke", tostring(WPOKE), "statsP1", statStr())
   VC_ACTIVE, INV_ACTIVE = true, true
   local f0, nextCk = frameNo, frameNo + 36000
   while frameNo - f0 < FRAMES do
     seg = seg + 1
     local r = math.random()
-    if r < 0.25 then force = TARGETS[math.random(#TARGETS)] walkUntilLoad(6300) force = nil fight(math.random(300, 900)) stats.tele = stats.tele + 1
+    if #MODES > 0 and math.random() < NEWP then newSeg()
+    elseif r < 0.25 then force = TARGETS[math.random(#TARGETS)] walkUntilLoad(6300) force = nil fight(math.random(300, 900)) stats.tele = stats.tele + 1
     elseif r < 0.45 then if walkUntilLoad(6300) then fight(math.random(200, 800)) end stats.nat = stats.nat + 1
     elseif r < 0.60 then menus() stats.menu = stats.menu + 1
     elseif r < 0.70 then if gamer then setG(false) else setG(true) fight(math.random(60, 400)) setG(false) end stats.igi = stats.igi + 1
@@ -152,7 +260,9 @@ run(function()
       log(string.format("CK emu %.2fh", (frameNo - f0) / 216000), "loads", loads, "maxBlank", maxBlank, "segs", seg,
           "tele", stats.tele, "nat", stats.nat, "menu", stats.menu, "igi", stats.igi, "gstr", stats.gstretch, "death", stats.death, "door", stats.door, "shop", stats.shop, "inshop", stats.inshop, "buy", stats.buy, "money", string.format("%06x", money()),
           "skill", rd(0x64C), "VC", VC.checks, "row", VC.rowHits, "chr", VC.chrHits, "invP", INV.persist, "hits", hits,
-          "rowstates", table.concat(st, "/"), "bk1C00", hex(0x1C00, 0xC0), "visited", table.concat(v, " "))
+          "rowstates", table.concat(st, "/"),
+          "new", string.format("grind=%d redo=%d/%d weap=%d pick=%d carry=%d kept=%d throw=%d wdeath=%d poke=%d combo=%d sw=%d cwd=%d", stats.grind, stats.redoOk, stats.redo, stats.weap, stats.wpick, stats.wcarry, stats.wkept, stats.wthrow, stats.wdeath, stats.wpoke, stats.combo, stats.cswitch, stats.cwdeath),
+          "wk", (function() local t = {} for k, n in pairs(stats.wkinds) do t[#t+1] = string.format("%02x:%d", k, n) end table.sort(t) return table.concat(t, " ") end)(), "statsP1", statStr(), "bk1C00", hex(0x1C00, 0xC0), "visited", table.concat(v, " "))
       inlog:flush()
     end
   end

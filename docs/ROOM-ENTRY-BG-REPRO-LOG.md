@@ -144,3 +144,18 @@ real long play session (several hours, with save/continue).
 - long-session m22 ended 2026-10-15 01:12 EDT: HIT lines 0; last: `[f871176] SUMMARY loads 623 segs 354 VC 214355 row 0 chr 0 invP 0 hits 0`
 - long-session b11 ended 2026-10-15 02:22 EDT: HIT lines 0; last: `[f868252] SUMMARY loads 923 segs 399 VC 211939 row 0 chr 0 invP 0 hits 0`
 - long-session shopsmoke ended 2026-10-21 15:36 EDT: HIT lines 0; last: `[f048605] SUMMARY loads 26 segs 16 VC 11658 row 0 chr 0 invP 0 hits 0`
+- long-session m24 ended 2026-10-21 16:26 EDT: HIT lines 0; last: `[f866220] SUMMARY loads 809 segs 343 VC 212400 row 0 chr 0 invP 0 hits 0`
+- long-session m23 ended 2026-10-21 17:43 EDT: HIT lines 0; last: `[f2161930] SUMMARY loads 1755 segs 917 VC 531586 row 0 chr 0 invP 0 hits 0`
+- long-session s1 ended 2026-10-21 17:45 EDT: HIT lines 0; last: `[f1950721] SUMMARY loads 1496 segs 745 VC 479197 row 0 chr 0 invP 0 hits 0`
+- long-session b13 ended 2026-10-21 18:33 EDT: HIT lines 0; last: `[f868052] SUMMARY loads 905 segs 410 VC 211810 row 0 chr 0 invP 0 hits 0`
+
+## 2026-10-21 opt-in segment modes (grinding / death-redo / weapons / combos)
+RAM used (from docs/SHOP-QOL-MECHANICS.md, tools/capture_shop_qol_mechanics.py, tools/build_gamer_item_caps.py, docs/RUMBLE.md):
+stat i of player p at `$049F + 4*i + p` (punch, kick, weapon, throw, agility, defense, strength, will, stamina `$04BF`, max power `$04C3`);
+caps 63 for stats 0-7 (127 via Gamer item consume), max power 127; password stat slots `$058E-$0595`; money `$04C7-$04C9` BCD.
+RCR has no XP. Objects: slot kind `$00CB+s` (`$08` rock .. `$0F` trash can), held = `$0056+s` bit 6, holder `$03B7+s`, x = `$008C+s`/`$0083+s`.
+- `room_bg_long.lua` (Mesen + bsnes): `GRIND=1 REDO=1 WEAP=1 COMBO=1 [WPOKE=1] [NEWP=0.35]`; per-segment `seg` log lines and a `new ...` CK field.
+  Smoke (seed 7, 49k frames): pickups work; held weapons are always dropped by room loads (kept 0/2), so WEAP throws in place 40% of the time.
+- `mister_rcr_blue_loop.py`: same env names, input-only (no RAM on hardware); `death_redo` events keep heading + door mash after an empty HP bar.
+- `tools/mister_blue_waiter_bl3.sh`: starts bl3 (seed 33, all modes) after bl2 exits, only if no STOP/HANDOVER file, no foreign SSH peer and RCR_4305e.mgl still loaded.
+- Launched 20:43 EDT on 4305e: m25 (mesen, all, WPOKE), m26 (mesen, all + SHOP), b14 (bsnes, all, WPOKE), b15 (bsnes, GRIND+COMBO, NEWP 0.5).
