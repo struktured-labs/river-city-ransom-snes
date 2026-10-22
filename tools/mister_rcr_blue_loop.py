@@ -32,6 +32,11 @@ def rec(**k):
     print(json.dumps(k), flush=True)
 def diff(a, b): return float((np.abs(a[PF] - b[PF]).max(axis=2) > 40).mean())
 def dark(a): return float(a[PF].mean()) < 25
+def hp(a):
+    # HUD HP bar (green, rows 28-48, x 60-130). 0 = Alex dead / 'has lost all of his power'
+    # text box -> respawn at Cross Town HS between shots, not #8 (bl1 t00037/t00077).
+    h = a[28:48, 60:130]
+    return int(((h[..., 1] > h[..., 0] + 40) & (h[..., 1] > 100)).sum())
 def wh(a, x0, x1, y0, y1): return int((a[y0:y1, x0:x1].min(axis=2) > 150).sum())
 BOX = {0: (12, 25, 398, 415), 1: (148, 160, 398, 415), 2: (12, 24, 430, 447), 3: (92, 104, 430, 447), 4: (180, 192, 430, 447)}
 def menu_state(a):
@@ -83,12 +88,15 @@ def arrival(name):
     if st is None: return None
     pad(tap('start', 0.12, 0.25) + tap('start', 0.12, 1.0)); P2 = snap(name + '_P2')
     f12, fa2 = diff(P1, P2), diff(A, P2)
+    hps = [hp(A), hp(P1), hp(P2)]
     close_pause(name)
-    if f12 > HIT_FRAC:
+    if f12 > HIT_FRAC and min(hps) == 0:
+        rec(ev='death_skip', name=name, p1p2=f12, ap2=fa2, hp=hps)
+    elif f12 > HIT_FRAC:
         HITS.mkdir(exist_ok=True)
         for s in ('_A', '_P1', '_P2'):
             (HITS / f'{name}{s}.png').write_bytes((OUT / 'native' / f'{name}{s}.png').read_bytes())
-        rec(ev='HIT', name=name, p1p2=f12, ap2=fa2)
+        rec(ev='HIT', name=name, p1p2=f12, ap2=fa2, hp=hps)
     return f12, fa2
 def walk(want):
     ev = []
