@@ -1,0 +1,48 @@
+diff --git a/bsnes/sfc/interface/interface.cpp b/bsnes/sfc/interface/interface.cpp
+index 51d3b9b..faeb52f 100644
+--- a/bsnes/sfc/interface/interface.cpp
++++ b/bsnes/sfc/interface/interface.cpp
+@@ -342,3 +342,8 @@ auto Interface::setRunAhead(bool runAhead) -> void {
+ }
+ 
+ }
++
++namespace SuperFamicom {
++void* rcrWram() { return cpu.wram; }
++void* rcrVram() { return ppu.vram.data; }
++}
+diff --git a/bsnes/sfc/ppu/ppu.hpp b/bsnes/sfc/ppu/ppu.hpp
+index 353acf2..68f3bb8 100644
+--- a/bsnes/sfc/ppu/ppu.hpp
++++ b/bsnes/sfc/ppu/ppu.hpp
+@@ -46,6 +46,7 @@ private:
+   auto writeIO(uint address, uint8 data) -> void;
+   auto updateVideoMode() -> void;
+ 
++public:
+   struct VRAM {
+     auto& operator[](uint address) { return data[address & mask]; }
+     uint16 data[64 * 1024];
+diff --git a/bsnes/target-libretro/libretro.cpp b/bsnes/target-libretro/libretro.cpp
+index fc7f321..9590ca1 100644
+--- a/bsnes/target-libretro/libretro.cpp
++++ b/bsnes/target-libretro/libretro.cpp
+@@ -771,12 +771,18 @@ RETRO_API unsigned retro_get_region()
+ 
+ // Currently, there is no safe/sensible way to use the memory interface without severe hackery.
+ // Rely on higan to load and save SRAM until there is really compelling reason not to.
++namespace SuperFamicom { void* rcrWram(); void* rcrVram(); }
++// rcr-work: expose WRAM (2) and accurate-PPU VRAM (0x100) for read-only checking.
+ RETRO_API void *retro_get_memory_data(unsigned id)
+ {
++	if(id == RETRO_MEMORY_SYSTEM_RAM) return SuperFamicom::rcrWram();
++	if(id == 0x100) return SuperFamicom::rcrVram();
+ 	return nullptr;
+ }
+ 
+ RETRO_API size_t retro_get_memory_size(unsigned id)
+ {
++	if(id == RETRO_MEMORY_SYSTEM_RAM) return 128 * 1024;
++	if(id == 0x100) return 64 * 1024;
+ 	return 0;
+ }

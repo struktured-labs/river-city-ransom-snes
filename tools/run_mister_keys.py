@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import shlex
 import subprocess
+import os
 
 if __package__:
     from .mister_key_sequence import validate
@@ -14,7 +15,12 @@ else:
 
 
 def run(host, events, out, pad=False):
-    if pad:
+    kbpad = pad and os.environ.get('HW_PADDEV') == 'kbd'
+    if kbpad:
+        if __package__: from .mister_kbpad_sequence import validate as validate_pad
+        else: from mister_kbpad_sequence import validate as validate_pad
+        validate_pad(events)
+    elif pad:
         if __package__:
             from .mister_pad_sequence import validate as validate_pad
         else:
@@ -26,7 +32,7 @@ def run(host, events, out, pad=False):
         raise ValueError('Need an explicit SSH hostname')
     if out.exists():raise ValueError('Receipt exists')
     runner_digest=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
-    source=Path(__file__).with_name('mister_pad_sequence.py' if pad else 'mister_key_sequence.py')
+    source=Path(__file__).with_name(('mister_kbpad_sequence.py' if kbpad else 'mister_pad_sequence.py') if pad else 'mister_key_sequence.py')
     digest=hashlib.sha256(source.read_bytes()).hexdigest()
     remote='/tmp/rcr-keys-'+digest[:16]+'.py'
     subprocess.run(['scp','-O',str(source),host+':'+remote],check=True,timeout=15)
