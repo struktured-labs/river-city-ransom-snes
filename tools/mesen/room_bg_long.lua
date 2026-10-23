@@ -123,7 +123,7 @@ end
 local gamer = false
 local function setG(on) inMenu = true local ok = setSkill(on and 3 or 4) inMenu = false gamer = on and ok or false return ok end
 local seg, stats = 0, {tele=0, nat=0, menu=0, igi=0, gstretch=0, death=0, door=0, shop=0, inshop=0, buy=0,
-  grind=0, redo=0, redoOk=0, weap=0, wpick=0, wcarry=0, wkept=0, wthrow=0, wdeath=0, wpoke=0, wkinds={}, combo=0, cswitch=0, cwdeath=0}
+  grind=0, grindG=0, grindNoG=0, grind64=0, redo=0, redoOk=0, weap=0, wpick=0, wcarry=0, wkept=0, wthrow=0, wdeath=0, wpoke=0, wkinds={}, combo=0, cswitch=0, cwdeath=0}
 -- Opt-in #8 segments (env, any combination; all off = previous behaviour):
 --   GRIND=1  long fights in one area, stats pushed toward the caps in Gamer mode
 --   REDO=1   after each death go back to the room the death happened in ($0042 forced on the next load)
@@ -150,9 +150,12 @@ local function holding() for s = 4, 7 do local k = rd(0xCB + s) if k >= 8 and k 
 local function lying() local best, bd for s = 4, 7 do local k = rd(0xCB + s) if k >= 8 and k <= 0x0F and not heldBy(s) and (rd(0xD3 + s) & 0x7F) ~= 0x7F then local d = math.abs(objX(s) - objX(0)) if not bd or d < bd then best, bd = s, d end end end return best end
 local function grind()
   local wasG = gamer
-  if not gamer then setG(true) end
+  -- Gamer must really engage ($064C == 3): retry the LEVEL menu (it fails mid-fight / under hits)
+  for t = 1, 4 do if rd(0x64C) == 3 then break end setG(true) if rd(0x64C) ~= 3 then fight(60) end end
+  gamer = rd(0x64C) == 3
   local cap = gamer and 127 or 63
-  for i = 0, 7 do local v = rd(0x49F + 4*i) if math.random() < 0.5 then v = math.random(cap - 6, cap) end emu.write(0x49F + 4*i, v, W) end
+  if gamer then stats.grindG = stats.grindG + 1 else stats.grindNoG = stats.grindNoG + 1 end
+  for i = 0, 7 do local v = rd(0x49F + 4*i) if math.random() < 0.8 then v = math.random(cap - 6, cap) end emu.write(0x49F + 4*i, v, W) end
   if math.random() < 0.3 then emu.write(0x4C3, math.random(118, 127), W) end
   local n = math.random(3000, 9000)
   local t0 = frameNo
@@ -161,6 +164,9 @@ local function grind()
     if math.random() < 0.15 then menus() end
   end
   stats.grindStats = statStr()
+  local mx = 0 for i = 0, 7 do mx = math.max(mx, rd(0x49F + 4*i)) end
+  if mx > 63 then stats.grind64 = stats.grind64 + 1 end
+  log("grind", "skill", rd(0x64C), "max", mx, "stats", statStr())
   if not wasG and math.random() < 0.5 then setG(false) end
 end
 local deathRoom
@@ -261,7 +267,7 @@ run(function()
           "tele", stats.tele, "nat", stats.nat, "menu", stats.menu, "igi", stats.igi, "gstr", stats.gstretch, "death", stats.death, "door", stats.door, "shop", stats.shop, "inshop", stats.inshop, "buy", stats.buy, "money", string.format("%06x", money()),
           "skill", rd(0x64C), "VC", VC.checks, "row", VC.rowHits, "chr", VC.chrHits, "invP", INV.persist, "hits", hits,
           "rowstates", table.concat(st, "/"),
-          "new", string.format("grind=%d redo=%d/%d weap=%d pick=%d carry=%d kept=%d throw=%d wdeath=%d poke=%d combo=%d sw=%d cwd=%d", stats.grind, stats.redoOk, stats.redo, stats.weap, stats.wpick, stats.wcarry, stats.wkept, stats.wthrow, stats.wdeath, stats.wpoke, stats.combo, stats.cswitch, stats.cwdeath),
+          "new", string.format("grindG=%d/%d noG=%d >63=%d ", stats.grindG, stats.grind, stats.grindNoG, stats.grind64) .. string.format("grind=%d redo=%d/%d weap=%d pick=%d carry=%d kept=%d throw=%d wdeath=%d poke=%d combo=%d sw=%d cwd=%d", stats.grind, stats.redoOk, stats.redo, stats.weap, stats.wpick, stats.wcarry, stats.wkept, stats.wthrow, stats.wdeath, stats.wpoke, stats.combo, stats.cswitch, stats.cwdeath),
           "wk", (function() local t = {} for k, n in pairs(stats.wkinds) do t[#t+1] = string.format("%02x:%d", k, n) end table.sort(t) return table.concat(t, " ") end)(), "statsP1", statStr(), "bk1C00", hex(0x1C00, 0xC0), "visited", table.concat(v, " "))
       inlog:flush()
     end

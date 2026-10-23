@@ -37,6 +37,14 @@ def hp(a):
     # text box -> respawn at Cross Town HS between shots, not #8 (bl1 t00037/t00077).
     h = a[28:48, 60:130]
     return int(((h[..., 1] > h[..., 0] + 40) & (h[..., 1] > 100)).sum())
+# 'ALEX has lost all' text box (pit deaths: HP bar not empty, bl2_t00157/bl3_t00040): white-pixel
+# mask of native rows 392-420, x 0-200 vs tools/mister/lost_all_mask.png; IoU >= 0.6 (all 16 known
+# death shots 0.92-1.0, every other shot of bl1-bl3 <= 0.28 except a half-typed box at 0.80).
+LOST_ALL = np.asarray(Image.open(Path(__file__).with_name('mister') / 'lost_all_mask.png').convert('L')) > 127
+def lost_all(a):
+    m = a[392:420, 0:200].min(axis=2) > 150; u = (m | LOST_ALL).sum()
+    return float((m & LOST_ALL).sum() / u) if u else 0.0
+def text_box(a): return menu_state(a) is None and wh(a, 0, 256, 392, 450) > 40   # any dialogue text, no pause menu
 def wh(a, x0, x1, y0, y1): return int((a[y0:y1, x0:x1].min(axis=2) > 150).sum())
 BOX = {0: (12, 25, 398, 415), 1: (148, 160, 398, 415), 2: (12, 24, 430, 447), 3: (92, 104, 430, 447), 4: (180, 192, 430, 447)}
 def menu_state(a):
@@ -90,13 +98,14 @@ def arrival(name):
     f12, fa2 = diff(P1, P2), diff(A, P2)
     hps = [hp(A), hp(P1), hp(P2)]
     close_pause(name)
-    if f12 > HIT_FRAC and min(hps) == 0:
-        rec(ev='death_skip', name=name, p1p2=f12, ap2=fa2, hp=hps)
+    la = [round(lost_all(x), 3) for x in (A, P1, P2)]; tb = [text_box(x) for x in (A, P1, P2)]
+    if f12 > HIT_FRAC and (min(hps) == 0 or max(la) >= 0.6 or any(tb)):
+        rec(ev='death_skip', name=name, p1p2=f12, ap2=fa2, hp=hps, lost_all=la, text_box=tb)
     elif f12 > HIT_FRAC:
         HITS.mkdir(exist_ok=True)
         for s in ('_A', '_P1', '_P2'):
             (HITS / f'{name}{s}.png').write_bytes((OUT / 'native' / f'{name}{s}.png').read_bytes())
-        rec(ev='HIT', name=name, p1p2=f12, ap2=fa2, hp=hps)
+        rec(ev='HIT', name=name, p1p2=f12, ap2=fa2, hp=hps, lost_all=la, text_box=tb)
     return f12, fa2
 def walk(want):
     ev = []

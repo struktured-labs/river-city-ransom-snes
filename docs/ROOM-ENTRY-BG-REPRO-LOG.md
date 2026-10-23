@@ -159,3 +159,14 @@ RCR has no XP. Objects: slot kind `$00CB+s` (`$08` rock .. `$0F` trash can), hel
 - `mister_rcr_blue_loop.py`: same env names, input-only (no RAM on hardware); `death_redo` events keep heading + door mash after an empty HP bar.
 - `tools/mister_blue_waiter_bl3.sh`: starts bl3 (seed 33, all modes) after bl2 exits, only if no STOP/HANDOVER file, no foreign SSH peer and RCR_4305e.mgl still loaded.
 - Launched 20:43 EDT on 4305e: m25 (mesen, all, WPOKE), m26 (mesen, all + SHOP), b14 (bsnes, all, WPOKE), b15 (bsnes, GRIND+COMBO, NEWP 0.5).
+- long-session m25 ended 2026-10-21 21:45 EDT: HIT lines 0; last: `[f869242] SUMMARY loads 893 segs 244 VC 212725 row 0 chr 0 invP 0 hits 0`
+- long-session m26 ended 2026-10-21 21:45 EDT: HIT lines 0; last: `[f879834] SUMMARY loads 702 segs 221 VC 216248 row 0 chr 0 invP 0 hits 0`
+- long-session s2 ended 2026-10-21 22:55 EDT: HIT lines 0; last: `[f1954492] SUMMARY loads 2041 segs 962 VC 476481 row 0 chr 0 invP 0 hits 0`
+- long-session b12 ended 2026-10-21 23:31 EDT: HIT lines 0; last: `[f2162210] SUMMARY loads 1363 segs 800 VC 533251 row 0 chr 0 invP 0 hits 0`
+- long-session b15 ended 2026-10-22 00:01 EDT: HIT lines 0; last: `[f867622] SUMMARY loads 1881 segs 267 VC 207209 row 0 chr 0 invP 0 hits 0`
+- long-session b14 ended 2026-10-22 00:03 EDT: HIT lines 0; last: `[f871241] SUMMARY loads 940 segs 215 VC 212848 row 0 chr 0 invP 0 hits 0`
+
+## 2026-10-23
+- blue loop: death_skip also on the "ALEX has lost all" text box (IoU vs tools/mister/lost_all_mask.png >= 0.6) or any dialogue text without a pause menu; fixes false HITs bl2_t00157 / bl3_t00040 (pit deaths, HP bar not empty). bl3 stopped at k 2500 / 90 transitions (STOP-bl3), bl4 (seed 34, all modes) started 11:2x EDT.
+- GRIND now retries LEVEL until \$064C == 3 and logs grind skill/max; smoke seed 9: 5/5 grinds in Gamer, stats 121-127.
+- Launched m27 m28(SHOP) b16 b17(SHOP), all modes, on 4305e.
